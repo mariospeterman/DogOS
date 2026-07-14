@@ -11,8 +11,27 @@ development content and are not approved for production use.
 
 ## Current status
 
-Phase 1 is research and architecture only. No product feature code has been
-implemented. Professional protocol and safety review is a release blocker.
+Phase 2 implementation has started. Slice 2.1 provides the pinned monorepo,
+bootable web and API shells, environment validation, test harnesses, and CI.
+No database schema or product workflow has been implemented yet. Professional
+protocol and safety review remains a production release blocker.
+
+## Local development
+
+Prerequisites: Node.js 24 LTS, Corepack, and Docker Desktop (used from Slice
+2.2 onward).
+
+```bash
+corepack enable
+pnpm install
+cp .env.example .env.local
+pnpm dev
+```
+
+The web app runs at <http://localhost:3000> and the API health endpoint at
+<http://127.0.0.1:4000/health/live>. See the
+[local development runbook](docs/runbooks/local-development.md) for all checks
+and the explicit Slice 2.1 limitations.
 
 ## Phase 1 documentation
 
@@ -26,3 +45,7 @@ implemented. Professional protocol and safety review is a release blocker.
 
 The original research notes remain in [architecture](architecture) and
 [provider-mvp imporvment](provider-mvp%20imporvment).
+
+## Phase 2 implementation
+
+- [Slice 2.1 foundation](docs/implementation/slice-2.1-foundation.md)

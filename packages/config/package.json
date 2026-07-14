@@ -1,0 +1,29 @@
+{
+  "name": "@dogos/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api": {
+      "types": "./src/api.ts",
+      "development": "./src/api.ts",
+      "default": "./dist/api.js"
+    },
+    "./web": {
+      "types": "./src/web.ts",
+      "development": "./src/web.ts",
+      "default": "./dist/web.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "6.0.3"
+  }
+}
