@@ -264,6 +264,15 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  packages/whatsapp:
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
 packages:
 
   '@babel/code-frame@7.29.7':
