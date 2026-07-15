@@ -80,7 +80,7 @@ export function DevelopmentNotice({ compact = false }: { compact?: boolean }) {
     <aside className={compact ? "dev-notice compact" : "dev-notice"}>
       <strong>Pilot-Hinweis</strong>
       <span>
-        Trainingsprotokoll in Prüfung · keine Diagnose oder Notfallhilfe
+        Keine Diagnose oder Notfallhilfe. Trainingsprotokoll in Prüfung.
       </span>
     </aside>
   );
