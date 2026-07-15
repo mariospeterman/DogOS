@@ -22,6 +22,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --config vitest.config.ts",
+    "test:contracts": "vitest run --config vitest.config.ts packages/contracts/src",
     "test:e2e": "playwright test",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "turbo run typecheck"
