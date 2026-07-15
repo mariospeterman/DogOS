@@ -58,7 +58,7 @@ database row -> mapper -> canonical contract -> engine
 Two Slice 2.2 schema mismatches are isolated for Slice 2.4:
 
 1. `api.canonical_code` accepts lowercase dotted codes, while the approved persisted engine reason-code contract uses uppercase underscore constants such as `SAFETY_SUSPECTED_PAIN`. A migration or explicit storage encoding must be approved before decisions can be persisted.
-2. Database measurement source uses `user_report`; the canonical contract uses `owner_report`. The row mapper explicitly translates `user_report` to `owner_report` and maps the reverse direction for persistence.
+2. Slice 2.4 migrates the historical database value `user_report` to canonical `owner_report`; runtime mappers reject the legacy term after migration.
 
 Additional persistence mapping is required for database dotted disposition/status codes versus canonical engine enums. Engines must not be changed merely to mirror storage representation.
 

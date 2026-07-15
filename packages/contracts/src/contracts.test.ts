@@ -109,7 +109,7 @@ describe("measurement contract", () => {
       is_unknown: true,
       unknown_reason: "unknown.not_observed",
       unit_code: "unit.count",
-      source: "user_report",
+      source: "owner_report",
       method_code: null,
       measured_at: measuredAt,
       environment_code: null,

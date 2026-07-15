@@ -42,7 +42,6 @@ export type PersistenceCommand =
   | PersistPlanAdjustmentCommand;
 
 const sourceMap = {
-  user_report: "owner_report",
   owner_report: "owner_report",
   trainer_report: "trainer_report",
   system: "system",

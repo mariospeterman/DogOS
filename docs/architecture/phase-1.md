@@ -33,15 +33,15 @@ and audit boundaries so they can be added without changing the training engine.
 
 Every content record and output carries one of these labels:
 
-| Label                         | Meaning                                                         |
-| ----------------------------- | --------------------------------------------------------------- |
-| `verified_fact`               | Directly supported by an identified primary or official source. |
-| `professional_consensus`      | Supported by a named professional body or approved reviewer.    |
-| `pending_professional_review` | Development content that must not drive a production plan.      |
-| `product_assumption`          | A product or architecture decision requiring validation.        |
-| `user_report`                 | Information supplied by a user and not independently verified.  |
-| `measured_observation`        | A value captured by a defined measurement method.               |
-| `hypothesis`                  | A non-diagnostic interpretation with evidence and confidence.   |
+| Label                         | Meaning                                                          |
+| ----------------------------- | ---------------------------------------------------------------- |
+| `verified_fact`               | Directly supported by an identified primary or official source.  |
+| `professional_consensus`      | Supported by a named professional body or approved reviewer.     |
+| `pending_professional_review` | Development content that must not drive a production plan.       |
+| `product_assumption`          | A product or architecture decision requiring validation.         |
+| `owner_report`                | Information supplied by an owner and not independently verified. |
+| `measured_observation`        | A value captured by a defined measurement method.                |
+| `hypothesis`                  | A non-diagnostic interpretation with evidence and confidence.    |
 
 At Phase 1 completion, all sample protocols and safety thresholds are
 `pending_professional_review`. No training content is production-approved.

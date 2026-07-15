@@ -46,7 +46,7 @@ approved under the governance process.
 }
 ```
 
-All values above are `user_report`; none are measured facts.
+All values above are `owner_report`; none are independently measured facts.
 
 ## 2. Measurable goal
 

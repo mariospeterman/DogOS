@@ -1983,7 +1983,8 @@ export type Database = {
       };
       progress_evaluations: {
         Row: {
-          confidence: string;
+          candidate_next_action: string | null;
+          confidence: string | null;
           created_at: string;
           engine_version: string;
           evaluated_at: string;
@@ -1991,11 +1992,13 @@ export type Database = {
           id: string;
           missing_metric_codes: unknown[];
           plan_version_id: string;
+          reason_codes: unknown[];
           rule_set_id: string;
           status_code: string;
         };
         Insert: {
-          confidence: string;
+          candidate_next_action?: string | null;
+          confidence?: string | null;
           created_at?: string;
           engine_version: string;
           evaluated_at: string;
@@ -2003,11 +2006,13 @@ export type Database = {
           id?: string;
           missing_metric_codes?: unknown[];
           plan_version_id: string;
+          reason_codes?: unknown[];
           rule_set_id: string;
           status_code: string;
         };
         Update: {
-          confidence?: string;
+          candidate_next_action?: string | null;
+          confidence?: string | null;
           created_at?: string;
           engine_version?: string;
           evaluated_at?: string;
@@ -2015,6 +2020,7 @@ export type Database = {
           id?: string;
           missing_metric_codes?: unknown[];
           plan_version_id?: string;
+          reason_codes?: unknown[];
           rule_set_id?: string;
           status_code?: string;
         };
@@ -2134,6 +2140,7 @@ export type Database = {
           id: string;
           permitted_action_codes: unknown[];
           prohibited_action_codes: unknown[];
+          reason_codes: unknown[];
           required_question_codes: unknown[];
           resolution: Json | null;
           reviewer_user_id: string | null;
@@ -2151,6 +2158,7 @@ export type Database = {
           id?: string;
           permitted_action_codes?: unknown[];
           prohibited_action_codes?: unknown[];
+          reason_codes?: unknown[];
           required_question_codes?: unknown[];
           resolution?: Json | null;
           reviewer_user_id?: string | null;
@@ -2168,6 +2176,7 @@ export type Database = {
           id?: string;
           permitted_action_codes?: unknown[];
           prohibited_action_codes?: unknown[];
+          reason_codes?: unknown[];
           required_question_codes?: unknown[];
           resolution?: Json | null;
           reviewer_user_id?: string | null;
@@ -2866,7 +2875,7 @@ export type Database = {
         | "professional_consensus"
         | "pending_professional_review"
         | "product_assumption"
-        | "user_report"
+        | "owner_report"
         | "measured_observation"
         | "hypothesis";
       locale_status: "unconfirmed" | "detected" | "confirmed";
@@ -3017,7 +3026,7 @@ export const Constants = {
         "professional_consensus",
         "pending_professional_review",
         "product_assumption",
-        "user_report",
+        "owner_report",
         "measured_observation",
         "hypothesis",
       ],

@@ -134,17 +134,17 @@ insert into api.dogs (
 insert into api.dog_breed_links (
   id, dog_id, breed_taxonomy_id, source, user_certainty
 ) values
-  ('30100000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '42000000-0000-0000-0000-000000000001', 'user_report', 0.600),
-  ('30100000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001', '42000000-0000-0000-0000-000000000002', 'user_report', 0.400),
-  ('30100000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000002', '42000000-0000-0000-0000-000000000001', 'user_report', 0.600),
-  ('30100000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000002', '42000000-0000-0000-0000-000000000002', 'user_report', 0.400);
+  ('30100000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '42000000-0000-0000-0000-000000000001', 'owner_report', 0.600),
+  ('30100000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001', '42000000-0000-0000-0000-000000000002', 'owner_report', 0.400),
+  ('30100000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000002', '42000000-0000-0000-0000-000000000001', 'owner_report', 0.600),
+  ('30100000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000002', '42000000-0000-0000-0000-000000000002', 'owner_report', 0.400);
 
 insert into api.dog_health_context (
   id, dog_id, reported_conditions, suspected_pain, sudden_behavior_change,
   mobility_constraints, source
 ) values
-  ('30200000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '{}', false, false, '{}', 'user_report'),
-  ('30200000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002', '{}', false, false, '{}', 'user_report');
+  ('30200000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '{}', false, false, '{}', 'owner_report'),
+  ('30200000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002', '{}', false, false, '{}', 'owner_report');
 
 insert into api.anamneses (
   id, dog_id, version, status, completeness, quality_status, completed_at, created_by
@@ -156,8 +156,8 @@ insert into api.anamnesis_answers (
   id, anamnesis_id, question_definition_id, raw_answer_text, raw_answer_locale,
   canonical_answer_code, source, collected_channel
 ) values
-  ('61000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', '41000000-0000-0000-0000-000000000001', 'Vor allem andere Hunde', 'de-CH', 'trigger.other_dog', 'user_report', 'whatsapp'),
-  ('61000000-0000-0000-0000-000000000002', '60000000-0000-0000-0000-000000000002', '41000000-0000-0000-0000-000000000001', 'Mostly other dogs', 'en', 'trigger.other_dog', 'user_report', 'whatsapp');
+  ('61000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', '41000000-0000-0000-0000-000000000001', 'Vor allem andere Hunde', 'de-CH', 'trigger.other_dog', 'owner_report', 'whatsapp'),
+  ('61000000-0000-0000-0000-000000000002', '60000000-0000-0000-0000-000000000002', '41000000-0000-0000-0000-000000000001', 'Mostly other dogs', 'en', 'trigger.other_dog', 'owner_report', 'whatsapp');
 
 insert into api.behavior_concerns (
   id, dog_id, anamnesis_id, concern_code, trigger_codes, frequency_code,
@@ -185,8 +185,8 @@ insert into api.goal_measurements (
   id, goal_version_id, metric_code, value_numeric, is_unknown, unit_code,
   source, method_code, environment_code, measured_at, quality
 ) values
-  ('72000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000001', 'metric.continuous_loose_steps', 4, false, 'unit.count', 'user_report', 'method.direct_count', 'environment.low_distraction', now(), 'moderate'),
-  ('72000000-0000-0000-0000-000000000002', '71000000-0000-0000-0000-000000000002', 'metric.continuous_loose_steps', 4, false, 'unit.count', 'user_report', 'method.direct_count', 'environment.low_distraction', now(), 'moderate');
+  ('72000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000001', 'metric.continuous_loose_steps', 4, false, 'unit.count', 'owner_report', 'method.direct_count', 'environment.low_distraction', now(), 'moderate'),
+  ('72000000-0000-0000-0000-000000000002', '71000000-0000-0000-0000-000000000002', 'metric.continuous_loose_steps', 4, false, 'unit.count', 'owner_report', 'method.direct_count', 'environment.low_distraction', now(), 'moderate');
 
 insert into api.plans (id, dog_id, goal_version_id, status) values
   ('73000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000001', 'active'),
@@ -196,8 +196,8 @@ insert into api.plan_versions (
   id, plan_id, version, protocol_version_id, rule_set_id,
   generation_reason_codes, generation_mode, status, effective_from
 ) values
-  ('74000000-0000-0000-0000-000000000001', '73000000-0000-0000-0000-000000000001', 1, '51000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000001', array['generation.initial_plan']::api.canonical_code[], 'development', 'active', now()),
-  ('74000000-0000-0000-0000-000000000002', '73000000-0000-0000-0000-000000000002', 1, '51000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000001', array['generation.initial_plan']::api.canonical_code[], 'development', 'active', now());
+  ('74000000-0000-0000-0000-000000000001', '73000000-0000-0000-0000-000000000001', 1, '51000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000001', array['PLAN_GENERATED_DEVELOPMENT_ONLY']::api.reason_code[], 'development', 'active', now()),
+  ('74000000-0000-0000-0000-000000000002', '73000000-0000-0000-0000-000000000002', 1, '51000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000001', array['PLAN_GENERATED_DEVELOPMENT_ONLY']::api.reason_code[], 'development', 'active', now());
 
 update api.plans set active_plan_version_id = '74000000-0000-0000-0000-000000000001' where id = '73000000-0000-0000-0000-000000000001';
 update api.plans set active_plan_version_id = '74000000-0000-0000-0000-000000000002' where id = '73000000-0000-0000-0000-000000000002';
@@ -219,8 +219,8 @@ insert into api.session_measurements (
   id, session_id, metric_code, value_numeric, is_unknown, unit_code,
   source, method_code, measured_at, quality
 ) values
-  ('77000000-0000-0000-0000-000000000001', '76000000-0000-0000-0000-000000000001', 'metric.continuous_loose_steps', 8, false, 'unit.count', 'user_report', 'method.direct_count', now(), 'moderate'),
-  ('77000000-0000-0000-0000-000000000002', '76000000-0000-0000-0000-000000000002', 'metric.continuous_loose_steps', 8, false, 'unit.count', 'user_report', 'method.direct_count', now(), 'moderate');
+  ('77000000-0000-0000-0000-000000000001', '76000000-0000-0000-0000-000000000001', 'metric.continuous_loose_steps', 8, false, 'unit.count', 'owner_report', 'method.direct_count', now(), 'moderate'),
+  ('77000000-0000-0000-0000-000000000002', '76000000-0000-0000-0000-000000000002', 'metric.continuous_loose_steps', 8, false, 'unit.count', 'owner_report', 'method.direct_count', now(), 'moderate');
 
 insert into api.progress_evaluations (
   id, plan_version_id, status_code, confidence, evidence_ids,
@@ -233,8 +233,8 @@ insert into api.plan_adjustments (
   id, plan_id, previous_plan_version_id, decision_code, reason_codes,
   evidence_ids, escalation_code, engine_version
 ) values
-  ('79000000-0000-0000-0000-000000000001', '73000000-0000-0000-0000-000000000001', '74000000-0000-0000-0000-000000000001', 'adjustment.repeat', array['reason.partial_progress']::api.canonical_code[], array['77000000-0000-0000-0000-000000000001']::uuid[], 'escalate.none', 'fixture-1'),
-  ('79000000-0000-0000-0000-000000000002', '73000000-0000-0000-0000-000000000002', '74000000-0000-0000-0000-000000000002', 'adjustment.repeat', array['reason.partial_progress']::api.canonical_code[], array['77000000-0000-0000-0000-000000000002']::uuid[], 'escalate.none', 'fixture-1');
+  ('79000000-0000-0000-0000-000000000001', '73000000-0000-0000-0000-000000000001', '74000000-0000-0000-0000-000000000001', 'adjustment.repeat', array['ADJUSTMENT_REPEAT_STEP']::api.reason_code[], array['77000000-0000-0000-0000-000000000001']::uuid[], 'escalate.none', 'fixture-1'),
+  ('79000000-0000-0000-0000-000000000002', '73000000-0000-0000-0000-000000000002', '74000000-0000-0000-0000-000000000002', 'adjustment.repeat', array['ADJUSTMENT_REPEAT_STEP']::api.reason_code[], array['77000000-0000-0000-0000-000000000002']::uuid[], 'escalate.none', 'fixture-1');
 
 insert into api.risk_assessments (
   id, dog_id, goal_id, risk_level_code, triggered_rule_codes,

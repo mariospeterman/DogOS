@@ -67,8 +67,12 @@ safer outcome and create a review event.
   "disposition": "veterinary_review",
   "triggered_rules": ["SUDDEN_CHANGE_001", "SUSPECTED_PAIN_001"],
   "evidence": [
-    { "type": "user_report", "field": "sudden_behavior_change", "value": true },
-    { "type": "user_report", "field": "pain_suspected", "value": true }
+    {
+      "type": "owner_report",
+      "field": "sudden_behavior_change",
+      "value": true
+    },
+    { "type": "owner_report", "field": "pain_suspected", "value": true }
   ],
   "excluded_actions": ["generate_training_plan", "increase_difficulty"],
   "content_status": "pending_professional_review"

@@ -158,7 +158,7 @@ version, but activation is transactional with an audit event and notification.
   "unit": "count",
   "unknown": false,
   "method": "owner_counted",
-  "source": "user_report",
+  "source": "owner_report",
   "measured_at": "2026-07-14T17:10:00Z",
   "environment": "quiet_street",
   "quality": "moderate"
