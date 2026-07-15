@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dogos/contracts": "workspace:*"
+    "@dogos/contracts": "workspace:*",
+    "postgres": "3.4.8"
   },
   "devDependencies": {
     "typescript": "6.0.3"
