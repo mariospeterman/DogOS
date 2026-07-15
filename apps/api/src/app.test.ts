@@ -31,7 +31,8 @@ describe("product API", () => {
     apps.push(app);
 
     const unauthenticated = await app.inject({ method: "GET", url: "/v1/me" });
-    expect(unauthenticated.statusCode).toBe(400);
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(unauthenticated.json().error.code).toBe("AUTH_REQUIRED");
 
     const viewer = await app.inject({
       method: "POST",

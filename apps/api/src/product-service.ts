@@ -50,6 +50,7 @@ export interface ProductSnapshot {
   safety: string;
   goal: string;
   planStatus: string;
+  planVersion: number;
   difficulty: number;
   sessions: Array<{
     id: string;
@@ -91,6 +92,7 @@ export class ProductService {
       safety: output.safety.disposition,
       goal: "goal.loose_leash_walking",
       planStatus: output.plan.status,
+      planVersion: 1,
       difficulty: 1,
       sessions: [],
       latestDecision: "repeat_step",
@@ -141,7 +143,8 @@ export class ProductService {
       foodAccepted: input.foodAccepted,
     });
     if (!input.foodAccepted && input.avoidance) {
-      this.#state.latestDecision = "schedule_rest";
+      this.#state.difficulty = Math.max(1, this.#state.difficulty - 1);
+      this.#state.latestDecision = "reduce_difficulty";
       this.#state.safety = "stop_training";
     } else if (
       this.#state.sessions.length >= 3 &&
@@ -168,6 +171,22 @@ export class ProductService {
       this.#state.workflowState = "professional_escalation";
     }
     this.#state.audit.push({ action: "safety.assessed", traceId });
+    return this.snapshot();
+  }
+
+  assertSessionStartAllowed(): void {
+    if (this.#state.planStatus === "blocked")
+      throw new Error("SAFETY_REVIEW_REQUIRED");
+  }
+
+  assertPlanGenerationAllowed(): void {
+    if (this.#state.planStatus === "blocked")
+      throw new Error("PLAN_GENERATION_BLOCKED");
+  }
+
+  activateAdjustment(traceId: string): ProductSnapshot {
+    this.#state.planVersion += 1;
+    this.#state.audit.push({ action: "plan.adjusted", traceId });
     return this.snapshot();
   }
 }

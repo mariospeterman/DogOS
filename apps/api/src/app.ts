@@ -144,6 +144,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       error !== null &&
       "validation" in error &&
       error.validation !== undefined;
+    const authHeaderMissing = hasValidation && message.includes("x-dogos-user");
     const apiError =
       error instanceof ApiError
         ? error
@@ -153,19 +154,33 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
               error.code,
               "The signed action is not valid",
             )
-          : message === "IDEMPOTENCY_CONFLICT"
-            ? new ApiError(
-                409,
-                "IDEMPOTENCY_CONFLICT",
-                "The key was already used for another command",
-              )
-            : new ApiError(
-                hasValidation ? 400 : 500,
-                "VALIDATION_FAILED",
-                hasValidation
-                  ? "Request validation failed"
-                  : "The request could not be completed",
-              );
+          : authHeaderMissing
+            ? new ApiError(401, "AUTH_REQUIRED", "Authentication is required")
+            : message === "IDEMPOTENCY_CONFLICT"
+              ? new ApiError(
+                  409,
+                  "IDEMPOTENCY_CONFLICT",
+                  "The key was already used for another command",
+                )
+              : message === "SAFETY_REVIEW_REQUIRED"
+                ? new ApiError(
+                    409,
+                    "SAFETY_REVIEW_REQUIRED",
+                    "Professional review is required before training",
+                  )
+                : message === "PLAN_GENERATION_BLOCKED"
+                  ? new ApiError(
+                      409,
+                      "PLAN_GENERATION_BLOCKED",
+                      "Safety assessment blocks plan generation",
+                    )
+                  : new ApiError(
+                      hasValidation ? 400 : 500,
+                      "VALIDATION_FAILED",
+                      hasValidation
+                        ? "Request validation failed"
+                        : "The request could not be completed",
+                    );
     void reply.status(apiError.status).send({
       error: { code: apiError.code, message: apiError.message },
       traceId: request.id,
@@ -394,8 +409,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           const user = identity(request);
           requireWrite(user);
           const body = request.body as object;
+          if (operationId === "startSession")
+            product.assertSessionStartAllowed();
+          if (operationId === "generatePlan")
+            product.assertPlanGenerationAllowed();
           const command = product.command(user, key(request), body, () =>
-            product.snapshot(),
+            operationId === "adjustPlan"
+              ? product.activateAdjustment(request.id)
+              : product.snapshot(),
           );
           reply.header("x-idempotent-replay", String(command.replayed));
           return command.result;
