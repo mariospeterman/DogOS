@@ -52,6 +52,19 @@ pnpm dev
 Local defaults enable mock providers. Production environment validation rejects
 mock providers and development signing secrets.
 
+## Review the first product
+
+```bash
+pnpm demo:product
+```
+
+This command starts Supabase when needed, resets only the local project, applies
+all migrations and deterministic seeds, starts or reuses the API and web app,
+generates Slice 2.5 review evidence, and prints URLs and local identity headers.
+It does not touch hosted data or external providers. Use
+`pnpm demo:product:check` in automation to perform the same readiness check and
+exit after services respond.
+
 ## Verify the foundation
 
 ```bash
@@ -65,6 +78,7 @@ pnpm build
 pnpm db:test
 pnpm db:lint
 pnpm db:types
+pnpm demo:product:check
 ```
 
 `pnpm db:types` regenerates `packages/database/src/database.types.ts`. Commit

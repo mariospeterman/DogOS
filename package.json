@@ -25,6 +25,8 @@
     "test:contracts": "vitest run --config vitest.config.ts packages/contracts/src",
     "test:engines": "vitest run --config vitest.config.ts packages/contracts/src packages/knowledge/src packages/safety-engine/src packages/training-engine/src packages/progress-engine/src packages/observation-engine/src packages/testing/src",
     "demo:engines": "pnpm --filter @dogos/testing demo",
+    "demo:product": "node scripts/demo-product.mjs",
+    "demo:product:check": "node scripts/demo-product.mjs --check",
     "test:e2e": "playwright test",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "turbo run typecheck"

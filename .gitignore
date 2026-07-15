@@ -4,7 +4,9 @@ apps/web/next-env.d.ts
 dist/
 coverage/
 playwright-report/
-test-results/
+test-results/*
+!test-results/slice-2.5/
+!test-results/slice-2.5/**
 .turbo/
 
 .env

@@ -1,0 +1,22 @@
+@api = http://127.0.0.1:4000
+@user = owner
+
+### Current identity
+GET {{api}}/v1/me
+x-dogos-user: {{user}}
+
+### Submit an observed session
+POST {{api}}/v1/sessions/session-1/complete
+x-dogos-user: {{user}}
+idempotency-key: review-session-1
+content-type: application/json
+
+{"success":75,"foodAccepted":true,"repetitions":8,"difficulty":2,"confidence":4}
+
+### Trigger deterministic suspected-pain review
+POST {{api}}/v1/dogs/dog-1/safety-assessments
+x-dogos-user: {{user}}
+idempotency-key: review-pain-1
+content-type: application/json
+
+{"kind":"pain"}

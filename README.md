@@ -13,12 +13,12 @@ development content and are not approved for production use.
 
 ## Current status
 
-Phase 2 implementation has started. Slice 2.1 provides the pinned monorepo,
-bootable web and API shells, environment validation, test harnesses, and CI.
-Slice 2.2 provides the local Supabase project, canonical multilingual schema,
-deterministic development data, generated database types, forced RLS, and
-pgTAP tests. Professional protocol, safety, legal, and launch translation review
-remain production release blockers.
+Phase 2 Slices 2.1 through 2.5 provide the pinned monorepo, local Supabase
+schema and RLS, deterministic multilingual engines, strict persistence mappers,
+transactional repositories, typed Fastify API and OpenAPI, signed actions, a
+local WhatsApp simulator, and the first mobile owner journey. Professional
+protocol, safety, legal, privacy, provider, and launch translation review remain
+production release blockers.
 
 ## Local development
 
@@ -39,6 +39,12 @@ The web app runs at <http://localhost:3000> and the API health endpoint at
 [local development runbook](docs/runbooks/local-development.md) for all checks
 and the current database workflow.
 
+For the complete reset, seed, API, simulator, and mobile review experience:
+
+```bash
+pnpm demo:product
+```
+
 ## Phase 1 documentation
 
 - [Architecture](docs/architecture/phase-1.md)
@@ -56,4 +62,7 @@ The original research notes remain in [architecture](architecture) and
 
 - [Slice 2.1 foundation](docs/implementation/slice-2.1-foundation.md)
 - [Slice 2.2 database foundation](docs/implementation/slice-2.2-database.md)
+- [Slice 2.3 deterministic engines](docs/implementation/slice-2.3-engines.md)
+- [Slice 2.4 API and persistence](docs/implementation/slice-2.4-api-persistence.md)
+- [Slice 2.5 local product](docs/implementation/slice-2.5-local-product.md)
 - [RLS access matrix](docs/architecture/phase-2-2-rls-matrix.md)
