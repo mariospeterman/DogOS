@@ -325,6 +325,38 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           return { unlinked: true, traceId: request.id };
         },
       );
+      routes.post(
+        "/v1/whatsapp/delete-data",
+        {
+          schema: {
+            operationId: "deleteWhatsAppData",
+            tags: ["account"],
+            headers: mutationHeaders,
+            body: {
+              type: "object",
+              additionalProperties: false,
+              required: ["contactId"],
+              properties: {
+                contactId: { type: "string", minLength: 1, maxLength: 120 },
+              },
+            },
+            response: { 200: stateSchema, ...commonResponses },
+          },
+        },
+        async (request) => {
+          const user = identity(request);
+          if (user !== "owner")
+            throw new ApiError(
+              403,
+              "ACCESS_DENIED",
+              "Owner authentication required",
+            );
+          await options.whatsapp!.deleteContact(
+            (request.body as { contactId: string }).contactId,
+          );
+          return { deleted: true, traceId: request.id };
+        },
+      );
     }
 
     routes.get(

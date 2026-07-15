@@ -27,9 +27,11 @@
     "demo:engines": "pnpm --filter @dogos/testing demo",
     "demo:product": "node scripts/demo-product.mjs",
     "demo:product:check": "node scripts/demo-product.mjs --check",
-    "demo:agent-tools": "tsx scripts/demo-agent-tools.ts",
+    "demo:agent-tools": "NODE_OPTIONS=--conditions=development tsx scripts/demo-agent-tools.ts",
     "demo:mcp": "pnpm --filter @dogos/mcp-server demo",
     "mcp:serve": "pnpm --filter @dogos/mcp-server start",
+    "whatsapp:verify-config": "NODE_OPTIONS=--conditions=development tsx scripts/verify-whatsapp-config.ts",
+    "whatsapp:run-pilot": "NODE_OPTIONS=--conditions=development tsx scripts/run-whatsapp-pilot.ts",
     "test:e2e": "playwright test",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "turbo run typecheck"

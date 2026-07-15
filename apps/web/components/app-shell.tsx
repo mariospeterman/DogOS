@@ -78,9 +78,9 @@ export function AppShell({
 export function DevelopmentNotice({ compact = false }: { compact?: boolean }) {
   return (
     <aside className={compact ? "dev-notice compact" : "dev-notice"}>
-      <strong>Entwicklungsprotokoll</strong>
+      <strong>Pilot-Hinweis</strong>
       <span>
-        Keine Diagnose oder Notfallhilfe. Fachliche Freigabe steht aus.
+        Trainingsprotokoll in Prüfung · keine Diagnose oder Notfallhilfe
       </span>
     </aside>
   );

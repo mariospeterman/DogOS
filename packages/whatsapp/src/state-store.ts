@@ -46,6 +46,7 @@ export interface WhatsAppStateStore {
     householdId: string,
   ): Promise<ProviderContact>;
   unlink(contactId: string): Promise<void>;
+  deleteContact(contactId: string): Promise<void>;
 }
 
 const hash = (value: string) =>
@@ -62,7 +63,6 @@ export class InMemoryWhatsAppStateStore implements WhatsAppStateStore {
 
   claimInbound(
     message: CanonicalInboundMessage,
-    _traceId: string,
   ): Promise<{ contact: ProviderContact; eventId: string } | null> {
     if (this.#events.has(message.id)) return Promise.resolve(null);
     this.#events.add(message.id);
@@ -90,7 +90,7 @@ export class InMemoryWhatsAppStateStore implements WhatsAppStateStore {
     );
   }
 
-  saveOutbound(message: OutboundMessage, _traceId: string): Promise<void> {
+  saveOutbound(message: OutboundMessage): Promise<void> {
     this.outbound.set(message.id, structuredClone(message));
     return Promise.resolve();
   }
@@ -147,6 +147,13 @@ export class InMemoryWhatsAppStateStore implements WhatsAppStateStore {
       contact.linked = false;
       contact.userId = null;
       contact.householdId = null;
+    }
+    return Promise.resolve();
+  }
+
+  deleteContact(contactId: string): Promise<void> {
+    for (const [externalId, contact] of this.#contacts) {
+      if (contact.id === contactId) this.#contacts.delete(externalId);
     }
     return Promise.resolve();
   }
@@ -288,6 +295,12 @@ export class PostgresWhatsAppStateStore implements WhatsAppStateStore {
         where contact_id = ${contactId} and consumed_at is null and revoked_at is null
       `;
     });
+  }
+
+  async deleteContact(contactId: string): Promise<void> {
+    await this.#sql`
+      delete from private.whatsapp_provider_contacts where id = ${contactId}
+    `;
   }
 
   private contact(row: Record<string, unknown>): ProviderContact {

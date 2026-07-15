@@ -1,0 +1,5 @@
+### Meta verification handshake
+GET https://pilot.example/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token={{verify_token}}&hub.challenge=12345
+
+### Webhook payloads require X-Hub-Signature-256 over the exact raw body.
+# Secrets and real personal data are deliberately absent from this artifact.

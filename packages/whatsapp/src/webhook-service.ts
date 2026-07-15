@@ -69,6 +69,10 @@ export class WhatsAppWebhookService {
     return this.store.unlink(contactId);
   }
 
+  deleteContact(contactId: string): Promise<void> {
+    return this.store.deleteContact(contactId);
+  }
+
   private async processStatuses(payload: string): Promise<void> {
     const parsed = JSON.parse(payload) as {
       entry?: Array<{

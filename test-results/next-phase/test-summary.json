@@ -1,0 +1,16 @@
+{
+  "phase": "agent-tools-and-whatsapp-pilot",
+  "status": "credential-gate",
+  "agentTools": "pass",
+  "mcpLocal": "pass",
+  "metaContractTests": "pass",
+  "automatedTests": {
+    "unit": 129,
+    "integration": 2,
+    "browserE2E": 22,
+    "pgTAP": 84,
+    "total": 237
+  },
+  "realMetaMessage": "blocked-pending-owner-credentials",
+  "prohibitedScope": ["stripe", "cal.com", "video-analysis", "public-production"]
+}
