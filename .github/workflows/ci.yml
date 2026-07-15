@@ -50,3 +50,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.13.0
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm dev:services
+      - run: pnpm db:reset
+      - run: pnpm db:test
+      - run: pnpm db:lint
+      - run: pnpm db:types
+      - run: git diff --exit-code -- packages/database/src/database.types.ts

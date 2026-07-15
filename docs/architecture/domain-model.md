@@ -1,7 +1,7 @@
 # Domain Model and Canonical Contracts
 
 - Status: proposed
-- Last reviewed: 2026-07-14
+- Last reviewed: 2026-07-15
 
 This reference defines the Phase 1 logical model. It is not a migration. Phase 2
 must convert it into reviewed SQL migrations, generated TypeScript types, and RLS
@@ -21,6 +21,18 @@ tests without silently changing the semantics below.
   explanation evidence.
 - Country, locale, and currency are configuration/context fields; training rules
   contain no DACH-specific branches unless a cited legal/safety rule requires one.
+- Domain codes, protocol logic, analytics dimensions, and persisted decisions are
+  language-neutral. BCP 47 locale, country, legal jurisdiction, timezone, and ISO
+  currency are modeled separately and never inferred from each other.
+- Locale resolution uses explicit preference, confirmed account locale, WhatsApp
+  metadata, safe conversation detection, household default, then platform
+  fallback. A locale switch affects future presentation and is audited; it does
+  not rewrite historical answers or decision records.
+- Localizations are version-bound and move through
+  `draft_machine_translation`, `human_review_pending`,
+  `professionally_reviewed`, `legal_reviewed`, `approved_for_release`, or
+  `superseded`. Safety-critical, protocol, and legal content fail closed unless
+  the required review state exists for the requested scope.
 
 ## 2. Schema boundaries
 
@@ -38,11 +50,11 @@ referral financials, or audit records directly. It submits commands to Fastify.
 
 | Entity                 | Required fields and constraints                                                                                      |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `users`                | `auth_user_id`, locale, country, timezone, status; no authorization role in user-editable metadata.                  |
+| `users`                | `auth_user_id`, preferred/fallback locale, locale status, country, jurisdiction, timezone, currency, status.         |
 | `user_contacts`        | normalized WhatsApp number hash/encrypted value, verification status, linked timestamp; uniqueness and relink audit. |
-| `households`           | name, country, currency, timezone, status.                                                                           |
+| `households`           | name, default/fallback locale, country, jurisdiction, currency, timezone, status.                                    |
 | `household_members`    | household, user, role (`owner`, `caregiver`, `viewer`), status; unique active membership.                            |
-| `consent_documents`    | consent type, locale, version, legal text hash, effective dates.                                                     |
+| `consent_documents`    | canonical document, type, version, jurisdiction, legal text hash, effective dates.                                   |
 | `consents`             | subject, document version, granted/withdrawn timestamp, scope, acquisition channel, evidence reference.              |
 | `identity_link_tokens` | hashed one-time token, contact, intended user/household, expiry, consumed/revoked timestamps, nonce.                 |
 | `audit_events`         | actor, action, target, timestamp, request/trace ID, outcome, bounded metadata; append-only.                          |
@@ -50,6 +62,23 @@ referral financials, or audit records directly. It submits commands to Fastify.
 Consent types are separate for terms, privacy, AI disclosure, video analysis,
 audio transcription, trainer sharing, research/debug reuse, and marketing.
 Withdrawal does not erase the historical evidence that consent once existed.
+
+### Localization and locale context
+
+| Entity                         | Purpose                                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `conversation_sessions`        | detected and active BCP 47 locale plus the winning resolution source; locale switches are audited.         |
+| `localized_content`            | version-bound presentation keyed by canonical content/version, locale, method, review state, and validity. |
+| `question_definitions`         | language-neutral question identity, answer schema, sensitivity, version, and validity.                     |
+| `question_localizations`       | reviewed localized wording for one exact question definition.                                              |
+| `protocol_localizations`       | presentation for one exact immutable protocol version; never decision-bearing protocol logic.              |
+| `message_catalog_entries`      | channel-aware localized messages keyed by stable canonical message code/version.                           |
+| `legal_document_localizations` | jurisdiction-bound consent document presentation linked to exact reviewed legal content.                   |
+| `translation_reviews`          | append-only professional/legal review outcome and findings for one localized content record.               |
+
+The initial development context uses `de-CH` as default, `de-DE` and `de-AT`
+as additional German variants, and `en` as fallback. These are configuration
+and fixture choices, not a database allowlist or a permanent product boundary.
 
 ## 4. Dog and anamnesis model
 

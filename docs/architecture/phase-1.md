@@ -1,11 +1,20 @@
 # DogOS Phase 1 Architecture
 
 - Status: proposed for Phase 2 approval
-- Last reviewed: 2026-07-14
-- Product market: DACH, German-first
-- Implementation status: architecture only
+- Last reviewed: 2026-07-15
+- Product market: Switzerland first, then DACH
+- Implementation status: Phase 2 foundation in progress
 
 ## 1. Product boundary
+
+DogOS is multilingual by design, Swiss-positioned and DACH-first commercially.
+German is the first reviewed launch content locale, not a technical product
+boundary.
+
+Canonical domain values and deterministic decisions are language-neutral.
+BCP 47 locale, country, legal jurisdiction, timezone, and ISO currency are
+independent context fields. Localized presentation is version-bound and cannot
+change protocol, risk, progression, pricing, or analytics semantics.
 
 The first release proves one complete training loop:
 
@@ -167,7 +176,8 @@ validated anamnesis + active risk flags + one prioritized goal
 -> create baseline measurement request
 -> freeze protocol version and rule-set version
 -> generate plan version and scheduled micro-sessions
--> explain the approved plan in German through the text provider
+-> explain the approved plan in the resolved locale through reviewed content
+   or a constrained text-provider presentation layer
 ```
 
 If no approved protocol is eligible, the engine returns an explicit unsupported

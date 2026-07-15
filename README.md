@@ -1,9 +1,11 @@
 # DogOS
 
-DogOS is a German-first, WhatsApp-first dog-training platform for Germany,
-Austria, and Switzerland. Its core is a contextual, deterministic training
-engine that turns anamnesis, safety checks, measurable goals, session evidence,
-and training history into versioned plans and explainable plan adjustments.
+DogOS is a multilingual, WhatsApp-first dog-training platform. It is
+Swiss-positioned and DACH-first commercially. German is the first reviewed
+launch content locale, not a technical product boundary. Its core is a
+contextual, deterministic training engine that turns anamnesis, safety checks,
+measurable goals, session evidence, and training history into versioned plans
+and explainable plan adjustments.
 
 DogOS does not use a language model as the authority for training progression,
 safety, medical interpretation, or protocol creation. Initial protocols are
@@ -13,8 +15,10 @@ development content and are not approved for production use.
 
 Phase 2 implementation has started. Slice 2.1 provides the pinned monorepo,
 bootable web and API shells, environment validation, test harnesses, and CI.
-No database schema or product workflow has been implemented yet. Professional
-protocol and safety review remains a production release blocker.
+Slice 2.2 provides the local Supabase project, canonical multilingual schema,
+deterministic development data, generated database types, forced RLS, and
+pgTAP tests. Professional protocol, safety, legal, and launch translation review
+remain production release blockers.
 
 ## Local development
 
@@ -25,13 +29,15 @@ Prerequisites: Node.js 24 LTS, Corepack, and Docker Desktop (used from Slice
 corepack enable
 pnpm install
 cp .env.example .env.local
+pnpm dev:services
+pnpm db:reset
 pnpm dev
 ```
 
 The web app runs at <http://localhost:3000> and the API health endpoint at
 <http://127.0.0.1:4000/health/live>. See the
 [local development runbook](docs/runbooks/local-development.md) for all checks
-and the explicit Slice 2.1 limitations.
+and the current database workflow.
 
 ## Phase 1 documentation
 
@@ -49,3 +55,5 @@ The original research notes remain in [architecture](architecture) and
 ## Phase 2 implementation
 
 - [Slice 2.1 foundation](docs/implementation/slice-2.1-foundation.md)
+- [Slice 2.2 database foundation](docs/implementation/slice-2.2-database.md)
+- [RLS access matrix](docs/architecture/phase-2-2-rls-matrix.md)

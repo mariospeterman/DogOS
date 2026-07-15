@@ -2,7 +2,7 @@
   "name": "dogos",
   "version": "0.1.0",
   "private": true,
-  "description": "German-first dog training platform",
+  "description": "Multilingual dog training platform, Swiss-positioned and DACH-first",
   "engines": {
     "node": ">=24.11.0 <25",
     "pnpm": "11.13.0"
@@ -11,6 +11,13 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "node --env-file-if-exists=.env.local ./node_modules/turbo/bin/turbo run dev",
+    "dev:services": "supabase start --exclude storage-api",
+    "db:reset": "supabase db reset",
+    "db:seed": "supabase db reset",
+    "seed": "supabase db reset",
+    "db:test": "supabase test db",
+    "db:lint": "supabase db lint --local --level warning",
+    "db:types": "supabase gen types typescript --local --schema api | prettier --parser typescript > packages/database/src/database.types.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",

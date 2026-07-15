@@ -17,6 +17,28 @@ cp .env.example .env.local
 The package manager version is enforced through `packageManager`, engines, and
 the lockfile. Do not install dependencies with npm or yarn.
 
+## Start local services
+
+Docker Desktop must be running.
+
+```bash
+pnpm dev:services
+pnpm db:reset
+```
+
+The reset applies every migration and reloads deterministic development data.
+`pnpm seed` is an intentional alias for the same clean reset, so deterministic
+fixture IDs never collide with an existing seed. The local Data API is
+<http://127.0.0.1:54321>; Postgres listens on `127.0.0.1:54322`. Optional Studio,
+Realtime, analytics, vector storage, and Edge Runtime services are disabled in
+config. `pnpm dev:services` excludes only the Storage API process while
+retaining Supabase's managed storage schema. The private bucket and object
+policies are migrated and tested as database contracts.
+
+Development fixture accounts use the password `DogOS-local-2026`; their email
+addresses are defined at the top of `supabase/seed.sql`. These credentials are
+local-only and must never be reused in a hosted environment.
+
 ## Run the applications
 
 ```bash
@@ -40,8 +62,11 @@ pnpm test
 pnpm test:integration
 pnpm test:e2e
 pnpm build
+pnpm db:test
+pnpm db:lint
+pnpm db:types
 ```
 
-`pnpm dev:services`, `pnpm db:reset`, and `pnpm seed` intentionally do not exist
-until Slice 2.2 adds a real local Supabase project, migrations, and deterministic
-seed data.
+`pnpm db:types` regenerates `packages/database/src/database.types.ts`. Commit
+type changes with the migration that produced them. Stop local infrastructure
+with `pnpm exec supabase stop`.
