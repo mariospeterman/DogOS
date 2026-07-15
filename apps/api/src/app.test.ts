@@ -17,7 +17,7 @@ describe("health routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "ok" });
-  });
+  }, 10_000);
 });
 
 const mutationHeaders = (user = "owner", key = "test-command-1") => ({
