@@ -27,6 +27,9 @@
     "demo:engines": "pnpm --filter @dogos/testing demo",
     "demo:product": "node scripts/demo-product.mjs",
     "demo:product:check": "node scripts/demo-product.mjs --check",
+    "demo:agent-tools": "tsx scripts/demo-agent-tools.ts",
+    "demo:mcp": "pnpm --filter @dogos/mcp-server demo",
+    "mcp:serve": "pnpm --filter @dogos/mcp-server start",
     "test:e2e": "playwright test",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "turbo run typecheck"
@@ -43,6 +46,7 @@
     "turbo": "2.10.5",
     "typescript": "6.0.3",
     "typescript-eslint": "8.64.0",
+    "tsx": "4.23.1",
     "vitest": "4.1.10"
   }
 }

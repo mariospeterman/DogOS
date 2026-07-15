@@ -1,0 +1,22 @@
+{
+  "name": "@dogos/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "demo": "NODE_OPTIONS=--conditions=development tsx src/server.ts --catalog",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dogos/agent-auth": "workspace:*",
+    "@dogos/agent-tools": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "tsx": "4.23.1",
+    "typescript": "6.0.3"
+  }
+}
