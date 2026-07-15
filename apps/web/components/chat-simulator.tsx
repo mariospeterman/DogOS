@@ -106,6 +106,7 @@ const choices: Record<string, [string, string][]> = {
     ["8 von 10 Abschnitten locker", "Loose in 8 of 10 segments"],
   ],
   baseline_collection: [["6 von 10", "6 of 10"]],
+  plan_ready: [["Plan öffnen", "Open plan"]],
 };
 
 export function ChatSimulator() {
@@ -150,8 +151,6 @@ export function ChatSimulator() {
       return escalate(selected, "veterinary");
     if (current?.[0] === "safety_screen" && de.includes("Biss"))
       return escalate(selected, "trainer");
-    if (current?.[0] === "locale_confirmation" && en === "English")
-      setLocale("en");
     setMessages((value) => [
       ...value,
       { from: "system", text: prompt ?? "" },
