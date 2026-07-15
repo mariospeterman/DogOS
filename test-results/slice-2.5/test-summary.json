@@ -12,8 +12,8 @@
       "passed": 2
     },
     "e2e": {
-      "tests": 20,
-      "passed": 20,
+      "tests": 22,
+      "passed": 22,
       "projects": [
         "Desktop Chrome",
         "Pixel 7"

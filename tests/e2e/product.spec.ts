@@ -309,3 +309,21 @@ test("scenario 10: language switch preserves answers and workflow", async ({
   ).toBeVisible();
   await expect(page.getByText("Schweiz · CHF · Europe/Zurich")).toBeVisible();
 });
+
+test("calendar supports bounded rescheduling and a revocable ICS feed", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(60_000);
+  await page.goto("/app/calendar");
+  await clickButton(page, "Freitag auf 17:30 verschieben");
+  await expect(page.getByText("17:30 · 4 Min.")).toBeVisible();
+
+  const invalid = await request.get("/api/calendar.ics");
+  expect(invalid.status()).toBe(401);
+  const valid = await request.get(
+    "/api/calendar.ics?token=local-review-calendar-v1",
+  );
+  expect(valid.headers()["content-type"]).toContain("text/calendar");
+  expect(await valid.text()).toContain("BEGIN:VEVENT");
+});

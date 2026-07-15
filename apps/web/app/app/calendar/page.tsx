@@ -56,6 +56,7 @@ const initial = [
 
 export default function CalendarPage() {
   const [items, setItems] = useState(initial);
+  const [rescheduled, setRescheduled] = useState(false);
   const icon = (type: string) =>
     type === "rest" ? (
       <Moon />
@@ -66,18 +67,33 @@ export default function CalendarPage() {
     ) : (
       <CalendarPlus />
     );
+  const reschedule = () => {
+    setItems((value) =>
+      value.map((item, index) =>
+        index === 2
+          ? {
+              ...item,
+              detail: rescheduled ? "08:00 · 4 Min." : "17:30 · 4 Min.",
+            }
+          : item,
+      ),
+    );
+    setRescheduled((value) => !value);
+  };
   return (
     <AppShell
       title="Trainingskalender"
       eyebrow="15. - 21. Juli"
       action={
-        <button
+        <a
           className="icon-action"
-          title="Revocable ICS herunterladen"
+          href="/api/calendar.ics?token=local-review-calendar-v1"
+          download
+          title="Widerrufbare ICS herunterladen"
           aria-label="Kalenderdatei herunterladen"
         >
           <Download />
-        </button>
+        </a>
       }
     >
       <DevelopmentNotice compact />
@@ -108,6 +124,12 @@ export default function CalendarPage() {
           </button>
         ))}
       </section>
+      <button className="button secondary wide" onClick={reschedule}>
+        <RefreshCw size={17} />
+        {rescheduled
+          ? "Freitag auf 08:00 zurücksetzen"
+          : "Freitag auf 17:30 verschieben"}
+      </button>
       <p className="helper">
         Tippe eine Einheit an, um sie als abgeschlossen zu markieren.
         Verschieben ist nur innerhalb dieser Trainingswoche erlaubt.

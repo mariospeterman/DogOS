@@ -13,7 +13,7 @@ const summary = {
   suites: {
     unit: { tests: 112, passed: 112 },
     integration: { tests: 2, passed: 2 },
-    e2e: { tests: 20, passed: 20, projects: ["Desktop Chrome", "Pixel 7"] },
+    e2e: { tests: 22, passed: 22, projects: ["Desktop Chrome", "Pixel 7"] },
     pgTap: { tests: 66, passed: 66 },
   },
   canonicalEquivalence: true,
