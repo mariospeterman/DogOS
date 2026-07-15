@@ -13,6 +13,18 @@ export class LocalWhatsAppSimulator implements WhatsAppProvider {
 
   constructor(private readonly webhookSecret: string) {}
 
+  verifySubscription(input: {
+    challenge: string;
+    mode: string;
+    verifyToken: string;
+  }): Promise<string | null> {
+    return Promise.resolve(
+      input.mode === "subscribe" && input.verifyToken === this.webhookSecret
+        ? input.challenge
+        : null,
+    );
+  }
+
   sign(payload: string): string {
     return createHmac("sha256", this.webhookSecret)
       .update(payload)

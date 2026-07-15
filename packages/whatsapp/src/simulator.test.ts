@@ -21,6 +21,13 @@ describe("local WhatsApp simulator", () => {
       await simulator.verifyWebhook(payload, simulator.sign(payload)),
     ).toBe(true);
     expect(await simulator.verifyWebhook(payload, "invalid")).toBe(false);
+    await expect(
+      simulator.verifySubscription({
+        challenge: "challenge",
+        mode: "subscribe",
+        verifyToken: "test-secret",
+      }),
+    ).resolves.toBe("challenge");
     expect(await simulator.parseInbound(payload)).toHaveLength(1);
     expect(await simulator.parseInbound(payload)).toHaveLength(0);
   });

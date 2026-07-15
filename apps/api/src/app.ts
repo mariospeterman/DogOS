@@ -1,5 +1,7 @@
 import swagger from "@fastify/swagger";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
+import rawBody from "fastify-raw-body";
+import type { WhatsAppWebhookService } from "@dogos/whatsapp";
 import {
   ProductService,
   localIdentities,
@@ -111,6 +113,7 @@ function key(request: FastifyRequest): string {
 export interface BuildAppOptions {
   product?: ProductService;
   signedActions?: SignedActionService;
+  whatsapp?: WhatsAppWebhookService;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -136,6 +139,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       },
     },
   });
+  app.register(rawBody, { global: false, encoding: "utf8", runFirst: true });
 
   app.setErrorHandler((error, request, reply) => {
     const message = error instanceof Error ? error.message : "";
@@ -174,13 +178,19 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
                       "PLAN_GENERATION_BLOCKED",
                       "Safety assessment blocks plan generation",
                     )
-                  : new ApiError(
-                      hasValidation ? 400 : 500,
-                      "VALIDATION_FAILED",
-                      hasValidation
-                        ? "Request validation failed"
-                        : "The request could not be completed",
-                    );
+                  : message === "IDENTITY_LINK_INVALID"
+                    ? new ApiError(
+                        400,
+                        "SIGNED_ACTION_INVALID",
+                        "The identity link is invalid or expired",
+                      )
+                    : new ApiError(
+                        hasValidation ? 400 : 500,
+                        "VALIDATION_FAILED",
+                        hasValidation
+                          ? "Request validation failed"
+                          : "The request could not be completed",
+                      );
     void reply.status(apiError.status).send({
       error: { code: apiError.code, message: apiError.message },
       traceId: request.id,
@@ -198,6 +208,124 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     routes.get("/openapi.json", { schema: { hide: true } }, async () =>
       routes.swagger(),
     );
+
+    if (options.whatsapp !== undefined) {
+      routes.get(
+        "/webhooks/whatsapp",
+        { schema: { hide: true } },
+        async (request, reply) => {
+          const query = request.query as Record<string, unknown>;
+          const challenge = await options.whatsapp!.verifySubscription({
+            challenge: String(query["hub.challenge"] ?? ""),
+            mode: String(query["hub.mode"] ?? ""),
+            verifyToken: String(query["hub.verify_token"] ?? ""),
+          });
+          if (challenge === null) return reply.status(403).send();
+          return reply.type("text/plain").send(challenge);
+        },
+      );
+      routes.post(
+        "/webhooks/whatsapp",
+        {
+          config: { rawBody: true },
+          schema: {
+            hide: true,
+            headers: {
+              type: "object",
+              required: ["x-hub-signature-256"],
+              properties: { "x-hub-signature-256": { type: "string" } },
+            },
+          },
+        },
+        async (request, reply) => {
+          const raw = (request as FastifyRequest & { rawBody?: string })
+            .rawBody;
+          if (raw === undefined)
+            throw new ApiError(400, "VALIDATION_FAILED", "Raw body required");
+          const signature = request.headers["x-hub-signature-256"];
+          if (typeof signature !== "string")
+            throw new ApiError(400, "VALIDATION_FAILED", "Signature required");
+          try {
+            await options.whatsapp!.process(raw, signature);
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message === "WHATSAPP_SIGNATURE_INVALID"
+            ) {
+              return reply.status(401).send();
+            }
+            throw error;
+          }
+          return reply.status(200).send({ received: true });
+        },
+      );
+      routes.post(
+        "/v1/whatsapp/link/confirm",
+        {
+          schema: {
+            operationId: "confirmWhatsAppIdentity",
+            tags: ["account"],
+            headers: authHeaders,
+            body: {
+              type: "object",
+              additionalProperties: false,
+              required: ["token"],
+              properties: {
+                token: { type: "string", minLength: 20, maxLength: 200 },
+              },
+            },
+            response: { 200: stateSchema, ...commonResponses },
+          },
+        },
+        async (request) => {
+          const user = identity(request);
+          if (user !== "owner")
+            throw new ApiError(
+              403,
+              "ACCESS_DENIED",
+              "Owner authentication required",
+            );
+          const actor = localIdentities[user];
+          return options.whatsapp!.confirmIdentity(
+            (request.body as { token: string }).token,
+            actor.id,
+            actor.householdId!,
+          );
+        },
+      );
+      routes.post(
+        "/v1/whatsapp/unlink",
+        {
+          schema: {
+            operationId: "unlinkWhatsAppIdentity",
+            tags: ["account"],
+            headers: mutationHeaders,
+            body: {
+              type: "object",
+              additionalProperties: false,
+              required: ["contactId"],
+              properties: {
+                contactId: { type: "string", minLength: 1, maxLength: 120 },
+              },
+            },
+            response: { 200: stateSchema, ...commonResponses },
+          },
+        },
+        async (request) => {
+          const user = identity(request);
+          if (user !== "owner")
+            throw new ApiError(
+              403,
+              "ACCESS_DENIED",
+              "Owner authentication required",
+            );
+          await options.whatsapp!.unlink(
+            (request.body as { contactId: string }).contactId,
+          );
+          return { unlinked: true, traceId: request.id };
+        },
+      );
+    }
 
     routes.get(
       "/v1/me",

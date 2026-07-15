@@ -18,6 +18,11 @@ export interface OutboundMessage {
 }
 
 export interface WhatsAppProvider {
+  verifySubscription(input: {
+    challenge: string;
+    mode: string;
+    verifyToken: string;
+  }): Promise<string | null>;
   verifyWebhook(payload: string, signature: string): Promise<boolean>;
   parseInbound(payload: string): Promise<CanonicalInboundMessage[]>;
   sendText(contactId: string, text: string): Promise<OutboundMessage>;
