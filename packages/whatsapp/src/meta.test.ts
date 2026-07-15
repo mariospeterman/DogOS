@@ -54,6 +54,19 @@ describe("Meta Cloud WhatsApp adapter", () => {
         WHATSAPP_TEST_ALLOWLIST: contact,
       }),
     ).toThrow("WHATSAPP_PRODUCTION_AUTH_REQUIRED");
+    expect(() =>
+      loadMetaWhatsAppConfig({
+        WHATSAPP_MODE: "production",
+        WHATSAPP_ACCESS_TOKEN: "x",
+        WHATSAPP_APP_SECRET: "x",
+        WHATSAPP_GRAPH_VERSION: "v24.0",
+        WHATSAPP_PHONE_NUMBER_ID: "x",
+        WHATSAPP_VERIFY_TOKEN: "x",
+        WHATSAPP_TEST_ALLOWLIST: contact,
+        DOGOS_AUTH_MODE: "supabase",
+        WHATSAPP_PRIVACY_APPROVED: "true",
+      }),
+    ).toThrow("WHATSAPP_PRODUCTION_NOT_ENABLED");
   });
 
   it("verifies subscription and raw payload signatures", async () => {

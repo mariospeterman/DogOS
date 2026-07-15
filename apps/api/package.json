@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dogos/agent-auth": "workspace:*",
+    "@dogos/agent-tools": "workspace:*",
     "@dogos/config": "workspace:*",
     "@dogos/contracts": "workspace:*",
     "@dogos/database": "workspace:*",

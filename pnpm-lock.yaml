@@ -53,6 +53,12 @@ importers:
 
   apps/api:
     dependencies:
+      '@dogos/agent-auth':
+        specifier: workspace:*
+        version: link:../../packages/agent-auth
+      '@dogos/agent-tools':
+        specifier: workspace:*
+        version: link:../../packages/agent-tools
       '@dogos/config':
         specifier: workspace:*
         version: link:../../packages/config

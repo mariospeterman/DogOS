@@ -61,6 +61,7 @@ export function loadMetaWhatsAppConfig(
     if (environment.WHATSAPP_PRIVACY_APPROVED !== "true") {
       throw new Error("WHATSAPP_PRODUCTION_PRIVACY_REQUIRED");
     }
+    throw new Error("WHATSAPP_PRODUCTION_NOT_ENABLED");
   }
   return {
     accessToken: environment.WHATSAPP_ACCESS_TOKEN!,

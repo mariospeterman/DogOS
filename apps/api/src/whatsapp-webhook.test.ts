@@ -13,10 +13,14 @@ describe("WhatsApp webhook routes", () => {
   it("verifies subscriptions, rejects signatures, deduplicates, and links identity", async () => {
     const provider = new LocalWhatsAppSimulator("webhook-secret");
     const store = new InMemoryWhatsAppStateStore();
+    let linkedMessages = 0;
     const service = new WhatsAppWebhookService(
       provider,
       store,
       "http://127.0.0.1:3000/app/account/link",
+      async () => {
+        linkedMessages += 1;
+      },
     );
     const app = buildApp({ whatsapp: service });
     apps.push(app);
@@ -77,6 +81,31 @@ describe("WhatsApp webhook routes", () => {
     });
     expect(linked.statusCode).toBe(200);
     expect(linked.json()).toMatchObject({ linked: true });
+    const linkedBody = JSON.stringify({
+      messages: [
+        {
+          id: "message-2",
+          contactId: "41790000000",
+          kind: "button",
+          text: "choice.1",
+          receivedAt: "2026-07-15T12:01:00.000Z",
+        },
+      ],
+    });
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/webhooks/whatsapp",
+          headers: {
+            "content-type": "application/json",
+            "x-hub-signature-256": provider.sign(linkedBody),
+          },
+          payload: linkedBody,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(linkedMessages).toBe(1);
     expect(
       (
         await app.inject({
