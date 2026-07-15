@@ -8,7 +8,6 @@ import {
   type Goal,
   type GoalVersion,
   type PlanGenerationResult,
-  type ProtocolEligibility,
   type ProtocolVersion,
   type RuleSet,
 } from "@dogos/contracts";

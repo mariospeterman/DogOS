@@ -1,6 +1,4 @@
 import {
-  canonicalCodeSchema,
-  entityIdSchema,
   isoTimestampSchema,
   metricCodeSchema,
   progressEvaluationSchema,
