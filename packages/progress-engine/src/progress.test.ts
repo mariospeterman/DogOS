@@ -148,7 +148,7 @@ describe("progress evaluation", () => {
     );
   });
 
-  it("lets food refusal override otherwise improving evidence", () => {
+  it("reports mixed evidence while regression controls the next action", () => {
     const latestAt = "2026-07-13T10:00:00.000Z";
     const result = evaluateProgress(
       input([
@@ -160,7 +160,7 @@ describe("progress evaluation", () => {
       ]),
     );
 
-    expect(result.status).toBe("regressing");
+    expect(result.status).toBe("mixed");
     expect(result.reasonCodes).toContain("REGRESSION_FOOD_REFUSAL");
     expect(result.candidateNextAction).toBe("reduce_difficulty");
   });

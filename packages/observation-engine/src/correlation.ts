@@ -163,3 +163,10 @@ export function observeCorrelation(
     }),
   };
 }
+
+export function findCorrelations(
+  input: CorrelationInput,
+): CorrelationObservation[] {
+  const result = observeCorrelation(input);
+  return result.status === "observed" ? [result.observation] : [];
+}

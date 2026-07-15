@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Measurement } from "@dogos/contracts";
 
-import { observeCorrelation } from "./correlation.js";
+import { findCorrelations, observeCorrelation } from "./correlation.js";
 import { createBoundedHypothesis, validateObservation } from "./observation.js";
 
 function outcome(
@@ -102,6 +102,7 @@ describe("descriptive correlations", () => {
       [...result.observation.supportingSessionIds].sort(),
     );
     expect(result).toEqual(observeCorrelation(input));
+    expect(findCorrelations(input)).toEqual([result.observation]);
   });
 
   it("suppresses an undersized comparison group", () => {

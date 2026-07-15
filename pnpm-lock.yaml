@@ -186,6 +186,34 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  packages/testing:
+    dependencies:
+      '@dogos/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@dogos/knowledge':
+        specifier: workspace:*
+        version: link:../knowledge
+      '@dogos/observation-engine':
+        specifier: workspace:*
+        version: link:../observation-engine
+      '@dogos/progress-engine':
+        specifier: workspace:*
+        version: link:../progress-engine
+      '@dogos/safety-engine':
+        specifier: workspace:*
+        version: link:../safety-engine
+      '@dogos/training-engine':
+        specifier: workspace:*
+        version: link:../training-engine
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
   packages/training-engine:
     dependencies:
       '@dogos/contracts':

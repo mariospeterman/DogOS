@@ -1,0 +1,30 @@
+{
+  "name": "@dogos/testing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "demo": "pnpm --filter @dogos/testing... --workspace-concurrency=1 build && node dist/demo.js"
+  },
+  "dependencies": {
+    "@dogos/contracts": "workspace:*",
+    "@dogos/knowledge": "workspace:*",
+    "@dogos/observation-engine": "workspace:*",
+    "@dogos/progress-engine": "workspace:*",
+    "@dogos/safety-engine": "workspace:*",
+    "@dogos/training-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "typescript": "6.0.3"
+  }
+}

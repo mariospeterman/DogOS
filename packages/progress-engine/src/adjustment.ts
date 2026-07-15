@@ -57,7 +57,10 @@ export function decidePlanAdjustment(
     decision = "stop_training";
   } else if (input.progress.reasonCodes.includes("REGRESSION_FOOD_REFUSAL")) {
     decision = "schedule_rest";
-  } else if (input.progress.status === "regressing") {
+  } else if (
+    input.progress.status === "regressing" ||
+    input.progress.status === "mixed"
+  ) {
     decision = "reduce_difficulty";
   } else if (input.prerequisiteStepCode !== null) {
     decision = "train_prerequisite";
@@ -145,3 +148,5 @@ export function decidePlanAdjustment(
     ].includes(decision),
   });
 }
+
+export const adjustPlan = decidePlanAdjustment;

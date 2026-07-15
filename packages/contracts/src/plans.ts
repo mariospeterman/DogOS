@@ -7,6 +7,7 @@ import {
   semanticVersionSchema,
 } from "./common.js";
 import { metricCodeSchema } from "./measurement.js";
+import { progressionRuleSchema, regressionRuleSchema } from "./knowledge.js";
 import { reasonCodeSchema } from "./reason-codes.js";
 
 export const goalSchema = z.strictObject({
@@ -62,6 +63,10 @@ export const planVersionSchema = z.strictObject({
   generationReasonCodes: z.array(reasonCodeSchema),
   steps: z.array(planStepSchema).min(1),
   scheduledSessions: z.array(scheduledSessionSchema),
+  progressionRules: z.array(progressionRuleSchema),
+  regressionRules: z.array(regressionRuleSchema),
+  stopRuleIds: z.array(canonicalCodeSchema),
+  escalationRuleIds: z.array(canonicalCodeSchema),
   createdAt: isoTimestampSchema,
 });
 

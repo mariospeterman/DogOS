@@ -102,6 +102,7 @@ function confidenceFor(
   sessions: SessionEvidence[],
   conflict: boolean,
   missingCount: number,
+  stale: boolean,
 ): ProgressEvaluation["confidence"] {
   const reliable = sessions.filter((session) =>
     session.measurements.some(
@@ -111,6 +112,7 @@ function confidenceFor(
   ).length;
   if (sessions.length === 0) return "unavailable";
   if (conflict || missingCount > 0 || reliable < 2) return "low";
+  if (stale) return sessions.length >= 3 ? "moderate" : "low";
   if (sessions.length >= 5 && reliable >= 4) return "high";
   return sessions.length >= 3 ? "moderate" : "low";
 }
@@ -296,7 +298,9 @@ export function evaluateProgress(
   const insufficient =
     missingMetricCodes.length > 0 || sessions.length < input.minimumSessions;
   const status: ProgressEvaluation["status"] = regression
-    ? "regressing"
+    ? progressionMet
+      ? "mixed"
+      : "regressing"
     : insufficient
       ? "insufficient_data"
       : conflict
@@ -317,7 +321,12 @@ export function evaluateProgress(
     ),
     evidenceIds,
     missingMetricCodes: [...new Set(missingMetricCodes)].sort(),
-    confidence: confidenceFor(sessions, conflict, missingMetricCodes.length),
+    confidence: confidenceFor(
+      sessions,
+      conflict,
+      missingMetricCodes.length,
+      stale,
+    ),
     reasonCodes: [...new Set(reasons)].sort(),
     candidateNextAction: regression
       ? "reduce_difficulty"
