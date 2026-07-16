@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "../../../components/app-shell";
+import { DistributionActions } from "../../../components/distribution-actions";
 import { createClient } from "../../../lib/supabase/client";
 
 export default function AccountPage() {
@@ -70,6 +71,13 @@ export default function AccountPage() {
         Zeitzone Europe/Zurich. Ein Sprachwechsel verändert weder Land, Währung
         noch frühere Antworten.
       </p>
+      <section className="account-distribution">
+        <div>
+          <strong>DogOS mitnehmen</strong>
+          <span>Installiere die App oder teile den sicheren Startlink.</span>
+        </div>
+        <DistributionActions />
+      </section>
       <button
         className="button danger"
         onClick={async () => {

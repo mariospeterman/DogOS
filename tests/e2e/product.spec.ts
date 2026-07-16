@@ -10,6 +10,7 @@ import {
 
 const api = "http://127.0.0.1:4000";
 const screenshots = resolve("test-results/slice-2.5/screenshots");
+const distributionScreenshots = resolve("test-results/slice-2.7/screenshots");
 const headers = (key: string, user = "owner") => ({
   "x-dogos-user": user,
   "idempotency-key": key,
@@ -32,15 +33,19 @@ async function clickButton(page: Page, name: string) {
   await button.click();
 }
 
-test.beforeAll(async () => mkdir(screenshots, { recursive: true }));
+test.beforeAll(async () => {
+  await Promise.all([
+    mkdir(screenshots, { recursive: true }),
+    mkdir(distributionScreenshots, { recursive: true }),
+  ]);
+});
 
 test("scenario 1: German low-risk owner reaches and uses the plan", async ({
   page,
   request,
 }, testInfo) => {
   await reset(request);
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/app\/today$/);
+  await page.goto("/app/today");
   await expect(
     page.getByRole("heading", { name: "Milo / Heute" }),
   ).toBeVisible();
@@ -317,4 +322,51 @@ test("calendar supports bounded rescheduling and a revocable ICS feed", async ({
   );
   expect(valid.headers()["content-type"]).toContain("text/calendar");
   expect(await valid.text()).toContain("BEGIN:VEVENT");
+});
+
+test("public start is WhatsApp-first and referral codes grant no access", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/?ref=DOGOS26");
+  await expect(
+    page.getByRole("heading", {
+      name: "Im WhatsApp-Chat starten. In DogOS dranbleiben.",
+    }),
+  ).toBeVisible();
+  const start = page.getByRole("link", { name: "In WhatsApp starten" });
+  await expect(start).toHaveAttribute("href", /text=DogOS\+starten/);
+  await expect(start).toHaveAttribute("href", /Einladung\+DOGOS26/);
+  await expect(
+    page.getByRole("link", { name: /Schon verbunden/ }),
+  ).toHaveAttribute("href", "/auth/sign-in");
+  await page.locator("main").screenshot({
+    path: resolve(
+      distributionScreenshots,
+      `start-${testInfo.project.name}.png`,
+    ),
+  });
+});
+
+test("PWA manifest exposes install and durable product shortcuts", async ({
+  request,
+}) => {
+  const response = await request.get("/manifest.webmanifest");
+  expect(response.status()).toBe(200);
+  const manifest = (await response.json()) as {
+    display: string;
+    icons: Array<{ sizes: string }>;
+    shortcuts: Array<{ url: string }>;
+    start_url: string;
+  };
+  expect(manifest.display).toBe("standalone");
+  expect(manifest.start_url).toContain("/app/today");
+  expect(manifest.icons.map((icon) => icon.sizes)).toEqual(
+    expect.arrayContaining(["192x192", "512x512"]),
+  );
+  expect(manifest.shortcuts.map((shortcut) => shortcut.url)).toEqual(
+    expect.arrayContaining([
+      "/app/today?source=app_shortcut",
+      "/app/progress?source=app_shortcut",
+    ]),
+  );
 });

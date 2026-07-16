@@ -1,5 +1,10 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { StartExperience } from "../components/start-experience";
 
 export default function HomePage() {
-  redirect("/app/today");
+  return (
+    <Suspense fallback={<main className="start-screen" />}>
+      <StartExperience />
+    </Suspense>
+  );
 }

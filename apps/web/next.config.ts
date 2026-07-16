@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
     "127.0.0.1",
     ...(configuredWebHostname === null ? [] : [configuredWebHostname]),
   ],
+  devIndicators: false,
   poweredByHeader: false,
   reactStrictMode: true,
   turbopack: {

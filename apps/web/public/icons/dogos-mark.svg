@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DogOS">
+  <rect width="512" height="512" rx="88" fill="#0b1f3a"/>
+  <rect x="0" y="374" width="512" height="138" fill="#c71f37"/>
+  <path d="M142 102h105c102 0 165 55 165 153s-63 155-165 155H142V102Zm98 240c54 0 86-28 86-87 0-57-32-85-86-85h-15v172h15Z" fill="#fff"/>
+</svg>
