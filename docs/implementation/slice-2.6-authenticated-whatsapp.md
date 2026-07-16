@@ -32,8 +32,12 @@ development authentication.
 
 The explicit state machine is persisted in
 `private.whatsapp_conversation_sessions`. The orchestrator supports restart,
-language switching, bounded deterministic free text, Meta reply buttons,
-duplicate delivery protection, and a daily entitlement counter.
+automatic language adaptation, bounded deterministic free text, Meta reply
+buttons, duplicate delivery protection, and a daily entitlement counter. There
+is no language-selection step: supported language is inferred from each inbound
+message, while ambiguous text and provider choice IDs preserve the active
+presentation locale. Existing sessions at the retired locale-confirmation state
+advance without losing answers.
 
 The conversation stays focused on dog training, observations, plan, and
 progress. Obvious prompt-injection and unrelated requests receive one short
@@ -54,7 +58,10 @@ may claim a higher tier directly.
 
 ## LLM boundary
 
-No LLM is authoritative in this increment. A future model receives a compact
+No LLM is authoritative in this increment. Language resolution is an injectable
+adapter; the current reviewed German/English development adapter is
+deterministic. A future multilingual model may replace that adapter only after
+evaluation and receives a compact
 context capsule containing only:
 
 ```text
@@ -65,7 +72,9 @@ intent + active dog facts needed for this turn + current canonical plan step
 It does not receive the whole account, the entire conversation, internal rule
 definitions, unrelated personal data, or entitlement secrets. Candidate facts
 are schema validated and confirmed where ambiguity matters. Engines compute
-risk, eligibility, plan, progression, and referral disposition.
+risk, eligibility, plan, progression, and referral disposition. Detected
+language changes presentation only; it cannot change canonical answers,
+country, currency, timezone, measurements, or engine decisions.
 
 ## Acceptance completed
 
@@ -74,7 +83,8 @@ risk, eligibility, plan, progression, and referral disposition.
 - explicit account-link confirmation sends a bearer token instead of
   `x-dogos-user`;
 - WhatsApp state and message limits persist in PostgreSQL;
-- German/English switching preserves CH, CHF, Europe/Zurich, answers, and state;
+- German/English is inferred without a selector and switching preserves CH,
+  CHF, Europe/Zurich, answers, and state;
 - prompt-injection and unrelated topic attempts remain out of scope;
 - high-risk handling remains recoverable rather than terminal;
 - the 390 x 844 Today, Plan, and Session views have been browser-reviewed.

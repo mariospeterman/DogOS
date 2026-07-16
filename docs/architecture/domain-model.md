@@ -24,10 +24,12 @@ tests without silently changing the semantics below.
 - Domain codes, protocol logic, analytics dimensions, and persisted decisions are
   language-neutral. BCP 47 locale, country, legal jurisdiction, timezone, and ISO
   currency are modeled separately and never inferred from each other.
-- Locale resolution uses explicit preference, confirmed account locale, WhatsApp
-  metadata, safe conversation detection, household default, then platform
-  fallback. A locale switch affects future presentation and is audited; it does
-  not rewrite historical answers or decision records.
+- WhatsApp locale resolution uses safe conversation detection on each inbound
+  message, then the active conversation locale, confirmed account preference,
+  household default, and platform fallback. It does not interrupt onboarding
+  with a language selector. An explicit natural-language request can switch
+  future presentation and is audited; it does not rewrite historical answers or
+  decision records.
 - Localizations are version-bound and move through
   `draft_machine_translation`, `human_review_pending`,
   `professionally_reviewed`, `legal_reviewed`, `approved_for_release`, or

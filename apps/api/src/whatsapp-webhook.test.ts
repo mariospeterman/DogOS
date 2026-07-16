@@ -119,5 +119,31 @@ describe("WhatsApp webhook routes", () => {
         })
       ).statusCode,
     ).toBe(400);
+
+    const germanBody = JSON.stringify({
+      messages: [
+        {
+          id: "message-3",
+          contactId: "41790000001",
+          kind: "text",
+          text: "Hoi, mein Hund braucht Training",
+          receivedAt: "2026-07-15T12:02:00.000Z",
+        },
+      ],
+    });
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/webhooks/whatsapp",
+          headers: {
+            "content-type": "application/json",
+            "x-hub-signature-256": provider.sign(germanBody),
+          },
+          payload: germanBody,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(provider.history().at(-1)?.text).toMatch(/Verknüpfe dein Konto/);
   });
 });

@@ -121,7 +121,7 @@ Every adjustment links to the evidence used and states what was missing.
 eligibility and specialization
 -> risk competence
 -> local/remote coverage
--> language
+-> automatic language adaptation from the conversation
 -> availability
 -> user price range
 -> quality/outcome data when valid

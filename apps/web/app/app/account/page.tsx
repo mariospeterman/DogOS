@@ -8,13 +8,11 @@ import {
   Shield,
   UserRound,
 } from "lucide-react";
-import { useState } from "react";
 import { AppShell } from "../../../components/app-shell";
 import { DistributionActions } from "../../../components/distribution-actions";
 import { createClient } from "../../../lib/supabase/client";
 
 export default function AccountPage() {
-  const [locale, setLocale] = useState("de-CH");
   return (
     <AppShell title="Konto" eyebrow="Profil und Zugriff">
       <section className="account-person">
@@ -25,19 +23,13 @@ export default function AccountPage() {
         </span>
       </section>
       <section className="settings">
-        <label>
+        <div>
           <span>
             <Globe2 />
-            Sprache<small>Ändert nur künftige Darstellung</small>
+            Sprache<small>Wird aus der Unterhaltung erkannt</small>
           </span>
-          <select
-            value={locale}
-            onChange={(event) => setLocale(event.target.value)}
-          >
-            <option value="de-CH">Deutsch (Schweiz)</option>
-            <option value="en">English</option>
-          </select>
-        </label>
+          <strong>Automatisch</strong>
+        </div>
         <div>
           <span>
             <CreditCard />
@@ -68,8 +60,8 @@ export default function AccountPage() {
         </div>
       </section>
       <p className="helper">
-        Zeitzone Europe/Zurich. Ein Sprachwechsel verändert weder Land, Währung
-        noch frühere Antworten.
+        Antworte DogOS einfach in deiner Sprache. Zeitzone Europe/Zurich, Land,
+        Währung und frühere Antworten bleiben davon unberührt.
       </p>
       <section className="account-distribution">
         <div>

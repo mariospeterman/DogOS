@@ -5,19 +5,20 @@ import {
   type ConversationSnapshot,
   type ConversationState,
 } from "./machine.js";
+import {
+  DeterministicConversationLanguageResolver,
+  type ConversationLanguageResolver,
+} from "./language.js";
 import type { OutboundMessage, WhatsAppProvider } from "./provider.js";
 import type { ProviderContact, WhatsAppStateStore } from "./state-store.js";
 
 const options: Record<ConversationState, Record<"de-CH" | "en", string[]>> = {
-  welcome: { "de-CH": ["Los geht's", "English"], en: ["Start", "Deutsch"] },
+  welcome: { "de-CH": ["Los geht's"], en: ["Start"] },
   ai_disclosure: {
     "de-CH": ["Verstanden"],
     en: ["Understood"],
   },
-  locale_confirmation: {
-    "de-CH": ["Deutsch", "English"],
-    en: ["English", "Deutsch"],
-  },
+  locale_confirmation: { "de-CH": [], en: [] },
   household_context: {
     "de-CH": ["Nur ich", "Mehrere Personen"],
     en: ["Only me", "Several people"],
@@ -80,18 +81,45 @@ export class WhatsAppConversationOrchestrator {
       contact: ProviderContact,
     ) => Promise<ConversationLinks>,
     private readonly tier: SubscriptionTier = "freemium",
+    private readonly languageResolver: ConversationLanguageResolver = new DeterministicConversationLanguageResolver(),
   ) {}
 
   async handle(
     contact: ProviderContact,
     text: string,
   ): Promise<OutboundMessage> {
-    const locale = contact.locale;
+    const saved = await this.store.loadConversation(contact.id);
+    const machine = new ConversationMachine(saved?.locale ?? contact.locale);
+    if (saved !== null) machine.resume(saved);
+    const beforeResolution = machine.view();
+    const resolution = await this.languageResolver.resolve({
+      currentLocale: beforeResolution.locale,
+      text,
+    });
+    if (resolution.locale !== beforeResolution.locale) {
+      machine.switchLocale(resolution.locale);
+    }
+
+    if (beforeResolution.state === "locale_confirmation") {
+      if (text === "choice.2") {
+        machine.switchLocale(
+          beforeResolution.locale === "de-CH" ? "en" : "de-CH",
+        );
+      }
+      machine.skipLegacyLocaleConfirmation();
+      await this.persist(contact.id, machine.view());
+      return this.present(contact.externalId, machine.view());
+    }
+
+    const current = machine.view();
+    const locale = current.locale;
+    const localeChanged = locale !== beforeResolution.locale;
     const allowed = await this.store.consumeDailyMessage(
       contact.id,
       capabilitiesForTier(this.tier).coachingMessagesPerDay,
     );
     if (!allowed) {
+      if (localeChanged) await this.persist(contact.id, current);
       return this.provider.sendText(
         contact.externalId,
         locale === "de-CH"
@@ -100,32 +128,19 @@ export class WhatsAppConversationOrchestrator {
       );
     }
 
+    if (resolution.source === "explicit_request") {
+      await this.persist(contact.id, current);
+      return this.present(contact.externalId, current);
+    }
+
     if (offTopicPattern.test(text)) {
+      if (localeChanged) await this.persist(contact.id, current);
       return this.provider.sendText(
         contact.externalId,
         locale === "de-CH"
           ? "Ich bleibe bei deinem Hund: Training, Beobachtungen, Plan und Fortschritt. Was davon brauchst du?"
           : "I stay focused on your dog: training, observations, plan, and progress. Which do you need?",
       );
-    }
-
-    const saved = await this.store.loadConversation(contact.id);
-    const machine = new ConversationMachine(saved?.locale ?? locale);
-    if (saved !== null) machine.resume(saved);
-    const current = machine.view();
-
-    if (
-      (current.state === "welcome" ||
-        current.state === "locale_confirmation") &&
-      text === "choice.2"
-    ) {
-      machine.switchLocale(current.locale === "de-CH" ? "en" : "de-CH");
-    }
-
-    if (isLocaleSwitch(text)) {
-      machine.switchLocale(wantsEnglish(text) ? "en" : "de-CH");
-      await this.persist(contact.id, machine.view());
-      return this.present(contact.externalId, machine.view());
     }
 
     if (current.state === "plan_ready") {
@@ -244,16 +259,6 @@ export class WhatsAppConversationOrchestrator {
     };
     return this.store.saveConversation(contactId, snapshot);
   }
-}
-
-function isLocaleSwitch(text: string): boolean {
-  return /^(english|deutsch|language\.en|language\.de|sprache englisch|sprache deutsch)$/i.test(
-    text.trim(),
-  );
-}
-
-function wantsEnglish(text: string): boolean {
-  return /english|\.en$/i.test(text.trim());
 }
 
 function isUsableName(text: string): boolean {

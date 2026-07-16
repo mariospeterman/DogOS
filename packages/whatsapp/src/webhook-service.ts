@@ -3,6 +3,10 @@ import type {
   WebhookVerificationContext,
   WhatsAppProvider,
 } from "./provider.js";
+import {
+  DeterministicConversationLanguageResolver,
+  type ConversationLanguageResolver,
+} from "./language.js";
 import type { ProviderContact, WhatsAppStateStore } from "./state-store.js";
 
 export class WhatsAppWebhookService {
@@ -14,6 +18,7 @@ export class WhatsAppWebhookService {
       message: { contact: ProviderContact; kind: string; text: string },
       traceId: string,
     ) => Promise<void>,
+    private readonly languageResolver: ConversationLanguageResolver = new DeterministicConversationLanguageResolver(),
   ) {}
 
   verifySubscription(input: {
@@ -41,6 +46,10 @@ export class WhatsAppWebhookService {
       if (claimed === null) continue;
       accepted += 1;
       if (!claimed.contact.linked) {
+        const language = await this.languageResolver.resolve({
+          currentLocale: claimed.contact.locale,
+          text: message.text,
+        });
         const token = await this.store.issueIdentityLink(
           claimed.contact.id,
           traceId,
@@ -48,7 +57,9 @@ export class WhatsAppWebhookService {
         );
         const outbound = await this.provider.sendText(
           message.contactId,
-          `DogOS development pilot. Automated messages support training but do not diagnose. Link your account: ${this.accountLinkBaseUrl}?token=${encodeURIComponent(token)}`,
+          language.locale === "de-CH"
+            ? `DogOS Entwicklungspilot. Automatisierte Nachrichten unterstützen das Training, stellen aber keine Diagnose. Verknüpfe dein Konto: ${this.accountLinkBaseUrl}?token=${encodeURIComponent(token)}`
+            : `DogOS development pilot. Automated messages support training but do not diagnose. Link your account: ${this.accountLinkBaseUrl}?token=${encodeURIComponent(token)}`,
         );
         await this.store.saveOutbound(outbound, traceId);
       } else if (this.onLinkedMessage !== undefined) {

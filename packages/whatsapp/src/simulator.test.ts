@@ -72,7 +72,7 @@ describe("conversation machine", () => {
       currency: "CHF",
       timezone: "Europe/Zurich",
     });
-    expect(after.prompt).toMatch(/English/);
+    expect(after.prompt).toMatch(/Who lives/);
   });
 
   it("resumes saved state and fails closed into professional escalation", () => {
@@ -124,10 +124,13 @@ describe("WhatsApp conversation orchestration", () => {
     return { contact, orchestrator, store };
   }
 
-  it("persists progress and switches presentation without changing Swiss context", async () => {
+  it("infers English without a selector and preserves Swiss context", async () => {
     const { contact, orchestrator, store } = await setup();
-    const disclosure = await orchestrator.handle(contact, "choice.2");
+    const disclosure = await orchestrator.handle(contact, "Proceed");
     expect(disclosure.text).toMatch(/rule-based/);
+    expect(disclosure.options).toEqual(["Understood"]);
+    expect(disclosure.options).not.toContain("Deutsch");
+    expect(disclosure.options).not.toContain("English");
     const snapshot = await store.loadConversation(contact.id);
     expect(snapshot).toMatchObject({
       country: "CH",
@@ -135,6 +138,50 @@ describe("WhatsApp conversation orchestration", () => {
       locale: "en",
       state: "ai_disclosure",
       timezone: "Europe/Zurich",
+    });
+
+    const household = await orchestrator.handle(contact, "choice.1");
+    expect(household.text).toMatch(/Who lives/);
+    expect((await store.loadConversation(contact.id))?.state).toBe(
+      "household_context",
+    );
+  });
+
+  it("switches naturally without consuming an answer", async () => {
+    const { contact, orchestrator, store } = await setup();
+    await orchestrator.handle(contact, "Proceed");
+    await orchestrator.handle(contact, "choice.1");
+    const before = await store.loadConversation(contact.id);
+
+    const german = await orchestrator.handle(
+      contact,
+      "Bitte antworte auf Deutsch",
+    );
+    const after = await store.loadConversation(contact.id);
+    expect(german.text).toMatch(/Wer lebt/);
+    expect(after?.state).toBe("household_context");
+    expect(after?.answers).toEqual(before?.answers);
+    expect(after).toMatchObject({
+      country: "CH",
+      currency: "CHF",
+      locale: "de-CH",
+      timezone: "Europe/Zurich",
+    });
+  });
+
+  it("moves sessions parked at the legacy selector forward once", async () => {
+    const { contact, orchestrator, store } = await setup();
+    const legacy = new ConversationMachine("de-CH").view();
+    await store.saveConversation(contact.id, {
+      ...legacy,
+      state: "locale_confirmation",
+    });
+
+    const household = await orchestrator.handle(contact, "choice.2");
+    expect(household.text).toMatch(/Who lives/);
+    expect(await store.loadConversation(contact.id)).toMatchObject({
+      locale: "en",
+      state: "household_context",
     });
   });
 
@@ -146,7 +193,7 @@ describe("WhatsApp conversation orchestration", () => {
     );
     expect(refused.text).toMatch(/Ich bleibe bei deinem Hund/);
     const machine = new ConversationMachine("de-CH");
-    for (let index = 0; index < 6; index += 1) machine.answer("answer.test");
+    for (let index = 0; index < 5; index += 1) machine.answer("answer.test");
     expect(machine.view().state).toBe("health_screen");
     await store.saveConversation(contact.id, machine.view());
     const stopped = await orchestrator.handle(contact, "Er lahmt plötzlich");

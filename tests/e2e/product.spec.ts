@@ -306,6 +306,19 @@ test("account link hydrates and confirms without exposing a web chat", async ({
   expect(simulator?.status()).toBe(404);
 });
 
+test("account language follows conversation without a selector", async ({
+  page,
+}) => {
+  await page.goto("/app/account");
+  await expect(page.getByText("Automatisch", { exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: /Sprache/ })).toHaveCount(0);
+  await expect(
+    page.getByText("Antworte DogOS einfach in deiner Sprache", {
+      exact: false,
+    }),
+  ).toBeVisible();
+});
+
 test("calendar supports bounded rescheduling and a revocable ICS feed", async ({
   page,
   request,

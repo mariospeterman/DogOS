@@ -36,7 +36,7 @@ const prompts: Record<ConversationLocale, Record<ConversationState, string>> = {
       "Hoi, ich begleite dich und deinen Hund durch kurze Trainingsschritte.",
     ai_disclosure:
       "DogOS nutzt spaeter KI-Unterstuetzung. Entscheidungen sind hier regelbasiert.",
-    locale_confirmation: "Moechtest du auf Deutsch weitermachen?",
+    locale_confirmation: "Die Sprache wird automatisch erkannt.",
     household_context: "Wer lebt mit deinem Hund im Haushalt?",
     dog_identity: "Wie heisst dein Hund?",
     dog_history: "Was weisst du ueber Alter und Herkunft?",
@@ -57,7 +57,7 @@ const prompts: Record<ConversationLocale, Record<ConversationState, string>> = {
     welcome: "Hi, I will guide you and your dog through short training steps.",
     ai_disclosure:
       "DogOS may use AI assistance later. Decisions here are rule-based.",
-    locale_confirmation: "Would you like to continue in English?",
+    locale_confirmation: "Language is detected automatically.",
     household_context: "Who lives with your dog?",
     dog_identity: "What is your dog's name?",
     dog_history: "What do you know about age and background?",
@@ -100,8 +100,10 @@ export class ConversationMachine {
   answer(canonicalAnswer: string): ReturnType<ConversationMachine["view"]> {
     this.#snapshot.answers[this.#snapshot.state] = canonicalAnswer;
     const index = conversationStates.indexOf(this.#snapshot.state);
-    if (index < conversationStates.length - 2)
-      this.#snapshot.state = conversationStates[index + 1]!;
+    let nextIndex = index + 1;
+    if (conversationStates[nextIndex] === "locale_confirmation") nextIndex += 1;
+    if (nextIndex < conversationStates.length - 1)
+      this.#snapshot.state = conversationStates[nextIndex]!;
     this.#snapshot.audit.push({
       event: "answer.recorded",
       state: this.#snapshot.state,
@@ -117,6 +119,17 @@ export class ConversationMachine {
       event: "locale.switched",
       state: this.#snapshot.state,
     });
+    return this.view();
+  }
+
+  skipLegacyLocaleConfirmation(): ReturnType<ConversationMachine["view"]> {
+    if (this.#snapshot.state === "locale_confirmation") {
+      this.#snapshot.state = "household_context";
+      this.#snapshot.audit.push({
+        event: "locale.prompt_skipped",
+        state: this.#snapshot.state,
+      });
+    }
     return this.view();
   }
 
