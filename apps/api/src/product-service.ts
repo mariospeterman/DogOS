@@ -113,7 +113,7 @@ export class ProductService {
     return this.snapshot();
   }
   command<T>(
-    identity: LocalIdentity,
+    identity: string,
     key: string,
     body: unknown,
     action: () => T,

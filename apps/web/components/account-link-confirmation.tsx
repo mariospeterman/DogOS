@@ -2,6 +2,7 @@
 
 import { Link2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
+import { createClient } from "../lib/supabase/client";
 import { AppShell, DevelopmentNotice } from "./app-shell";
 
 export function AccountLinkConfirmation({ token }: { token: string }) {
@@ -11,13 +12,22 @@ export function AccountLinkConfirmation({ token }: { token: string }) {
   async function confirm() {
     setStatus("working");
     try {
+      const { data } = await createClient().auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (accessToken === undefined) {
+        const next = `${window.location.pathname}${window.location.search}`;
+        window.location.assign(
+          `/auth/sign-in?next=${encodeURIComponent(next)}`,
+        );
+        return;
+      }
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000"}/v1/whatsapp/link/confirm`,
         {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "x-dogos-user": "owner",
+            authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ token }),
         },

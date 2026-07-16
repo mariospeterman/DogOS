@@ -6,18 +6,20 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import rawBody from "fastify-raw-body";
+import type { AgentActorContext } from "@dogos/agent-auth";
 import type { WhatsAppWebhookService } from "@dogos/whatsapp";
-import {
-  ProductService,
-  localIdentities,
-  type LocalIdentity,
-} from "./product-service.js";
+import { ProductService, localIdentities } from "./product-service.js";
 import {
   SignedActionError,
   SignedActionService,
   signedActionPurposes,
   type SignedActionPurpose,
 } from "./signed-actions.js";
+import {
+  AuthenticationError,
+  LocalRequestAuthenticator,
+  type RequestAuthenticator,
+} from "./auth.js";
 
 const errorCodes = [
   "AUTH_REQUIRED",
@@ -73,8 +75,9 @@ const commonResponses = {
 };
 const mutationHeaders = {
   type: "object",
-  required: ["x-dogos-user", "idempotency-key"],
+  required: ["idempotency-key"],
   properties: {
+    authorization: { type: "string" },
     "x-dogos-user": { type: "string", enum: Object.keys(localIdentities) },
     "idempotency-key": { type: "string", minLength: 4, maxLength: 120 },
     "x-request-id": { type: "string" },
@@ -82,8 +85,8 @@ const mutationHeaders = {
 } as const;
 const authHeaders = {
   type: "object",
-  required: ["x-dogos-user"],
   properties: {
+    authorization: { type: "string" },
     "x-dogos-user": { type: "string", enum: Object.keys(localIdentities) },
   },
 } as const;
@@ -94,14 +97,8 @@ const idParams = {
   properties: { id: { type: "string", minLength: 1 } },
 } as const;
 
-function identity(request: FastifyRequest): LocalIdentity {
-  const value = request.headers["x-dogos-user"];
-  if (typeof value !== "string" || !(value in localIdentities))
-    throw new ApiError(401, "AUTH_REQUIRED", "Authentication is required");
-  return value as LocalIdentity;
-}
-function requireWrite(user: LocalIdentity): void {
-  if (!["owner", "caregiver"].includes(user))
+function requireWrite(actor: AgentActorContext): void {
+  if (!["owner", "caregiver"].includes(actor.role))
     throw new ApiError(
       403,
       "ACCESS_DENIED",
@@ -116,6 +113,7 @@ function key(request: FastifyRequest): string {
 }
 
 export interface BuildAppOptions {
+  authenticator?: RequestAuthenticator;
   product?: ProductService;
   signedActions?: SignedActionService;
   twilio?: {
@@ -133,6 +131,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     requestIdHeader: "x-request-id",
   });
   const product = options.product ?? new ProductService();
+  const authenticator =
+    options.authenticator ?? new LocalRequestAuthenticator("test");
   const signed =
     options.signedActions ??
     new SignedActionService(
@@ -145,6 +145,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       info: { title: "DogOS API", version: "0.2.5" },
       components: {
         securitySchemes: {
+          bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
           localIdentity: { type: "apiKey", in: "header", name: "x-dogos-user" },
         },
       },
@@ -153,6 +154,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register(cors, {
     allowedHeaders: [
       "content-type",
+      "authorization",
       "idempotency-key",
       "x-dogos-user",
       "x-request-id",
@@ -176,18 +178,23 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       error !== null &&
       "validation" in error &&
       error.validation !== undefined;
-    const authHeaderMissing = hasValidation && message.includes("x-dogos-user");
     const apiError =
       error instanceof ApiError
         ? error
-        : error instanceof SignedActionError
+        : error instanceof AuthenticationError
           ? new ApiError(
-              error.code === "SIGNED_ACTION_REPLAYED" ? 409 : 400,
+              error.code === "AUTH_REQUIRED" ? 401 : 403,
               error.code,
-              "The signed action is not valid",
+              error.code === "AUTH_REQUIRED"
+                ? "Authentication is required"
+                : "Household access denied",
             )
-          : authHeaderMissing
-            ? new ApiError(401, "AUTH_REQUIRED", "Authentication is required")
+          : error instanceof SignedActionError
+            ? new ApiError(
+                error.code === "SIGNED_ACTION_REPLAYED" ? 409 : 400,
+                error.code,
+                "The signed action is not valid",
+              )
             : message === "IDEMPOTENCY_CONFLICT"
               ? new ApiError(
                   409,
@@ -370,18 +377,20 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           },
         },
         async (request) => {
-          const user = identity(request);
-          if (user !== "owner")
+          const actor = await authenticator.authenticate(
+            request.headers,
+            request.id,
+          );
+          if (actor.role !== "owner" || actor.householdId === null)
             throw new ApiError(
               403,
               "ACCESS_DENIED",
               "Owner authentication required",
             );
-          const actor = localIdentities[user];
           return options.whatsapp!.confirmIdentity(
             (request.body as { token: string }).token,
-            actor.id,
-            actor.householdId!,
+            actor.actorId,
+            actor.householdId,
           );
         },
       );
@@ -404,8 +413,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           },
         },
         async (request) => {
-          const user = identity(request);
-          if (user !== "owner")
+          const actor = await authenticator.authenticate(
+            request.headers,
+            request.id,
+          );
+          if (actor.role !== "owner")
             throw new ApiError(
               403,
               "ACCESS_DENIED",
@@ -436,8 +448,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           },
         },
         async (request) => {
-          const user = identity(request);
-          if (user !== "owner")
+          const actor = await authenticator.authenticate(
+            request.headers,
+            request.id,
+          );
+          if (actor.role !== "owner")
             throw new ApiError(
               403,
               "ACCESS_DENIED",
@@ -462,10 +477,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         },
       },
       async (request) => {
-        const user = identity(request);
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
         return {
-          identity: user,
-          ...localIdentities[user],
+          identity: actor.identity,
+          id: actor.actorId,
+          role: actor.role,
+          householdId: actor.householdId,
+          authMode: actor.authMode,
           locale: product.snapshot().locale,
         };
       },
@@ -493,8 +514,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           },
         },
         async (request) => {
-          const user = identity(request);
-          if (user === "unrelated")
+          const actor = await authenticator.authenticate(
+            request.headers,
+            request.id,
+          );
+          if (
+            actor.householdId !== product.snapshot().household.id ||
+            actor.identity === "unrelated"
+          )
             throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
           return product.snapshot();
         },
@@ -516,10 +543,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         },
       },
       async (request) => {
-        const user = identity(request);
-        requireWrite(user);
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
         const body = request.body as { locale?: "de-CH" | "en" };
-        return product.command(user, key(request), body, () =>
+        return product.command(actor.actorId, key(request), body, () =>
           product.reset(body.locale),
         ).result;
       },
@@ -542,10 +572,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         },
       },
       async (request) => {
-        const user = identity(request);
-        requireWrite(user);
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
         const body = request.body as { locale: "de-CH" | "en" };
-        return product.command(user, key(request), body, () =>
+        return product.command(actor.actorId, key(request), body, () =>
           product.switchLocale(body.locale, request.id),
         ).result;
       },
@@ -571,10 +604,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         },
       },
       async (request, reply) => {
-        const user = identity(request);
-        requireWrite(user);
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
         const body = request.body as { kind: "low" | "pain" | "child_bite" };
-        const command = product.command(user, key(request), body, () =>
+        const command = product.command(actor.actorId, key(request), body, () =>
           product.setSafety(body.kind, request.id),
         );
         reply.header("x-idempotent-replay", String(command.replayed));
@@ -609,14 +645,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         },
       },
       async (request, reply) => {
-        const user = identity(request);
-        requireWrite(user);
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
         const body = request.body as {
           success: number;
           foodAccepted: boolean;
           avoidance?: boolean;
         };
-        const command = product.command(user, key(request), body, () =>
+        const command = product.command(actor.actorId, key(request), body, () =>
           product.completeSession(body, request.id),
         );
         reply.header("x-idempotent-replay", String(command.replayed));
@@ -658,17 +697,24 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           },
         },
         async (request, reply) => {
-          const user = identity(request);
-          requireWrite(user);
+          const actor = await authenticator.authenticate(
+            request.headers,
+            request.id,
+          );
+          requireWrite(actor);
           const body = request.body as object;
           if (operationId === "startSession")
             product.assertSessionStartAllowed();
           if (operationId === "generatePlan")
             product.assertPlanGenerationAllowed();
-          const command = product.command(user, key(request), body, () =>
-            operationId === "adjustPlan"
-              ? product.activateAdjustment(request.id)
-              : product.snapshot(),
+          const command = product.command(
+            actor.actorId,
+            key(request),
+            body,
+            () =>
+              operationId === "adjustPlan"
+                ? product.activateAdjustment(request.id)
+                : product.snapshot(),
           );
           reply.header("x-idempotent-replay", String(command.replayed));
           return command.result;
@@ -708,8 +754,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         },
       },
       async (request, reply) => {
-        const user = identity(request);
-        requireWrite(user);
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
         const body = request.body as {
           purpose: SignedActionPurpose;
           householdId: string;
@@ -719,7 +768,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         };
         const token = await signed.issue({
           ...body,
-          actorId: localIdentities[user].id,
+          actorId: actor.actorId,
           ttlSeconds: body.ttlSeconds ?? 900,
         });
         return reply
@@ -760,7 +809,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         },
       },
       async (request) => {
-        const user = identity(request);
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
         const body = request.body as {
           token: string;
           purpose: SignedActionPurpose;
@@ -768,7 +820,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           subjectId: string;
           consume?: boolean;
         };
-        if (body.purpose === "link_identity" && user !== "owner")
+        if (body.purpose === "link_identity" && actor.role !== "owner")
           throw new ApiError(
             403,
             "ACCESS_DENIED",
@@ -776,7 +828,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           );
         const record = await signed.verify({
           ...body,
-          actorId: localIdentities[user].id,
+          actorId: actor.actorId,
         });
         return { valid: true, actionId: record.id };
       },

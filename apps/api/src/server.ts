@@ -13,10 +13,18 @@ import {
 } from "@dogos/whatsapp";
 
 import { buildApp } from "./app.js";
+import { createRequestAuthenticator } from "./auth.js";
 import { ProductService } from "./product-service.js";
 import { SignedActionService } from "./signed-actions.js";
 
 const environment = loadApiEnv(process.env);
+const authenticator = createRequestAuthenticator({
+  authMode: environment.DOGOS_AUTH_MODE,
+  databaseUrl: environment.DATABASE_URL,
+  environment: environment.DOGOS_ENV,
+  publishableKey: environment.SUPABASE_PUBLISHABLE_KEY,
+  supabaseUrl: environment.SUPABASE_URL,
+});
 const metaConfig = loadMetaWhatsAppConfig(process.env);
 const twilioConfig = loadTwilioSandboxWhatsAppConfig(process.env);
 const whatsappStore =
@@ -101,6 +109,7 @@ const whatsapp = new WhatsAppWebhookService(
   },
 );
 const app = buildApp({
+  authenticator,
   product,
   signedActions,
   whatsapp,
