@@ -173,6 +173,7 @@ describe("WhatsApp webhook and identity linking", () => {
     await expect(
       service.process(textPayload, signature(textPayload)),
     ).resolves.toEqual({ accepted: 0 });
+    expect(store.processedEvents).toHaveLength(1);
     const sentBody = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as {
       text: { body: string };
     };

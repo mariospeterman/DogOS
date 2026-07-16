@@ -27,6 +27,7 @@ export interface WhatsAppStateStore {
     message: CanonicalInboundMessage,
     traceId: string,
   ): Promise<{ contact: ProviderContact; eventId: string } | null>;
+  markInboundProcessed(eventId: string): Promise<void>;
   getContact(externalId: string): Promise<ProviderContact | null>;
   saveOutbound(message: OutboundMessage, traceId: string): Promise<void>;
   updateDelivery(
@@ -60,6 +61,7 @@ export class InMemoryWhatsAppStateStore implements WhatsAppStateStore {
     { contactId: string; expiresAt: number; used: boolean }
   >();
   readonly outbound = new Map<string, OutboundMessage>();
+  readonly processedEvents = new Set<string>();
 
   claimInbound(
     message: CanonicalInboundMessage,
@@ -78,10 +80,16 @@ export class InMemoryWhatsAppStateStore implements WhatsAppStateStore {
       };
       this.#contacts.set(message.contactId, contact);
     }
+    const eventId = randomUUID();
     return Promise.resolve({
       contact: structuredClone(contact),
-      eventId: randomUUID(),
+      eventId,
     });
+  }
+
+  markInboundProcessed(eventId: string): Promise<void> {
+    this.processedEvents.add(eventId);
+    return Promise.resolve();
   }
 
   getContact(externalId: string): Promise<ProviderContact | null> {
@@ -206,6 +214,13 @@ export class PostgresWhatsAppStateStore implements WhatsAppStateStore {
         and external_contact_id = ${externalId}
     `;
     return row === undefined ? null : this.contact(row);
+  }
+
+  async markInboundProcessed(eventId: string): Promise<void> {
+    await this.#sql`
+      update private.whatsapp_inbound_events set processed_at = now()
+      where id = ${eventId} and processed_at is null
+    `;
   }
 
   async saveOutbound(message: OutboundMessage, traceId: string): Promise<void> {

@@ -57,6 +57,7 @@ export class WhatsAppWebhookService {
           traceId,
         );
       }
+      await this.store.markInboundProcessed(claimed.eventId);
     }
     return { accepted };
   }

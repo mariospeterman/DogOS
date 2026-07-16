@@ -9,6 +9,41 @@
       "cache": false,
       "persistent": true
     },
+    "@dogos/api#dev": {
+      "passThroughEnv": [
+        "API_HOST",
+        "API_PORT",
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "DOGOS_AUTH_MODE",
+        "DOGOS_ENV",
+        "LOG_LEVEL",
+        "NODE_ENV",
+        "SIGNED_LINK_SECRET",
+        "SUPABASE_PROJECT_REF",
+        "SUPABASE_PUBLISHABLE_KEY",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_URL",
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_ALLOWED_TEST_NUMBERS",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_INBOUND_WEBHOOK_URL",
+        "TWILIO_STATUS_CALLBACK_URL",
+        "TWILIO_WHATSAPP_FROM",
+        "USE_MOCK_PROVIDERS",
+        "WEB_ORIGIN",
+        "WHATSAPP_ACCESS_TOKEN",
+        "WHATSAPP_ACCOUNT_LINK_URL",
+        "WHATSAPP_APP_SECRET",
+        "WHATSAPP_GRAPH_VERSION",
+        "WHATSAPP_MODE",
+        "WHATSAPP_PHONE_NUMBER_ID",
+        "WHATSAPP_PRIVACY_APPROVED",
+        "WHATSAPP_PUBLIC_WEBHOOK_URL",
+        "WHATSAPP_TEST_ALLOWLIST",
+        "WHATSAPP_VERIFY_TOKEN"
+      ]
+    },
     "typecheck": {
       "dependsOn": ["^build"],
       "outputs": []

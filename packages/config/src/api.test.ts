@@ -1,8 +1,30 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { loadApiEnv } from "./api.js";
 
 describe("API environment", () => {
+  it("passes server credentials through Turborepo in development", () => {
+    const turboConfig = JSON.parse(
+      readFileSync(new URL("../../../turbo.json", import.meta.url), "utf8"),
+    ) as {
+      tasks?: Record<string, { passThroughEnv?: string[] }>;
+    };
+    const environment = turboConfig.tasks?.["@dogos/api#dev"]?.passThroughEnv;
+
+    expect(environment).toEqual(
+      expect.arrayContaining([
+        "DATABASE_URL",
+        "SUPABASE_SECRET_KEY",
+        "WHATSAPP_ACCESS_TOKEN",
+        "WHATSAPP_APP_SECRET",
+        "WHATSAPP_MODE",
+        "WHATSAPP_VERIFY_TOKEN",
+      ]),
+    );
+  });
+
   it("provides explicit local-only defaults", () => {
     const environment = loadApiEnv({ NODE_ENV: "test" });
 
