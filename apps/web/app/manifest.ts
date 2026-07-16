@@ -4,8 +4,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "DogOS",
     short_name: "DogOS",
-    description: "Dog-first training, progress, and coaching through WhatsApp.",
-    start_url: "/app/today?source=installed_app",
+    description: "Dog-first training and one Coach across DogOS and WhatsApp.",
+    start_url: "/app/coach?source=installed_app",
     scope: "/",
     display: "standalone",
     background_color: "#f4f6f9",
@@ -26,6 +26,17 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     shortcuts: [
+      {
+        name: "DogOS Coach",
+        short_name: "Coach",
+        url: "/app/coach?source=app_shortcut",
+        icons: [
+          {
+            src: "/icons/dogos-192.png",
+            sizes: "192x192",
+          },
+        ],
+      },
       {
         name: "Heutiges Training",
         short_name: "Heute",

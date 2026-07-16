@@ -1,28 +1,36 @@
 {
-  "slice": "distribution-growth-foundation",
-  "date": "2026-07-16",
-  "status": "passed",
-  "tests": {
-    "unit": 158,
-    "integration": 2,
-    "e2e": 28,
-    "database": 90,
-    "total": 278
+  "slice": "2.7",
+  "status": "pass",
+  "generatedAt": "2026-07-17T01:18:00+02:00",
+  "suites": {
+    "unit": {
+      "tests": 169,
+      "passed": 169
+    },
+    "integration": {
+      "tests": 3,
+      "passed": 3
+    },
+    "e2e": {
+      "tests": 32,
+      "passed": 32,
+      "projects": ["Desktop Chrome", "Pixel 7"]
+    },
+    "pgTap": {
+      "tests": 101,
+      "passed": 101
+    }
   },
-  "checks": {
-    "lint": "passed",
-    "format": "passed",
-    "typecheck": "passed",
-    "databaseReset": "passed",
-    "databaseLint": "passed",
-    "databaseTypes": "clean",
-    "build": "passed",
-    "credentialScan": "passed_placeholders_only",
-    "dependencyAudit": "no_known_vulnerabilities",
-    "demoProductCheck": "passed"
-  },
-  "evidence": [
-    "screenshots/start-chromium.png",
-    "screenshots/start-mobile-chromium.png"
-  ]
+  "total": 305,
+  "databaseReset": "pass",
+  "databaseLint": "pass",
+  "build": "pass",
+  "dependencyAudit": "pass",
+  "hostedMigration": "applied",
+  "providers": {
+    "whatsapp": "restricted-meta-pilot",
+    "stripe": "not-started",
+    "calcom": "not-started",
+    "llm": "deterministic-development-replies"
+  }
 }

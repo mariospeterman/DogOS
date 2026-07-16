@@ -5,10 +5,11 @@
 
 ## Product boundary
 
-WhatsApp is the coaching and explanation surface. The web app is a thin control
-and evidence layer for dog profile, plan, schedule, session capture, milestones,
-account, entitlement, billing, and professional referrals. It is not a second
-chat product.
+WhatsApp and the authenticated web Coach are two clients for one canonical
+conversation. The web app remains a thin control and evidence layer for dog
+profile, plan, schedule, session capture, milestones, account, entitlement,
+billing, and professional referrals. Its Coach view is not a second agent:
+history, context, entitlements, and reply generation remain shared.
 
 The normal path contains one compact training block, an outcome target, a start
 control, and a WhatsApp handoff. Generic equipment prerequisites and pre-emptive

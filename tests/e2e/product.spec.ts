@@ -117,7 +117,7 @@ test("scenario 4: food refusal and avoidance reduce autonomous work without diag
     page.getByText("Futterverweigerung, Meiden, Schmerzzeichen"),
   ).not.toBeVisible();
   await expect(
-    page.getByText("Hat sich bei Milo heute etwas akut verändert?", {
+    page.getByText("Etwas hat sich bei Milo verändert?", {
       exact: false,
     }),
   ).toBeVisible();
@@ -288,7 +288,7 @@ test("scenario 10: language switch preserves account and workflow", async ({
   });
 });
 
-test("account link hydrates and confirms without exposing a web chat", async ({
+test("account link hydrates and confirms without exposing a simulator", async ({
   page,
 }) => {
   await page.route("**/v1/whatsapp/link/confirm", async (route) => {
@@ -304,6 +304,34 @@ test("account link hydrates and confirms without exposing a web chat", async ({
 
   const simulator = await page.goto("/simulator");
   expect(simulator?.status()).toBe(404);
+});
+
+test("web Coach shares a focused timeline and keeps WhatsApp handoff explicit", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/app/coach");
+  await expect(page.getByRole("heading", { name: "Coach" })).toBeVisible();
+  await expect(page.getByText("Milo · Coach aktiv")).toBeVisible();
+  const navigation = page.getByRole("navigation", {
+    name: "Produktnavigation",
+  });
+  for (const name of ["Coach", "Heute", "Plan", "Fortschritt", "Konto"]) {
+    await expect(
+      navigation.getByRole("link", { name, exact: true }),
+    ).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Warum dieser Block?" }).click();
+  await page.getByRole("button", { name: "Senden" }).click();
+  await expect(
+    page.getByText("Milo arbeitet gerade an", { exact: false }).last(),
+  ).toBeVisible();
+  await expect(page.getByText("DogOS", { exact: true }).last()).toBeVisible();
+  await page.screenshot({
+    path: resolve(
+      distributionScreenshots,
+      `coach-${testInfo.project.name}.png`,
+    ),
+  });
 });
 
 test("account language follows conversation without a selector", async ({
@@ -372,12 +400,13 @@ test("PWA manifest exposes install and durable product shortcuts", async ({
     start_url: string;
   };
   expect(manifest.display).toBe("standalone");
-  expect(manifest.start_url).toContain("/app/today");
+  expect(manifest.start_url).toContain("/app/coach");
   expect(manifest.icons.map((icon) => icon.sizes)).toEqual(
     expect.arrayContaining(["192x192", "512x512"]),
   );
   expect(manifest.shortcuts.map((shortcut) => shortcut.url)).toEqual(
     expect.arrayContaining([
+      "/app/coach?source=app_shortcut",
       "/app/today?source=app_shortcut",
       "/app/progress?source=app_shortcut",
     ]),

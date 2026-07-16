@@ -60,18 +60,20 @@ run("node", ["scripts/generate-slice-2-5-artifacts.mjs"]);
 
 if (!(await available("http://127.0.0.1:4000/health/ready")))
   start(["--filter", "@dogos/api", "dev"]);
-if (!(await available("http://127.0.0.1:3000/app/today")))
+if (!(await available("http://127.0.0.1:3000/app/coach")))
   start(["--filter", "@dogos/web", "dev", "--hostname", "127.0.0.1"]);
 
 await Promise.all([
   waitFor("http://127.0.0.1:4000/health/ready"),
-  waitFor("http://127.0.0.1:3000/app/today"),
+  waitFor("http://127.0.0.1:3000/app/coach"),
 ]);
 
 console.log(`
 DogOS local product is ready
 
+Coach:    http://127.0.0.1:3000/app/coach
 Today:    http://127.0.0.1:3000/app/today
+Plan:     http://127.0.0.1:3000/app/plan
 Account:  http://127.0.0.1:3000/app/account
 API:      http://127.0.0.1:4000/openapi.json
 

@@ -1,6 +1,7 @@
 # DogOS
 
-DogOS is a multilingual, WhatsApp-first dog-training platform. It is
+DogOS is a multilingual dog-training platform with one Coach across its web app
+and WhatsApp. It is
 Swiss-positioned and DACH-first commercially. German is the first reviewed
 launch content locale, not a technical product boundary. Its core is a
 contextual, deterministic training engine that turns anamnesis, safety checks,
@@ -13,10 +14,11 @@ development content and are not approved for production use.
 
 ## Current status
 
-Phase 2 Slices 2.1 through 2.5 provide the pinned monorepo, local Supabase
+Phase 2 Slices 2.1 through 2.7 provide the pinned monorepo, local Supabase
 schema and RLS, deterministic multilingual engines, strict persistence mappers,
 transactional repositories, typed Fastify API and OpenAPI, signed actions, a
-local WhatsApp simulator, and the first mobile owner journey. Professional
+provider-neutral WhatsApp integration, a canonical omnichannel Coach timeline,
+and the first mobile owner journey. Professional
 protocol, safety, legal, privacy, provider, and launch translation review remain
 production release blockers.
 
@@ -39,7 +41,7 @@ The web app runs at <http://localhost:3000> and the API health endpoint at
 [local development runbook](docs/runbooks/local-development.md) for all checks
 and the current database workflow.
 
-For the complete reset, seed, API, simulator, and mobile review experience:
+For the complete reset, seed, API, Coach, and mobile review experience:
 
 ```bash
 pnpm demo:product
@@ -66,4 +68,6 @@ The original research notes remain in [architecture](architecture) and
 - [Slice 2.3 deterministic engines](docs/implementation/slice-2.3-engines.md)
 - [Slice 2.4 API and persistence](docs/implementation/slice-2.4-api-persistence.md)
 - [Slice 2.5 local product](docs/implementation/slice-2.5-local-product.md)
+- [Slice 2.6 authenticated WhatsApp](docs/implementation/slice-2.6-authenticated-whatsapp.md)
+- [Slice 2.7 omnichannel Coach](docs/implementation/slice-2.7-omnichannel-coach.md)
 - [RLS access matrix](docs/architecture/phase-2-2-rls-matrix.md)

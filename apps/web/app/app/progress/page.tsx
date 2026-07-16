@@ -3,9 +3,11 @@ import {
   ArrowRight,
   Database,
   Info,
+  MessageCircle,
   TrendingUp,
 } from "lucide-react";
 import { AppShell } from "../../../components/app-shell";
+import Link from "next/link";
 
 const metrics = [
   ["Lockere Abschnitte", "6 / 8", 75],
@@ -67,6 +69,12 @@ export default function ProgressPage() {
       <a className="text-link" href="/app/plan">
         Begründung im Plan ansehen <ArrowRight size={16} />
       </a>
+      <Link
+        className="button secondary wide"
+        href="/app/coach?context=progress&prompt=Wie%20bewertest%20du%20Milos%20Fortschritt%3F"
+      >
+        <MessageCircle size={18} /> Fortschritt besprechen
+      </Link>
     </AppShell>
   );
 }

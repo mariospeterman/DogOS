@@ -1,9 +1,12 @@
 import { ChevronRight, Crosshair, Info, MessageCircle } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
+import { PlanTabs } from "../../../components/plan-tabs";
 
 export default function PlanPage() {
   return (
     <AppShell title="Milos Plan" eyebrow="Aktiver Trainingszyklus">
+      <PlanTabs active="plan" />
       <section className="plan-objective">
         <Crosshair />
         <div>
@@ -69,15 +72,12 @@ export default function PlanPage() {
           <ChevronRight />
         </div>
       </section>
-      <a
+      <Link
         className="button secondary wide"
-        href={
-          process.env.NEXT_PUBLIC_WHATSAPP_CHAT_URL ??
-          "https://wa.me/15551617622"
-        }
+        href="/app/coach?context=plan&prompt=Erkläre%20mir%20warum%20dieser%20Block%20jetzt%20passt."
       >
         <MessageCircle size={18} /> Plan mit Coach besprechen
-      </a>
+      </Link>
     </AppShell>
   );
 }

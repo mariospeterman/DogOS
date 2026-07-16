@@ -1,31 +1,20 @@
-import {
-  CalendarDays,
-  CircleUserRound,
-  MessageCircle,
-  PawPrint,
-  Route,
-  TrendingUp,
-} from "lucide-react";
+import { CircleUserRound, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-
-const navigation = [
-  { href: "/app/today", label: "Heute", icon: PawPrint },
-  { href: "/app/plan", label: "Plan", icon: Route },
-  { href: "/app/calendar", label: "Kalender", icon: CalendarDays },
-  { href: "/app/progress", label: "Fortschritt", icon: TrendingUp },
-] as const;
+import { AppNavigation } from "./app-navigation";
 
 export function AppShell({
   children,
   title,
   eyebrow,
   action,
+  wide = false,
 }: {
   children: ReactNode;
   title: string;
   eyebrow?: string;
   action?: ReactNode;
+  wide?: boolean;
 }) {
   return (
     <div className="product-shell">
@@ -56,7 +45,9 @@ export function AppShell({
           </Link>
         </div>
       </header>
-      <main className="product-main">
+      <main
+        className={wide ? "product-main product-main-wide" : "product-main"}
+      >
         <div className="page-heading">
           <div>
             {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
@@ -66,14 +57,7 @@ export function AppShell({
         </div>
         {children}
       </main>
-      <nav className="bottom-nav" aria-label="Produktnavigation">
-        {navigation.map(({ href, icon: Icon, label }) => (
-          <Link href={href} key={href}>
-            <Icon size={20} />
-            <span>{label}</span>
-          </Link>
-        ))}
-      </nav>
+      <AppNavigation />
     </div>
   );
 }

@@ -262,7 +262,7 @@ a {
   border-top: 1px solid var(--line);
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   height: 70px;
   left: 0;
   position: fixed;
@@ -282,6 +282,20 @@ a {
 }
 .bottom-nav a:hover {
   color: var(--green);
+}
+.bottom-nav a[aria-current="page"] {
+  color: var(--blue);
+}
+.bottom-nav a[aria-current="page"]::before {
+  background: var(--coral);
+  content: "";
+  height: 3px;
+  position: absolute;
+  top: 0;
+  width: 26px;
+}
+.bottom-nav a {
+  position: relative;
 }
 .dev-notice {
   align-items: center;
@@ -1038,7 +1052,7 @@ a {
     bottom: 18px;
     height: 64px;
     left: 50%;
-    max-width: 500px;
+    max-width: 580px;
     transform: translateX(-50%);
   }
   .product-main {
@@ -1051,6 +1065,228 @@ a {
     margin-left: 0;
     margin-right: 0;
   }
+}
+
+/* One canonical Coach across DogOS and WhatsApp. */
+.product-main-wide {
+  max-width: 860px;
+}
+.section-tabs {
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 24px;
+  margin: -8px 0 24px;
+}
+.section-tabs a {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 10px 2px 12px;
+  position: relative;
+  text-decoration: none;
+}
+.section-tabs a[aria-current="page"] {
+  color: var(--green);
+}
+.section-tabs a[aria-current="page"]::after {
+  background: var(--coral);
+  bottom: -1px;
+  content: "";
+  height: 3px;
+  left: 0;
+  position: absolute;
+  right: 0;
+}
+.coach-surface {
+  background: #fff;
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  height: clamp(430px, calc(100svh - 290px), 680px);
+  min-height: 0;
+}
+.coach-contextbar {
+  align-items: center;
+  background: var(--green);
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 14px;
+}
+.coach-contextbar > span,
+.coach-contextbar a {
+  align-items: center;
+  display: flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  gap: 7px;
+  text-decoration: none;
+}
+.coach-contextbar a {
+  color: #dbeafe;
+}
+.status-dot {
+  background: #4ade80;
+  border: 2px solid #ffffff40;
+  border-radius: 50%;
+  height: 9px;
+  width: 9px;
+}
+.coach-timeline {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  max-height: min(62svh, 620px);
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px;
+  scroll-behavior: smooth;
+}
+.coach-day {
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-align: center;
+}
+.coach-message {
+  align-items: flex-end;
+  display: flex;
+  gap: 8px;
+  max-width: 86%;
+}
+.coach-message > div:last-child {
+  background: #edf3ff;
+  border-left: 3px solid var(--blue);
+  padding: 11px 13px 9px;
+}
+.coach-message.user {
+  align-self: flex-end;
+}
+.coach-message.user > div:last-child {
+  background: var(--green);
+  border-left: 0;
+  color: #fff;
+}
+.coach-message p {
+  font-size: 0.9rem;
+  line-height: 1.52;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.coach-message span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.62rem;
+  margin-top: 7px;
+}
+.coach-message.user span {
+  color: #cbd5e1;
+}
+.coach-avatar {
+  align-items: center;
+  background: var(--coral);
+  color: #fff;
+  display: flex;
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 900;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+.coach-quick-actions {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 8px 14px;
+}
+.coach-quick-actions button {
+  background: #fff;
+  border: 1px solid #aeb9c9;
+  color: var(--green);
+  cursor: pointer;
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 0 11px;
+}
+.coach-context-chip {
+  align-items: center;
+  background: #edf3ff;
+  color: var(--blue);
+  display: flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  gap: 7px;
+  margin: 4px 14px;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+.coach-context-chip a {
+  font-size: 1.1rem;
+  margin-left: auto;
+  text-decoration: none;
+}
+.coach-composer {
+  align-items: flex-end;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 11px 12px;
+}
+.coach-composer textarea {
+  border: 0;
+  color: var(--ink);
+  flex: 1;
+  line-height: 1.4;
+  max-height: 120px;
+  min-height: 42px;
+  outline: 0;
+  padding: 10px 5px;
+  resize: none;
+}
+.coach-composer button {
+  align-items: center;
+  background: var(--blue);
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  flex: none;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+.coach-composer button:disabled {
+  background: #9aa6b7;
+}
+.coach-disclosure {
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0 14px 10px;
+  text-align: center;
+}
+.coach-error {
+  align-items: center;
+  background: #fff1f2;
+  border: 0;
+  color: #9b1730;
+  display: flex;
+  font-size: 0.72rem;
+  gap: 6px;
+  justify-content: center;
+  margin: 5px 14px;
+  padding: 8px;
+}
+.coach-loading {
+  color: var(--muted);
+  padding: 30px 0;
 }
 
 /* Slice 2.6: compact working-dog product surface. */
@@ -1305,6 +1541,16 @@ a {
     font-size: 0.76rem;
     padding: 0 6px;
   }
+  .bottom-nav a {
+    font-size: 0.58rem;
+  }
+  .coach-contextbar a {
+    font-size: 0;
+  }
+  .coach-contextbar a::before {
+    content: "WhatsApp";
+    font-size: 0.7rem;
+  }
 }
 @media (max-width: 720px) {
   .start-core {
@@ -1329,6 +1575,15 @@ a {
   }
   .page-heading h1 {
     font-size: 1.75rem;
+  }
+  .product-main-wide {
+    padding-top: 20px;
+  }
+  .product-main-wide .page-heading {
+    margin-bottom: 16px;
+  }
+  .coach-surface {
+    height: max(390px, calc(100svh - 250px));
   }
 }
 @media (max-width: 420px) {

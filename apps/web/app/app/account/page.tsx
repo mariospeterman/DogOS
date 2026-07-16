@@ -42,7 +42,7 @@ export default function AccountPage() {
             <MessageCircle />
             Coaching
           </span>
-          <strong>WhatsApp verbunden</strong>
+          <strong>DogOS + WhatsApp</strong>
         </div>
         <div>
           <span>

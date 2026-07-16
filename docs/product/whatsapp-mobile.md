@@ -1,11 +1,17 @@
 # WhatsApp, Mobile, and Referral Flows
 
-- Status: proposed
-- Last reviewed: 2026-07-14
+- Status: implemented foundation
+- Last reviewed: 2026-07-17
 
-WhatsApp is the daily interaction layer. Signed mobile pages handle sensitive,
-long, visual, or account-level tasks. The user should experience one product,
-not a chatbot plus a separate dashboard.
+DogOS and WhatsApp are two clients for one canonical Coach. WhatsApp supports
+discovery, quick questions, reminders, and check-ins. The authenticated Coach
+supports the same conversation when longer explanations, history, video, or
+account context benefit from the app. The user should experience one product,
+not two agents or a chatbot plus a separate dashboard.
+
+Web messages are never mirrored to WhatsApp by default. The user explicitly
+chooses `In WhatsApp fortsetzen`; notification delivery remains a separate,
+consented concern.
 
 ## 1. Conversation state machine
 
@@ -56,7 +62,21 @@ it never advances the plan implicitly.
 | Payment and subscription management                        | Stripe-hosted or authenticated signed page          |
 | Full plan, progress chart, calendar, booking               | Signed mobile page                                  |
 
-## 3. Daily loop
+## 3. Shared Coach timeline
+
+```text
+private.coach_conversations (system of record)
+  -> private.coach_messages (ordered user/assistant timeline)
+  -> private.coach_channel_bindings (web and WhatsApp routing only)
+```
+
+Provider message IDs deduplicate WhatsApp delivery. Client idempotency IDs
+deduplicate web retries. Each message retains its channel of origin, context
+kind, trace, and optional subject without making provider state authoritative.
+WhatsApp onboarding state remains explicit and deterministic; after plan-ready,
+the same channel-neutral reply composer serves both surfaces.
+
+## 4. Daily loop
 
 ```text
 optional utility reminder -> user replies "Start"
@@ -71,10 +91,11 @@ Reminder frequency is user-controlled. Messages are grouped to reduce cost and
 notification fatigue. The 24-hour customer-service window and current WhatsApp
 message-category rules are treated as provider policy, not hard-coded forever.
 
-## 4. Signed mobile pages
+## 5. Mobile pages
 
 | Route                   | Purpose                                               | Key states                                             |
 | ----------------------- | ----------------------------------------------------- | ------------------------------------------------------ |
+| `/app/coach`            | Shared conversation, contextual questions, handoff    | loading, empty, active, retry                          |
 | `/app/today`            | Current step, timer, instructions, start/stop         | loading, unavailable, safety stop, active, completed   |
 | `/app/plan`             | Frozen plan version and rationale                     | active, superseded, paused, pending review             |
 | `/app/calendar`         | Sessions, recovery, reviews, reschedule, `.ics`       | empty, scheduled, changed, export revoked              |
@@ -89,7 +110,10 @@ Links contain opaque, hashed-on-server, short-lived, purpose-bound tokens with a
 nonce. They are single-use for sensitive mutations, revocable, and never include
 dog, health, referral, or account data in the URL.
 
-## 5. Calendar behavior
+Calendar is a subview of Plan in primary navigation, not a separate product
+area.
+
+## 6. Calendar behavior
 
 - Show planned sessions, duration, focus, recovery days, future video review
   placeholders, weekly review, and changed/cancelled states.
@@ -99,7 +123,7 @@ dog, health, referral, or account data in the URL.
 - Timezone comes from household preference and is stored with each scheduled
   occurrence to make daylight-saving changes explicit.
 
-## 6. Progress presentation
+## 7. Progress presentation
 
 Do not show one universal score. Show separate cards/rows for:
 
@@ -113,7 +137,7 @@ Do not show one universal score. Show separate cards/rows for:
 
 Every adjustment links to the evidence used and states what was missing.
 
-## 7. Trainer referral and booking
+## 8. Trainer referral and booking
 
 ### Ranking policy
 
@@ -158,7 +182,7 @@ recommended -> viewed -> booking_started -> booked -> completed
                                   |-> expired
 ```
 
-## 8. Marketing-ready public surface
+## 9. Marketing-ready public surface
 
 The same Next.js app includes public, indexable German pages for product value,
 how the deterministic process works, safety/limitations, trainer collaboration,
@@ -166,7 +190,7 @@ pricing, FAQ, contact, legal notice, privacy, and consent explanations. Marketin
 claims must match approved capabilities. Video and live coaching are described
 as future/beta only after evidence supports them.
 
-## 9. Acceptance scenarios
+## 10. Acceptance scenarios
 
 - A new German user completes intake using buttons plus one sensitive signed page.
 - An expired/replayed link fails safely and offers a fresh link without data loss.

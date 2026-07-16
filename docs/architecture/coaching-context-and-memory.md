@@ -17,7 +17,8 @@ PostgreSQL facts and measurements (authoritative)
   -> natural coaching model
   -> typed draft with citations and proposed actions
   -> validation
-  -> WhatsApp or app presentation
+  -> canonical Coach message
+  -> web or WhatsApp presentation
 
 Confirmed user fact or command
   -> canonical API tool
@@ -29,6 +30,12 @@ The model writes prose and proposes actions. Only canonical tools can mutate
 state. This keeps the prompt short while protecting the few boundaries that
 matter: identity, household access, measured facts, evidence provenance, and
 durable writes.
+
+The canonical conversation belongs to DogOS, not a provider. Web and WhatsApp
+append to one ordered timeline. Channel bindings contain routing metadata only;
+they cannot fork memory, plan state, entitlements, or assistant behavior. A web
+reply is not automatically delivered through WhatsApp, preventing duplicate
+notifications and unnecessary provider/model calls.
 
 ## Context capsule
 

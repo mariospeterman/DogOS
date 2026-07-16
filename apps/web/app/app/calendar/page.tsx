@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "../../../components/app-shell";
+import { PlanTabs } from "../../../components/plan-tabs";
 
 const initial = [
   {
@@ -96,6 +97,7 @@ export default function CalendarPage() {
         </a>
       }
     >
+      <PlanTabs active="calendar" />
       <section className="calendar-list">
         {items.map((item, index) => (
           <button

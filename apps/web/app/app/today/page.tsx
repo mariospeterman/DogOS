@@ -45,18 +45,17 @@ export default function TodayPage() {
           <Link className="button primary" href="/app/session/session-1">
             <Play size={18} /> Starten
           </Link>
-          <a
+          <Link
             className="button secondary"
-            href={`${process.env.NEXT_PUBLIC_WHATSAPP_CHAT_URL ?? "https://wa.me/15551617622"}?text=${encodeURIComponent("Erkläre mir Milos heutigen Trainingsblock.")}`}
+            href="/app/coach?context=today&prompt=Erkläre%20mir%20Milos%20heutigen%20Trainingsblock."
           >
             <MessageCircle size={18} /> Coach fragen
-          </a>
+          </Link>
         </div>
       </section>
-      <p className="reactive-note">
-        Hat sich bei Milo heute etwas akut verändert? Melde die Beobachtung im
-        Coach-Chat, bevor du startest.
-      </p>
+      <Link className="reactive-note" href="/app/coach?context=today">
+        Etwas hat sich bei Milo verändert? Beobachtung im Coach festhalten.
+      </Link>
     </AppShell>
   );
 }

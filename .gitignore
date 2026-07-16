@@ -9,6 +9,8 @@ test-results/*
 !test-results/slice-2.5/**
 !test-results/next-phase/
 !test-results/next-phase/**
+!test-results/slice-2.7/
+!test-results/slice-2.7/**
 .turbo/
 
 .env

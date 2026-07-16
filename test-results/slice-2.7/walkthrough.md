@@ -1,63 +1,47 @@
-# DogOS Distribution and Growth Walkthrough
+# DogOS Slice 2.7 walkthrough
 
-## Start locally
+## Start
 
 ```bash
 pnpm demo:product
 ```
 
-Open [DogOS start](http://127.0.0.1:3000/?ref=DOGOS26). The primary action
-opens the configured WhatsApp number with a bounded invite code. The code is
-acquisition context only and grants no account or household access.
+Open [Coach](http://127.0.0.1:3000/app/coach). The installed PWA now starts on
+the same Coach surface. Local review uses `x-dogos-user: owner`; preview and
+production require a Supabase bearer session.
 
-## Review the first-use journey
+## Shared conversation
 
-1. Confirm the first screen has one primary action: **In WhatsApp starten**.
-2. Open the WhatsApp action and verify the prefilled message contains
-   `DogOS starten` and, for this URL, `Einladung DOGOS26`.
-3. Return to DogOS and select **Installieren**. Chromium shows the native PWA
-   prompt when its install criteria are met; iOS shows the Safari Add to Home
-   Screen instruction.
-4. Select **Teilen** and verify the operating-system share sheet opens. The
-   shared URL contains no dog, household, contact, or health data.
-5. Select **Schon verbunden? DogOS öffnen** and sign in with Supabase Auth.
-6. Open [Account](http://127.0.0.1:3000/app/account) and verify install/share are
-   also available after authentication.
-7. Continue through [Today](http://127.0.0.1:3000/app/today), Plan, Session,
-   Calendar, and Progress. WhatsApp remains the conversation surface; these
-   pages remain the durable training record.
+1. Ask **Warum dieser Block?** in the web Coach.
+2. Confirm the answer uses Milo, the active loose-leash goal, and the current
+   low-distraction stage.
+3. Open **In WhatsApp fortsetzen**. The text is prefilled but is sent only after
+   the user acts in WhatsApp.
+4. Send a message from the linked pilot phone. Reload the web Coach and confirm
+   the message and response appear with a WhatsApp origin label.
+5. Open Today, Plan, or Progress and use the contextual Coach action. Confirm the
+   relevant context chip is visible and previous messages remain unchanged.
 
-## Automated verification
+## Navigation
 
-Executed on 2026-07-16:
+The primary mobile navigation is Coach, Today, Plan, Progress, and Account.
+Calendar is available as the Calendar tab inside Plan. There is no web WhatsApp
+simulator and no second assistant history.
 
-```text
-158 unit tests
-  2 integration tests
- 28 browser E2E tests (Desktop Chrome and Pixel 7)
- 90 pgTAP database tests
-278 automated tests total
-```
+## Security checks
 
-Also passed: lint, format check, typecheck, clean database reset, database lint,
-generated database types, production build, dependency audit, and
-`pnpm demo:product:check`.
+- viewer can read the timeline but cannot send;
+- unrelated household access returns `ACCESS_DENIED`;
+- repeated web idempotency keys and WhatsApp provider IDs append once;
+- local and configured HTTPS origins work in development; production accepts
+  only the configured web origin;
+- web replies are not automatically delivered as WhatsApp notifications.
 
-## Review evidence
+## Evidence
 
-- `screenshots/start-chromium.png`
-- `screenshots/start-mobile-chromium.png`
-- `docs/product/distribution-growth-commerce.md`
+- `screenshots/coach-chromium.png`
+- `screenshots/coach-mobile-chromium.png`
 
-## Current boundaries
-
-- The PWA is the shipping distribution target. Android TWA/Play packaging and
-  a native-value iOS shell are not implemented.
-- Referral redemption, attribution persistence, reward policy, and fraud
-  controls are specified but not yet exposed through an API.
-- Affiliate catalogs, redirect resolution, conversions, billing, and payouts
-  are not integrated. Commission is excluded from recommendation ranking.
-- Push notifications, public events, and nearby-handler discovery are deferred.
-- The Meta WhatsApp setup remains a restricted pilot. App-store, payment,
-  insurance, nutrition, and professional-service releases require their own
-  policy and commercial review.
+The Coach is deterministic development behavior. Production LLM selection,
+streaming, video analysis, LiveKit, proactive WhatsApp templates, billing, and
+production protocol approval remain outside this slice.
