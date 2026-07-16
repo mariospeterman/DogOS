@@ -4,12 +4,22 @@ insert into auth.users (
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
   confirmation_token, email_change, email_change_token_new, recovery_token
 ) values
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'owner.ch@dogos.local', crypt('DogOS-local-2026', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'caregiver.ch@dogos.local', crypt('DogOS-local-2026', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'viewer.ch@dogos.local', crypt('DogOS-local-2026', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'revoked.ch@dogos.local', crypt('DogOS-local-2026', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'outsider.de@dogos.local', crypt('DogOS-local-2026', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
-  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'trainer.ch@dogos.local', crypt('DogOS-local-2026', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', '');
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'owner.ch@dogos.local', extensions.crypt('DogOS-local-2026', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'caregiver.ch@dogos.local', extensions.crypt('DogOS-local-2026', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'viewer.ch@dogos.local', extensions.crypt('DogOS-local-2026', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'revoked.ch@dogos.local', extensions.crypt('DogOS-local-2026', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'outsider.de@dogos.local', extensions.crypt('DogOS-local-2026', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'trainer.ch@dogos.local', extensions.crypt('DogOS-local-2026', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', '');
+
+insert into auth.identities (
+  id, provider_id, user_id, identity_data, provider, created_at, updated_at
+) values
+  ('01000000-0000-0000-0000-000000000001', 'owner.ch@dogos.local', '00000000-0000-0000-0000-000000000001', '{"sub":"00000000-0000-0000-0000-000000000001","email":"owner.ch@dogos.local","email_verified":true,"phone_verified":false}', 'email', now(), now()),
+  ('01000000-0000-0000-0000-000000000002', 'caregiver.ch@dogos.local', '00000000-0000-0000-0000-000000000002', '{"sub":"00000000-0000-0000-0000-000000000002","email":"caregiver.ch@dogos.local","email_verified":true,"phone_verified":false}', 'email', now(), now()),
+  ('01000000-0000-0000-0000-000000000003', 'viewer.ch@dogos.local', '00000000-0000-0000-0000-000000000003', '{"sub":"00000000-0000-0000-0000-000000000003","email":"viewer.ch@dogos.local","email_verified":true,"phone_verified":false}', 'email', now(), now()),
+  ('01000000-0000-0000-0000-000000000004', 'revoked.ch@dogos.local', '00000000-0000-0000-0000-000000000004', '{"sub":"00000000-0000-0000-0000-000000000004","email":"revoked.ch@dogos.local","email_verified":true,"phone_verified":false}', 'email', now(), now()),
+  ('01000000-0000-0000-0000-000000000005', 'outsider.de@dogos.local', '00000000-0000-0000-0000-000000000005', '{"sub":"00000000-0000-0000-0000-000000000005","email":"outsider.de@dogos.local","email_verified":true,"phone_verified":false}', 'email', now(), now()),
+  ('01000000-0000-0000-0000-000000000006', 'trainer.ch@dogos.local', '00000000-0000-0000-0000-000000000006', '{"sub":"00000000-0000-0000-0000-000000000006","email":"trainer.ch@dogos.local","email_verified":true,"phone_verified":false}', 'email', now(), now());
 
 insert into api.users (
   id, auth_user_id, preferred_locale, locale_status, fallback_locale,
