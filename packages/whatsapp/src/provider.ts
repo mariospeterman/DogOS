@@ -17,14 +17,30 @@ export interface OutboundMessage {
   state: DeliveryState;
 }
 
+export interface CanonicalDeliveryEvent {
+  errorCode?: string;
+  providerMessageId: string;
+  providerTimestamp?: string;
+  state: DeliveryState;
+}
+
+export interface WebhookVerificationContext {
+  url?: string;
+}
+
 export interface WhatsAppProvider {
   verifySubscription(input: {
     challenge: string;
     mode: string;
     verifyToken: string;
   }): Promise<string | null>;
-  verifyWebhook(payload: string, signature: string): Promise<boolean>;
+  verifyWebhook(
+    payload: string,
+    signature: string,
+    context?: WebhookVerificationContext,
+  ): Promise<boolean>;
   parseInbound(payload: string): Promise<CanonicalInboundMessage[]>;
+  parseDeliveryStatuses(payload: string): Promise<CanonicalDeliveryEvent[]>;
   sendText(contactId: string, text: string): Promise<OutboundMessage>;
   sendInteractive(
     contactId: string,

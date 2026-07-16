@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "postgres": "3.4.8"
+    "postgres": "3.4.8",
+    "twilio": "6.0.2"
   },
   "devDependencies": {
     "@types/node": "24.13.3",

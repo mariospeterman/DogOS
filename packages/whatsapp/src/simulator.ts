@@ -53,6 +53,10 @@ export class LocalWhatsAppSimulator implements WhatsAppProvider {
     return fresh;
   }
 
+  parseDeliveryStatuses(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   sendText(contactId: string, text: string): Promise<OutboundMessage> {
     return this.outbound(contactId, "text", text, []);
   }

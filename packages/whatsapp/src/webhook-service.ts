@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import type { DeliveryState, WhatsAppProvider } from "./provider.js";
+import type {
+  WebhookVerificationContext,
+  WhatsAppProvider,
+} from "./provider.js";
 import type { ProviderContact, WhatsAppStateStore } from "./state-store.js";
 
 export class WhatsAppWebhookService {
@@ -24,12 +27,13 @@ export class WhatsAppWebhookService {
   async process(
     payload: string,
     signature: string,
+    context?: WebhookVerificationContext,
   ): Promise<{ accepted: number }> {
-    if (!(await this.provider.verifyWebhook(payload, signature))) {
+    if (!(await this.provider.verifyWebhook(payload, signature, context))) {
       throw new Error("WHATSAPP_SIGNATURE_INVALID");
     }
     const traceId = randomUUID();
-    await this.processStatuses(payload);
+    await this.persistStatuses(payload);
     const messages = await this.provider.parseInbound(payload);
     let accepted = 0;
     for (const message of messages) {
@@ -57,6 +61,17 @@ export class WhatsAppWebhookService {
     return { accepted };
   }
 
+  async processDeliveryStatuses(
+    payload: string,
+    signature: string,
+    context?: WebhookVerificationContext,
+  ): Promise<{ accepted: number }> {
+    if (!(await this.provider.verifyWebhook(payload, signature, context))) {
+      throw new Error("WHATSAPP_SIGNATURE_INVALID");
+    }
+    return { accepted: await this.persistStatuses(payload) };
+  }
+
   confirmIdentity(
     token: string,
     userId: string,
@@ -73,36 +88,16 @@ export class WhatsAppWebhookService {
     return this.store.deleteContact(contactId);
   }
 
-  private async processStatuses(payload: string): Promise<void> {
-    const parsed = JSON.parse(payload) as {
-      entry?: Array<{
-        changes?: Array<{
-          value?: {
-            statuses?: Array<{
-              errors?: Array<{ code?: number }>;
-              id: string;
-              status: DeliveryState;
-              timestamp?: string;
-            }>;
-          };
-        }>;
-      }>;
-    };
-    for (const entry of parsed.entry ?? []) {
-      for (const change of entry.changes ?? []) {
-        for (const status of change.value?.statuses ?? []) {
-          await this.store.updateDelivery(
-            status.id,
-            status.status,
-            status.timestamp === undefined
-              ? undefined
-              : new Date(Number(status.timestamp) * 1000).toISOString(),
-            status.errors?.[0]?.code === undefined
-              ? undefined
-              : String(status.errors[0].code),
-          );
-        }
-      }
+  private async persistStatuses(payload: string): Promise<number> {
+    const statuses = await this.provider.parseDeliveryStatuses(payload);
+    for (const status of statuses) {
+      await this.store.updateDelivery(
+        status.providerMessageId,
+        status.state,
+        status.providerTimestamp,
+        status.errorCode,
+      );
     }
+    return statuses.length;
   }
 }

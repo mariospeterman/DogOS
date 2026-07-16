@@ -1,11 +1,13 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type {
+  CanonicalDeliveryEvent,
   CanonicalInboundMessage,
   OutboundMessage,
   WhatsAppProvider,
 } from "./provider.js";
 
-export type WhatsAppMode = "simulator" | "meta_test" | "production";
+export type WhatsAppMode =
+  "simulator" | "meta_test" | "twilio_sandbox" | "production";
 
 export interface MetaWhatsAppConfig {
   accessToken: string;
@@ -31,7 +33,7 @@ export function loadMetaWhatsAppConfig(
   environment: NodeJS.ProcessEnv,
 ): MetaWhatsAppConfig | null {
   const mode = (environment.WHATSAPP_MODE ?? "simulator") as WhatsAppMode;
-  if (mode === "simulator") return null;
+  if (mode === "simulator" || mode === "twilio_sandbox") return null;
   if (!(["meta_test", "production"] as const).includes(mode)) {
     throw new Error("WHATSAPP_MODE_INVALID");
   }
@@ -158,6 +160,47 @@ export class MetaCloudWhatsAppProvider implements WhatsAppProvider {
       }
     }
     return result;
+  }
+
+  async parseDeliveryStatuses(
+    payload: string,
+  ): Promise<CanonicalDeliveryEvent[]> {
+    const parsed = JSON.parse(payload) as {
+      entry?: Array<{
+        changes?: Array<{
+          value?: {
+            statuses?: Array<{
+              errors?: Array<{ code?: number }>;
+              id: string;
+              status: CanonicalDeliveryEvent["state"];
+              timestamp?: string;
+            }>;
+          };
+        }>;
+      }>;
+    };
+    const statuses: CanonicalDeliveryEvent[] = [];
+    for (const entry of parsed.entry ?? []) {
+      for (const change of entry.changes ?? []) {
+        for (const status of change.value?.statuses ?? []) {
+          statuses.push({
+            providerMessageId: status.id,
+            state: status.status,
+            ...(status.timestamp === undefined
+              ? {}
+              : {
+                  providerTimestamp: new Date(
+                    Number(status.timestamp) * 1000,
+                  ).toISOString(),
+                }),
+            ...(status.errors?.[0]?.code === undefined
+              ? {}
+              : { errorCode: String(status.errors[0].code) }),
+          });
+        }
+      }
+    }
+    return statuses;
   }
 
   sendText(contactId: string, text: string): Promise<OutboundMessage> {
