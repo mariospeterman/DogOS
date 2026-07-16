@@ -4,8 +4,8 @@
   "generatedAt": "2026-07-16T16:00:00.000Z",
   "suites": {
     "unit": {
-      "tests": 141,
-      "passed": 141
+      "tests": 147,
+      "passed": 147
     },
     "integration": {
       "tests": 2,
@@ -20,8 +20,8 @@
       ]
     },
     "pgTap": {
-      "tests": 87,
-      "passed": 87
+      "tests": 90,
+      "passed": 90
     }
   },
   "canonicalEquivalence": true,

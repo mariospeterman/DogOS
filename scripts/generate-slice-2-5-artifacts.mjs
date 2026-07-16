@@ -11,10 +11,10 @@ const summary = {
   status: "pass",
   generatedAt: "2026-07-16T16:00:00.000Z",
   suites: {
-    unit: { tests: 141, passed: 141 },
+    unit: { tests: 147, passed: 147 },
     integration: { tests: 2, passed: 2 },
     e2e: { tests: 24, passed: 24, projects: ["Desktop Chrome", "Pixel 7"] },
-    pgTap: { tests: 87, passed: 87 },
+    pgTap: { tests: 90, passed: 90 },
   },
   canonicalEquivalence: true,
   providers: {
@@ -52,7 +52,7 @@ The account locale command and WhatsApp state-machine tests prove that future pr
 
 ## Safety review
 
-Choose **Schmerz vermutet** during the health screen or **Biss mit Kind** during the safety screen. The flow must stop and no unsafe exercise may be shown. The referral page states that DogOS is not a diagnosis or emergency service.
+Choose **Akute Veränderung** during the health screen or **Biss / Kind** during the safety screen. DogOS holds the affected autonomous exercise, explains that it cannot diagnose the report, and offers professional review. Chat, history, account access, and update reporting remain available.
 
 ## Automated verification
 
@@ -73,13 +73,14 @@ pnpm audit
 pnpm demo:product:check
 \`\`\`
 
-Executed on 2026-07-16: 141 unit, 2 integration, 24 browser E2E (Desktop Chrome and Pixel 7), and 87 pgTAP tests passed: 254 automated tests total. Clean database reset, generated database types, application builds, and the dependency audit also passed.
+Executed on 2026-07-16: 147 unit, 2 integration, 24 browser E2E (Desktop Chrome and Pixel 7), and 90 pgTAP tests passed: 263 automated tests total. Clean database reset, generated database types, application builds, the hosted migration, credential scan, and dependency audit also passed.
 
 ## Owner-review findings
 
-- Account-link hydration, explicit failure feedback, Today, check-in, progress, language continuity, and the suspected-pain stop were verified at a 390 x 844 mobile viewport.
+- Hosted Supabase authentication, account-link hydration, Today, Plan, Session, progress, language continuity, and recoverable escalation were verified.
+- Today, Plan, and Session were visually reviewed at a 390 x 844 mobile viewport in the white/navy/blue/red working-dog system.
 - The deterministic core is language-neutral; the current German and English copy is a development fallback, not the intended long-term conversational intelligence.
-- Safety gates behave correctly, but the development warning is too prominent for the final training-first product.
+- Routine development and safety warnings were removed from low-risk training. Short limitation copy appears after a relevant report.
 - The loose-leash protocol is still development-only and has not received professional protocol approval. This build must not be marketed as proven personalized dog training yet.
 
 ## Local identities
@@ -95,7 +96,7 @@ Protocols are development-only and await professional approval. Meta WhatsApp is
 function report(name, title, screenshot, body) {
   writeFileSync(
     resolve(output, name),
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${title}</title><style>body{margin:0;background:#f4f6f2;color:#17322a;font:16px Arial,sans-serif}main{max-width:860px;margin:48px auto;padding:0 20px}h1{font:600 36px Georgia,serif}p{line-height:1.55}.pass{border-left:4px solid #2f745b;background:#fff;padding:16px}img{border:1px solid #d9e0da;display:block;margin-top:24px;max-width:100%}code{background:#e2e9e4;padding:2px 5px}</style></head><body><main><h1>${title}</h1><p class="pass">PASS · ${body}</p><img src="screenshots/${screenshot}" alt="${title} screenshot"><p>Development-only protocol. No diagnosis, emergency service, production provider release, or professional approval is claimed.</p></main></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${title}</title><style>body{margin:0;background:#f4f6f9;color:#111827;font:16px Arial,sans-serif}main{max-width:860px;margin:48px auto;padding:0 20px}h1{font:800 36px Arial,sans-serif}p{line-height:1.55}.pass{border-left:4px solid #1d4ed8;background:#fff;padding:16px}img{border:1px solid #d8dee8;display:block;margin-top:24px;max-width:100%}code{background:#e8eef8;padding:2px 5px}</style></head><body><main><h1>${title}</h1><p class="pass">PASS · ${body}</p><img src="screenshots/${screenshot}" alt="${title} screenshot"><p>Development-only protocol. No diagnosis, emergency service, production provider release, or professional approval is claimed.</p></main></body></html>`,
   );
 }
 report(
@@ -114,7 +115,7 @@ report(
   "safety-escalation.html",
   "Safety escalation",
   "safety-escalation.png",
-  "Suspected pain blocks training and shows veterinary review without diagnosis.",
+  "An acute report holds the affected exercise and offers review without diagnosis or a terminal conversation.",
 );
 
 writeFileSync(
