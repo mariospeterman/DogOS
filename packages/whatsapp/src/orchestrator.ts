@@ -1,0 +1,225 @@
+import { capabilitiesForTier, type SubscriptionTier } from "@dogos/contracts";
+
+import {
+  ConversationMachine,
+  type ConversationSnapshot,
+  type ConversationState,
+} from "./machine.js";
+import type { OutboundMessage, WhatsAppProvider } from "./provider.js";
+import type { ProviderContact, WhatsAppStateStore } from "./state-store.js";
+
+const options: Record<ConversationState, Record<"de-CH" | "en", string[]>> = {
+  welcome: { "de-CH": ["Los geht's", "English"], en: ["Start", "Deutsch"] },
+  ai_disclosure: {
+    "de-CH": ["Verstanden"],
+    en: ["Understood"],
+  },
+  locale_confirmation: {
+    "de-CH": ["Deutsch", "English"],
+    en: ["English", "Deutsch"],
+  },
+  household_context: {
+    "de-CH": ["Nur ich", "Mehrere Personen"],
+    en: ["Only me", "Several people"],
+  },
+  dog_identity: { "de-CH": [], en: [] },
+  dog_history: {
+    "de-CH": ["Unter 1 Jahr", "1-7 Jahre", "Über 7 Jahre"],
+    en: ["Under 1 year", "1-7 years", "Over 7 years"],
+  },
+  health_screen: {
+    "de-CH": ["Nein", "Akute Veränderung"],
+    en: ["No", "Acute change"],
+  },
+  safety_screen: {
+    "de-CH": ["Nein", "Schnappen", "Biss / Kind"],
+    en: ["No", "Snap", "Bite / child"],
+  },
+  behavior_concern: {
+    "de-CH": ["Leinenführung", "Rückruf", "Begegnungen"],
+    en: ["Loose leash", "Recall", "Encounters"],
+  },
+  goal_selection: {
+    "de-CH": ["Ruhig starten", "Distanz halten", "Signal halten"],
+    en: ["Calm start", "Hold distance", "Hold cue"],
+  },
+  baseline_collection: {
+    "de-CH": ["Selten", "Etwa zur Hälfte", "Meistens"],
+    en: ["Rarely", "About half", "Usually"],
+  },
+  plan_ready: {
+    "de-CH": ["Heute", "Plan", "Fortschritt"],
+    en: ["Today", "Plan", "Progress"],
+  },
+  daily_session: { "de-CH": ["Start", "Später"], en: ["Start", "Later"] },
+  checkin: {
+    "de-CH": ["Gut", "Schwer", "Abgebrochen"],
+    en: ["Good", "Hard", "Stopped"],
+  },
+  progress_review: { "de-CH": ["Plan öffnen"], en: ["Open plan"] },
+  adjustment: { "de-CH": ["Verstanden"], en: ["Understood"] },
+  professional_escalation: { "de-CH": [], en: [] },
+};
+
+const offTopicPattern =
+  /ignore (all|previous)|system prompt|developer message|jailbreak|write (code|an essay)|politics|investment|homework/i;
+const acutePattern = /schmerz|pain|lahm|limp|plötzlich|sudden|akut|acute/i;
+
+export interface ConversationLinks {
+  plan: string;
+  progress: string;
+  today: string;
+}
+
+export class WhatsAppConversationOrchestrator {
+  constructor(
+    private readonly provider: WhatsAppProvider,
+    private readonly store: WhatsAppStateStore,
+    private readonly links: (
+      contact: ProviderContact,
+    ) => Promise<ConversationLinks>,
+    private readonly tier: SubscriptionTier = "freemium",
+  ) {}
+
+  async handle(
+    contact: ProviderContact,
+    text: string,
+  ): Promise<OutboundMessage> {
+    const locale = contact.locale;
+    const allowed = await this.store.consumeDailyMessage(
+      contact.id,
+      capabilitiesForTier(this.tier).coachingMessagesPerDay,
+    );
+    if (!allowed) {
+      return this.provider.sendText(
+        contact.externalId,
+        locale === "de-CH"
+          ? "Für heute ist das Nachrichtenlimit erreicht. Dein Plan und die heutige Einheit bleiben in DogOS verfügbar."
+          : "Today's message limit is reached. Your plan and today's session remain available in DogOS.",
+      );
+    }
+
+    if (offTopicPattern.test(text)) {
+      return this.provider.sendText(
+        contact.externalId,
+        locale === "de-CH"
+          ? "Ich bleibe bei deinem Hund: Training, Beobachtungen, Plan und Fortschritt. Was davon brauchst du?"
+          : "I stay focused on your dog: training, observations, plan, and progress. Which do you need?",
+      );
+    }
+
+    const saved = await this.store.loadConversation(contact.id);
+    const machine = new ConversationMachine(saved?.locale ?? locale);
+    if (saved !== null) machine.resume(saved);
+    const current = machine.view();
+
+    if (
+      (current.state === "welcome" ||
+        current.state === "locale_confirmation") &&
+      text === "choice.2"
+    ) {
+      machine.switchLocale(current.locale === "de-CH" ? "en" : "de-CH");
+    }
+
+    if (isLocaleSwitch(text)) {
+      machine.switchLocale(wantsEnglish(text) ? "en" : "de-CH");
+      await this.persist(contact.id, machine.view());
+      return this.present(contact.externalId, machine.view());
+    }
+
+    if (current.state === "plan_ready") {
+      return this.presentPlan(contact, text, current.locale);
+    }
+
+    if (
+      (current.state === "health_screen" &&
+        (acutePattern.test(text) || text === "choice.2")) ||
+      (current.state === "safety_screen" && text === "choice.3")
+    ) {
+      machine.escalate();
+      await this.persist(contact.id, machine.view());
+      return this.provider.sendText(
+        contact.externalId,
+        current.locale === "de-CH"
+          ? "Training pausiert. Die neue Beobachtung braucht zuerst eine tierärztliche oder qualifizierte fachliche Beurteilung. DogOS stellt bis dahin keine nächste Übung bereit."
+          : "Training is paused. The new observation needs veterinary or qualified professional review first. DogOS will not provide another exercise until then.",
+      );
+    }
+
+    if (current.state === "dog_identity" && !isUsableName(text)) {
+      return this.provider.sendText(
+        contact.externalId,
+        current.locale === "de-CH"
+          ? "Wie heisst dein Hund? Antworte nur mit dem Rufnamen."
+          : "What is your dog's name? Reply with the call name only.",
+      );
+    }
+
+    const canonicalAnswer = normalizeAnswer(current.state, text);
+    machine.answer(canonicalAnswer);
+    await this.persist(contact.id, machine.view());
+    return this.present(contact.externalId, machine.view());
+  }
+
+  private async presentPlan(
+    contact: ProviderContact,
+    text: string,
+    locale: "de-CH" | "en",
+  ): Promise<OutboundMessage> {
+    const links = await this.links(contact);
+    const normalized = text.trim().toLowerCase();
+    if (["choice.2", "plan"].includes(normalized)) {
+      return this.provider.sendText(contact.externalId, links.plan);
+    }
+    if (["choice.3", "fortschritt", "progress"].includes(normalized)) {
+      return this.provider.sendText(contact.externalId, links.progress);
+    }
+    const copy =
+      locale === "de-CH"
+        ? `Heute trainiert ihr vier Minuten ruhige Orientierung an lockerer Leine. Starte auf einem übersichtlichen Abschnitt. Gehe erst los, wenn die Leine locker ist; jede freiwillige Orientierung bestätigt die richtige Position. So wird nicht Tempo, sondern saubere Kontrolle aufgebaut. ${links.today}`
+        : `Today you will train four minutes of calm orientation on a loose leash. Start on a clear stretch. Move only while the leash is loose; each voluntary check-in confirms the correct position. This builds clean control rather than speed. ${links.today}`;
+    return this.provider.sendInteractive(
+      contact.externalId,
+      copy,
+      options.plan_ready[locale],
+    );
+  }
+
+  private present(
+    contactId: string,
+    view: ReturnType<ConversationMachine["view"]>,
+  ): Promise<OutboundMessage> {
+    const choices = options[view.state][view.locale];
+    return choices.length === 0
+      ? this.provider.sendText(contactId, view.prompt)
+      : this.provider.sendInteractive(contactId, view.prompt, choices);
+  }
+
+  private persist(
+    contactId: string,
+    view: ReturnType<ConversationMachine["view"]>,
+  ): Promise<void> {
+    const { prompt: _prompt, ...snapshot } = view;
+    return this.store.saveConversation(contactId, snapshot);
+  }
+}
+
+function isLocaleSwitch(text: string): boolean {
+  return /^(english|deutsch|language\.en|language\.de|sprache englisch|sprache deutsch)$/i.test(
+    text.trim(),
+  );
+}
+
+function wantsEnglish(text: string): boolean {
+  return /english|\.en$/i.test(text.trim());
+}
+
+function isUsableName(text: string): boolean {
+  return /^[\p{L}][\p{L}' -]{0,39}$/u.test(text.trim());
+}
+
+function normalizeAnswer(state: ConversationState, text: string): string {
+  const value = text.trim();
+  if (/^choice\.[1-3]$/.test(value)) return `${state}.${value}`;
+  return `${state}.text:${value.slice(0, 120)}`;
+}

@@ -1,4 +1,5 @@
 export * from "./machine.js";
+export * from "./orchestrator.js";
 export * from "./provider.js";
 export * from "./simulator.js";
 export * from "./meta.js";

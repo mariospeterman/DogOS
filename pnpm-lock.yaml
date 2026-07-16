@@ -350,6 +350,9 @@ importers:
 
   packages/whatsapp:
     dependencies:
+      '@dogos/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       postgres:
         specifier: 3.4.8
         version: 3.4.8

@@ -5,6 +5,7 @@ import type {
   DeliveryState,
   OutboundMessage,
 } from "./provider.js";
+import type { ConversationSnapshot } from "./machine.js";
 
 interface TransactionQuery {
   (
@@ -48,6 +49,12 @@ export interface WhatsAppStateStore {
   ): Promise<ProviderContact>;
   unlink(contactId: string): Promise<void>;
   deleteContact(contactId: string): Promise<void>;
+  loadConversation(contactId: string): Promise<ConversationSnapshot | null>;
+  saveConversation(
+    contactId: string,
+    snapshot: ConversationSnapshot,
+  ): Promise<void>;
+  consumeDailyMessage(contactId: string, limit: number): Promise<boolean>;
 }
 
 const hash = (value: string) =>
@@ -62,9 +69,12 @@ export class InMemoryWhatsAppStateStore implements WhatsAppStateStore {
   >();
   readonly outbound = new Map<string, OutboundMessage>();
   readonly processedEvents = new Set<string>();
+  readonly #conversations = new Map<string, ConversationSnapshot>();
+  readonly #usage = new Map<string, { count: number; day: string }>();
 
   claimInbound(
     message: CanonicalInboundMessage,
+    _traceId: string,
   ): Promise<{ contact: ProviderContact; eventId: string } | null> {
     if (this.#events.has(message.id)) return Promise.resolve(null);
     this.#events.add(message.id);
@@ -164,6 +174,32 @@ export class InMemoryWhatsAppStateStore implements WhatsAppStateStore {
       if (contact.id === contactId) this.#contacts.delete(externalId);
     }
     return Promise.resolve();
+  }
+
+  loadConversation(contactId: string): Promise<ConversationSnapshot | null> {
+    return Promise.resolve(
+      structuredClone(this.#conversations.get(contactId) ?? null),
+    );
+  }
+
+  saveConversation(
+    contactId: string,
+    snapshot: ConversationSnapshot,
+  ): Promise<void> {
+    this.#conversations.set(contactId, structuredClone(snapshot));
+    return Promise.resolve();
+  }
+
+  consumeDailyMessage(contactId: string, limit: number): Promise<boolean> {
+    const day = new Date().toISOString().slice(0, 10);
+    const usage = this.#usage.get(contactId);
+    if (usage === undefined || usage.day !== day) {
+      this.#usage.set(contactId, { count: 1, day });
+      return Promise.resolve(true);
+    }
+    if (usage.count >= limit) return Promise.resolve(false);
+    usage.count += 1;
+    return Promise.resolve(true);
   }
 }
 
@@ -319,6 +355,52 @@ export class PostgresWhatsAppStateStore implements WhatsAppStateStore {
     await this.#sql`
       delete from private.whatsapp_provider_contacts where id = ${contactId}
     `;
+  }
+
+  async loadConversation(
+    contactId: string,
+  ): Promise<ConversationSnapshot | null> {
+    const [row] = await this.#sql`
+      select canonical_state
+      from private.whatsapp_conversation_sessions
+      where contact_id = ${contactId} and expires_at > now()
+    `;
+    return row === undefined
+      ? null
+      : (structuredClone(row.canonical_state) as ConversationSnapshot);
+  }
+
+  async saveConversation(
+    contactId: string,
+    snapshot: ConversationSnapshot,
+  ): Promise<void> {
+    await this.#sql`
+      insert into private.whatsapp_conversation_sessions
+        (contact_id, workflow_state, canonical_state, expires_at)
+      values (${contactId}, ${snapshot.state}, ${this.#sql.json(JSON.parse(JSON.stringify(snapshot)))}, now() + interval '30 days')
+      on conflict (contact_id) do update set
+        workflow_state = excluded.workflow_state,
+        canonical_state = excluded.canonical_state,
+        expires_at = excluded.expires_at,
+        updated_at = now()
+    `;
+  }
+
+  async consumeDailyMessage(
+    contactId: string,
+    limit: number,
+  ): Promise<boolean> {
+    const [row] = await this.#sql`
+      insert into private.whatsapp_usage_windows
+        (contact_id, bucket_start, message_count)
+      values (${contactId}, date_trunc('day', now()), 1)
+      on conflict (contact_id, bucket_start) do update
+        set message_count = private.whatsapp_usage_windows.message_count + 1,
+            updated_at = now()
+        where private.whatsapp_usage_windows.message_count < ${limit}
+      returning message_count
+    `;
+    return row !== undefined;
   }
 
   private contact(row: Record<string, unknown>): ProviderContact {

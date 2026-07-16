@@ -143,10 +143,10 @@ export class SupabaseRequestAuthenticator implements RequestAuthenticator {
 
 export function createRequestAuthenticator(input: {
   authMode: "hybrid" | "local" | "supabase";
-  databaseUrl?: string;
+  databaseUrl: string | undefined;
   environment: "local" | "preview" | "production" | "test";
-  publishableKey?: string;
-  supabaseUrl?: string;
+  publishableKey: string | undefined;
+  supabaseUrl: string | undefined;
 }): RequestAuthenticator {
   if (input.authMode === "local") {
     if (input.environment === "preview" || input.environment === "production") {
