@@ -1,0 +1,28 @@
+{
+  "slice": "distribution-growth-foundation",
+  "date": "2026-07-16",
+  "status": "passed",
+  "tests": {
+    "unit": 158,
+    "integration": 2,
+    "e2e": 28,
+    "database": 90,
+    "total": 278
+  },
+  "checks": {
+    "lint": "passed",
+    "format": "passed",
+    "typecheck": "passed",
+    "databaseReset": "passed",
+    "databaseLint": "passed",
+    "databaseTypes": "clean",
+    "build": "passed",
+    "credentialScan": "passed_placeholders_only",
+    "dependencyAudit": "no_known_vulnerabilities",
+    "demoProductCheck": "passed"
+  },
+  "evidence": [
+    "screenshots/start-chromium.png",
+    "screenshots/start-mobile-chromium.png"
+  ]
+}
