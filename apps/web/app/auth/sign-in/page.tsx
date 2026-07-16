@@ -2,12 +2,26 @@
 
 import { LogIn } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 import { AppShell } from "../../../components/app-shell";
 import { createClient } from "../../../lib/supabase/client";
 
 export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell title="Anmelden" eyebrow="DogOS Konto">
+          <p className="helper">Anmeldung wird vorbereitet...</p>
+        </AppShell>
+      }
+    >
+      <SignInForm />
+    </Suspense>
+  );
+}
+
+function SignInForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("owner.ch@dogos.local");
   const [password, setPassword] = useState("");
