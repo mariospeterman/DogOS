@@ -1,17 +1,16 @@
-import { AppShell, DevelopmentNotice } from "../../../../components/app-shell";
+import { AppShell } from "../../../../components/app-shell";
 import { SessionControls } from "../../../../components/session-controls";
 
 export default function SessionPage() {
   return (
-    <AppShell title="Orientierung" eyebrow="Einheit mit Milo">
-      <DevelopmentNotice compact />
+    <AppShell title="Block 01" eyebrow="Live · Milo">
       <section className="session-instruction">
-        <strong>Heute</strong>
+        <strong>Orientierung / lockere Leine</strong>
         <p>
-          Belohne den Blickkontakt bei lockerer Leine. Stoppe bei
-          Futterverweigerung, Meiden oder Schmerzzeichen.
+          Warte auf lockere Leine, gehe an und bestätige Milos freiwillige
+          Orientierung. Bei Zug stehen bleiben; mit lockerer Leine fortsetzen.
         </p>
-        <span>Maximal 8 Wiederholungen · ruhige Strasse</span>
+        <span>4 Minuten · 8 Abschnitte · ruhige Strecke</span>
       </section>
       <SessionControls />
     </AppShell>

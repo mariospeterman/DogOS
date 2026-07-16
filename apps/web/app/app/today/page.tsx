@@ -1,11 +1,10 @@
-import { Clock3, Footprints, Play, ShieldCheck, Target } from "lucide-react";
+import { Clock3, MessageCircle, Play, Target } from "lucide-react";
 import Link from "next/link";
-import { AppShell, DevelopmentNotice } from "../../../components/app-shell";
+import { AppShell } from "../../../components/app-shell";
 
 export default function TodayPage() {
   return (
-    <AppShell title="Heute mit Milo" eyebrow="Mittwoch, 15. Juli">
-      <DevelopmentNotice compact />
+    <AppShell title="Milo / Heute" eyebrow="Mittwoch, 15. Juli">
       <section className="today-focus">
         <div
           className="dog-photo"
@@ -15,51 +14,49 @@ export default function TodayPage() {
           <span>M</span>
         </div>
         <div>
-          <p>Aktuelles Ziel</p>
+          <p>Aktiver Auftrag</p>
           <h2>Locker an der Leine</h2>
-          <span>Stufe 1 · ruhige Strasse</span>
+          <span>Block 01 · Orientierung</span>
         </div>
       </section>
       <section className="exercise">
         <div className="exercise-top">
-          <span>HEUTIGE EINHEIT</span>
+          <span>TRAININGSBLOCK 01</span>
           <span>
             <Clock3 size={16} /> 4 Minuten
           </span>
         </div>
-        <h2>Orientierung vor dem Losgehen</h2>
-        <p>Belohne Milo, wenn er sich bei lockerer Leine zu dir orientiert.</p>
-        <div className="detail-list">
+        <h2>Ruhig starten. Leine locker halten.</h2>
+        <p className="exercise-brief">
+          Nimm einen übersichtlichen Abschnitt. Warte auf lockere Leine, gehe an
+          und bestätige jede freiwillige Orientierung zu dir. Wird die Leine
+          straff, bleibst du ruhig stehen und setzt erst mit lockerer Leine
+          fort.
+        </p>
+        <div className="brief-grid">
           <div>
             <Target />
             <span>
-              <strong>Zweck</strong>Ruhigen Kontakt aufbauen
-            </span>
-          </div>
-          <div>
-            <Footprints />
-            <span>
-              <strong>Aufbau</strong>Ruhiger Weg, Geschirr, kleine Belohnungen
-            </span>
-          </div>
-          <div>
-            <ShieldCheck />
-            <span>
-              <strong>Stopp</strong>Futterverweigerung, Meiden, Schmerzzeichen
+              <strong>Zielbild</strong>6 von 8 Abschnitten mit lockerer Leine
             </span>
           </div>
         </div>
-        <p className="criterion">
-          Erfolg: 6 von 8 Abschnitten mit lockerer Leine · maximal 8
-          Wiederholungen
-        </p>
-        <Link className="button primary wide" href="/app/session/session-1">
-          <Play size={18} /> Einheit starten
-        </Link>
+        <div className="action-grid">
+          <Link className="button primary" href="/app/session/session-1">
+            <Play size={18} /> Starten
+          </Link>
+          <a
+            className="button secondary"
+            href={`${process.env.NEXT_PUBLIC_WHATSAPP_CHAT_URL ?? "https://wa.me/15551617622"}?text=${encodeURIComponent("Erkläre mir Milos heutigen Trainingsblock.")}`}
+          >
+            <MessageCircle size={18} /> Coach fragen
+          </a>
+        </div>
       </section>
-      <Link className="text-link" href="/app/session/session-1">
-        Bereits trainiert? Check-in abschliessen
-      </Link>
+      <p className="reactive-note">
+        Hat sich bei Milo heute etwas akut verändert? Melde die Beobachtung im
+        Coach-Chat, bevor du startest.
+      </p>
     </AppShell>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Minus, Pause, Play, Plus, Square } from "lucide-react";
+import { AlertTriangle, Check, Minus, Pause, Play, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function SessionControls() {
@@ -9,6 +9,10 @@ export function SessionControls() {
   const [repetitions, setRepetitions] = useState(0);
   const [successes, setSuccesses] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [outcome, setOutcome] = useState<"clean" | "mixed" | "stopped" | null>(
+    null,
+  );
+  const [concern, setConcern] = useState(false);
 
   useEffect(() => {
     if (!running) return;
@@ -29,6 +33,14 @@ export function SessionControls() {
           {repetitions} Wiederholungen, davon {successes} erfolgreich. Nicht
           erfasste Werte bleiben unbekannt.
         </p>
+        {concern ? (
+          <p className="escalation-copy">
+            Deine Beobachtung ist gespeichert. DogOS stellt keine Diagnose. Bei
+            einer akuten körperlichen Veränderung lass Milo tierärztlich
+            beurteilen; bei einem Beissvorfall kannst du direkt eine
+            qualifizierte Fachperson anfragen.
+          </p>
+        ) : null}
         <a className="button primary" href="/app/progress">
           Fortschritt ansehen
         </a>
@@ -62,54 +74,45 @@ export function SessionControls() {
           max={repetitions}
         />
       </section>
-      <section className="form-section">
-        <h2>Kurzer Check-in</h2>
-        <label>
-          Futter angenommen?
-          <select defaultValue="unknown">
-            <option value="unknown">Nicht erfasst</option>
-            <option>Ja</option>
-            <option>Nein</option>
-          </select>
-        </label>
-        <label>
-          Ablenkung
-          <select defaultValue="unknown">
-            <option value="unknown">Nicht erfasst</option>
-            <option>Niedrig</option>
-            <option>Mittel</option>
-            <option>Hoch</option>
-          </select>
-        </label>
-        <label>
-          Schwierigkeit
-          <select defaultValue="2">
-            <option value="1">Sehr leicht</option>
-            <option value="2">Passend</option>
-            <option value="3">Schwierig</option>
-          </select>
-        </label>
-        <label>
-          Dein Vertrauen
-          <select defaultValue="4">
-            <option value="1">1 - gering</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5 - hoch</option>
-          </select>
-        </label>
-        <label>
-          Bedenken (optional)
-          <textarea placeholder="Nur eintragen, was du beobachtet hast" />
-        </label>
+      <section className="outcome-section">
+        <h2>Ergebnis</h2>
+        <div className="segmented-control">
+          {(
+            [
+              ["clean", "Sauber"],
+              ["mixed", "Uneinheitlich"],
+              ["stopped", "Abgebrochen"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              className={outcome === value ? "active" : ""}
+              key={value}
+              onClick={() => setOutcome(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <details className="observation-details">
+          <summary>
+            <AlertTriangle size={17} /> Etwas Ungewöhnliches beobachtet
+          </summary>
+          <label>
+            Nur beobachtbare Fakten
+            <textarea
+              onChange={(event) => setConcern(event.target.value.length > 0)}
+              placeholder="Was ist konkret passiert?"
+            />
+          </label>
+        </details>
       </section>
       <div className="button-row">
-        <button className="button danger">
-          <Square size={18} /> Einheit stoppen
-        </button>
-        <button className="button primary" onClick={() => setSubmitted(true)}>
-          Abschliessen
+        <button
+          className="button primary wide"
+          disabled={outcome === null}
+          onClick={() => setSubmitted(true)}
+        >
+          <Check size={18} /> Speichern
         </button>
       </div>
     </>

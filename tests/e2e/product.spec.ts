@@ -42,14 +42,14 @@ test("scenario 1: German low-risk owner reaches and uses the plan", async ({
   await page.goto("/");
   await expect(page).toHaveURL(/\/app\/today$/);
   await expect(
-    page.getByRole("heading", { name: "Heute mit Milo" }),
+    page.getByRole("heading", { name: "Milo / Heute" }),
   ).toBeVisible();
   if (testInfo.project.name === "chromium")
     await page.screenshot({
       path: resolve(screenshots, "german-flow.png"),
       fullPage: true,
     });
-  await expect(page.getByText("Stufe 1 · ruhige Strasse")).toBeVisible();
+  await expect(page.getByText("Block 01 · Orientierung")).toBeVisible();
 });
 
 test("scenario 2: English owner remains in Switzerland and CHF", async ({
@@ -110,9 +110,11 @@ test("scenario 4: food refusal and avoidance reduce autonomous work without diag
   await page.goto("/app/today");
   await expect(
     page.getByText("Futterverweigerung, Meiden, Schmerzzeichen"),
-  ).toBeVisible();
+  ).not.toBeVisible();
   await expect(
-    page.getByText("Keine Diagnose oder Notfallhilfe.", { exact: false }),
+    page.getByText("Hat sich bei Milo heute etwas akut verändert?", {
+      exact: false,
+    }),
   ).toBeVisible();
 });
 

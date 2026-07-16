@@ -9,7 +9,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useState } from "react";
-import { AppShell, DevelopmentNotice } from "../../../components/app-shell";
+import { AppShell } from "../../../components/app-shell";
 
 const initial = [
   {
@@ -82,7 +82,7 @@ export default function CalendarPage() {
   };
   return (
     <AppShell
-      title="Trainingskalender"
+      title="Einsatzplan"
       eyebrow="15. - 21. Juli"
       action={
         <a
@@ -96,7 +96,6 @@ export default function CalendarPage() {
         </a>
       }
     >
-      <DevelopmentNotice compact />
       <section className="calendar-list">
         {items.map((item, index) => (
           <button

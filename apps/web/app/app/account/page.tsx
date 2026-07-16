@@ -1,18 +1,26 @@
 "use client";
 
-import { Globe2, LogOut, Shield, UserRound } from "lucide-react";
+import {
+  CreditCard,
+  Globe2,
+  LogOut,
+  MessageCircle,
+  Shield,
+  UserRound,
+} from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "../../../components/app-shell";
+import { createClient } from "../../../lib/supabase/client";
 
 export default function AccountPage() {
   const [locale, setLocale] = useState("de-CH");
   return (
-    <AppShell title="Konto" eyebrow="Lokale Testidentität">
+    <AppShell title="Konto" eyebrow="Profil und Zugriff">
       <section className="account-person">
         <div>MK</div>
         <span>
           <strong>Maria Keller</strong>
-          <small>Eigentümerin · Familie Keller</small>
+          <small>Owner · Familie Keller</small>
         </span>
       </section>
       <section className="settings">
@@ -31,6 +39,20 @@ export default function AccountPage() {
         </label>
         <div>
           <span>
+            <CreditCard />
+            Tarif
+          </span>
+          <strong>Freemium · Pilot</strong>
+        </div>
+        <div>
+          <span>
+            <MessageCircle />
+            Coaching
+          </span>
+          <strong>WhatsApp verbunden</strong>
+        </div>
+        <div>
+          <span>
             <UserRound />
             Land und Währung
           </span>
@@ -41,15 +63,21 @@ export default function AccountPage() {
             <Shield />
             Datenschutz
           </span>
-          <strong>Lokale Demo</strong>
+          <strong>Supabase Auth</strong>
         </div>
       </section>
       <p className="helper">
         Zeitzone Europe/Zurich. Ein Sprachwechsel verändert weder Land, Währung
         noch frühere Antworten.
       </p>
-      <button className="button danger">
-        <LogOut size={18} /> Lokale Sitzung beenden
+      <button
+        className="button danger"
+        onClick={async () => {
+          await createClient().auth.signOut();
+          window.location.assign("/auth/sign-in");
+        }}
+      >
+        <LogOut size={18} /> Abmelden
       </button>
     </AppShell>
   );

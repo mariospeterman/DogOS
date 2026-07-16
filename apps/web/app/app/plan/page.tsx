@@ -1,56 +1,49 @@
-import { AlertTriangle, CheckCircle2, ChevronRight, Info } from "lucide-react";
-import { AppShell, DevelopmentNotice } from "../../../components/app-shell";
+import { ChevronRight, Crosshair, Info, MessageCircle } from "lucide-react";
+import { AppShell } from "../../../components/app-shell";
 
 export default function PlanPage() {
   return (
-    <AppShell title="Milos Trainingsplan" eyebrow="Ziel · lockere Leine">
-      <DevelopmentNotice />
-      <section className="goal-band">
+    <AppShell title="Milos Plan" eyebrow="Aktiver Trainingszyklus">
+      <section className="plan-objective">
+        <Crosshair />
         <div>
-          <span>Ausgangswert</span>
-          <strong>6 / 10</strong>
-        </div>
-        <div className="goal-arrow">→</div>
-        <div>
-          <span>Ziel</span>
-          <strong>8 / 10</strong>
+          <span>Auftrag</span>
+          <strong>Lockere Leine auf ruhigen Alltagswegen</strong>
+          <p>Von 6 auf 8 kontrollierte Abschnitte pro Einheit.</p>
         </div>
       </section>
       <section className="plain-section">
         <h2>Aktuelle Stufe</h2>
-        <p className="section-lede">Orientierung in ruhiger Umgebung</p>
+        <p className="section-lede">01 / Orientierung unter wenig Ablenkung</p>
         <div className="stage-track">
           <span className="done" />
           <span className="active" />
           <span />
           <span />
         </div>
-        <small>Stufe 1 von 3 · drei Einheiten vor der nächsten Prüfung</small>
+        <small>Nächste Prüfung nach drei vergleichbaren Einheiten</small>
       </section>
       <section className="plain-section">
-        <h2>Voraussetzungen</h2>
-        <ul className="check-list">
-          <li>
-            <CheckCircle2 />
-            Gut sitzendes Geschirr
-          </li>
-          <li>
-            <CheckCircle2 />
-            Futter wird angenommen
-          </li>
-          <li>
-            <CheckCircle2 />
-            Ruhige Trainingsstrecke
-          </li>
-        </ul>
+        <h2>Warum dieser Block?</h2>
+        <p className="plan-copy">
+          Milo arbeitet aktuell in ruhiger Umgebung stabiler als unter hoher
+          Ablenkung. Dieser Block festigt zuerst Orientierung und
+          Leinenkontrolle; Tempo und Ablenkung werden erst nach wiederholbarer
+          Ausführung erhöht.
+        </p>
+        <div className="dog-factors">
+          <span>Mischling</span>
+          <span>Erwachsen</span>
+          <span>Stadtumgebung</span>
+        </div>
       </section>
       <section className="reason-panel">
         <Info />
         <div>
-          <strong>Warum bleibt die Schwierigkeit gleich?</strong>
+          <strong>Entscheidung: Schwierigkeit halten</strong>
           <p>
-            Eine Einheit ist vorhanden. Für eine Erhöhung braucht Milo drei
-            aufeinanderfolgende Einheiten mit mindestens 80 % Erfolg.
+            Eine vergleichbare Einheit liegt vor. Einzelne gute Ergebnisse
+            ändern den Block noch nicht; Milos gemessene Ausführung entscheidet.
           </p>
           <span>1 von 3 Einheiten als Evidenz</span>
         </div>
@@ -76,10 +69,15 @@ export default function PlanPage() {
           <ChevronRight />
         </div>
       </section>
-      <p className="legal-line">
-        <AlertTriangle size={16} /> Entwicklungsvorschlag, keine medizinische
-        Diagnose.
-      </p>
+      <a
+        className="button secondary wide"
+        href={
+          process.env.NEXT_PUBLIC_WHATSAPP_CHAT_URL ??
+          "https://wa.me/15551617622"
+        }
+      >
+        <MessageCircle size={18} /> Plan mit Coach besprechen
+      </a>
     </AppShell>
   );
 }

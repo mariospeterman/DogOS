@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   CircleUserRound,
+  MessageCircle,
   PawPrint,
   Route,
   TrendingUp,
@@ -34,6 +35,17 @@ export function AppShell({
           <span>DogOS</span>
         </Link>
         <div className="top-actions">
+          <a
+            className="icon-link coach-link"
+            href={
+              process.env.NEXT_PUBLIC_WHATSAPP_CHAT_URL ??
+              "https://wa.me/15551617622"
+            }
+            aria-label="DogOS Coach in WhatsApp"
+            title="DogOS Coach in WhatsApp"
+          >
+            <MessageCircle size={20} />
+          </a>
           <Link
             className="icon-link"
             href="/app/account"

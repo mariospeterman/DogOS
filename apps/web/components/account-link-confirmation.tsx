@@ -12,9 +12,15 @@ export function AccountLinkConfirmation({ token }: { token: string }) {
   async function confirm() {
     setStatus("working");
     try {
-      const { data } = await createClient().auth.getSession();
-      const accessToken = data.session?.access_token;
-      if (accessToken === undefined) {
+      const browserAuthConfigured =
+        process.env.NEXT_PUBLIC_SUPABASE_URL !== undefined &&
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY !== undefined;
+      const accessToken = browserAuthConfigured
+        ? (await createClient().auth.getSession()).data.session?.access_token
+        : undefined;
+      const localMode =
+        (process.env.NEXT_PUBLIC_DOGOS_ENV ?? "local") === "local";
+      if (accessToken === undefined && !localMode) {
         const next = `${window.location.pathname}${window.location.search}`;
         window.location.assign(
           `/auth/sign-in?next=${encodeURIComponent(next)}`,
@@ -27,7 +33,9 @@ export function AccountLinkConfirmation({ token }: { token: string }) {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            authorization: `Bearer ${accessToken}`,
+            ...(accessToken === undefined
+              ? { "x-dogos-user": "owner" }
+              : { authorization: `Bearer ${accessToken}` }),
           },
           body: JSON.stringify({ token }),
         },

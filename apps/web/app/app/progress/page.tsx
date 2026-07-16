@@ -5,37 +5,31 @@ import {
   Info,
   TrendingUp,
 } from "lucide-react";
-import { AppShell, DevelopmentNotice } from "../../../components/app-shell";
+import { AppShell } from "../../../components/app-shell";
 
 const metrics = [
-  ["Zielerreichung", "6 / 10", 60],
-  ["Konstanz", "2 Wochen", 68],
-  ["Erfolgsrate", "76 %", 76],
-  ["Schwierigkeit", "Stufe 1", 28],
-  ["Engagement", "gut", 82],
-  ["Erholung", "32 Sek.", 71],
-  ["Ausführung", "stabil", 74],
-  ["Datenqualität", "mittel", 62],
+  ["Lockere Abschnitte", "6 / 8", 75],
+  ["Konstante Ausführung", "2 Einheiten", 50],
+  ["Datenabdeckung", "mittel", 62],
 ] as const;
 
 export default function ProgressPage() {
   return (
-    <AppShell title="Milos Fortschritt" eyebrow="Letzte 14 Tage">
-      <DevelopmentNotice compact />
+    <AppShell title="Milos Entwicklung" eyebrow="Letzte 14 Tage">
       <section className="decision-banner">
         <TrendingUp />
         <div>
-          <span>Letzte Entscheidung</span>
-          <strong>Stufe beibehalten</strong>
+          <span>Aktuelle Entscheidung</span>
+          <strong>Block 01 halten</strong>
           <p>
-            Noch eine vergleichbare Einheit fehlt für eine verlässliche
-            Anpassung.
+            Noch eine vergleichbare Einheit fehlt. Danach prüft DogOS den
+            nächsten Ablenkungsgrad.
           </p>
         </div>
       </section>
       <section className="metrics">
         <div className="metrics-head">
-          <h2>Messdimensionen</h2>
+          <h2>Kernsignale</h2>
           <span>
             <Database size={15} /> 2 Einheiten
           </span>
@@ -52,22 +46,22 @@ export default function ProgressPage() {
           </div>
         ))}
       </section>
-      <section className="missing-data">
+      <section className="missing-data compact-evidence">
         <AlertCircle />
         <div>
-          <strong>Noch nicht gemessen</strong>
+          <strong>Offene Evidenz</strong>
           <p>
-            Reaktionszeit und Triggerdistanz bleiben unbekannt. DogOS ergänzt
-            keine fehlenden Werte.
+            Reaktionszeit und Distanz wurden nicht erfasst. Sie bleiben offen,
+            statt geschätzt zu werden.
           </p>
         </div>
       </section>
       <section className="plain-section">
-        <h2>Beschreibende Beobachtung</h2>
+        <h2>Beobachtung</h2>
         <p>In ruhiger Umgebung war die Erfolgsrate in 2 Einheiten höher.</p>
         <p className="caveat">
-          <Info size={15} /> Kleines Sample. Zusammenhang bedeutet keine
-          Ursache.
+          <Info size={15} /> Zwei Einheiten zeigen eine Tendenz, noch keinen
+          belastbaren Zusammenhang.
         </p>
       </section>
       <a className="text-link" href="/app/plan">
