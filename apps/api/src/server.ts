@@ -4,9 +4,11 @@ import { loadApiEnv } from "@dogos/config/api";
 import {
   InMemoryWhatsAppStateStore,
   loadMetaWhatsAppConfig,
+  loadTwilioSandboxWhatsAppConfig,
   LocalWhatsAppSimulator,
   MetaCloudWhatsAppProvider,
   PostgresWhatsAppStateStore,
+  TwilioSandboxWhatsAppProvider,
   WhatsAppWebhookService,
 } from "@dogos/whatsapp";
 
@@ -16,19 +18,23 @@ import { SignedActionService } from "./signed-actions.js";
 
 const environment = loadApiEnv(process.env);
 const metaConfig = loadMetaWhatsAppConfig(process.env);
+const twilioConfig = loadTwilioSandboxWhatsAppConfig(process.env);
 const whatsappStore =
-  metaConfig === null
+  metaConfig === null && twilioConfig === null
     ? new InMemoryWhatsAppStateStore()
     : new PostgresWhatsAppStateStore(
         process.env.DATABASE_URL ??
           "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+        twilioConfig === null ? "meta_cloud" : "twilio_sandbox",
       );
 const whatsappProvider =
-  metaConfig === null
-    ? new LocalWhatsAppSimulator(
-        process.env.WHATSAPP_VERIFY_TOKEN ?? "local-whatsapp-secret",
-      )
-    : new MetaCloudWhatsAppProvider(metaConfig);
+  twilioConfig !== null
+    ? new TwilioSandboxWhatsAppProvider(twilioConfig)
+    : metaConfig === null
+      ? new LocalWhatsAppSimulator(
+          process.env.WHATSAPP_VERIFY_TOKEN ?? "local-whatsapp-secret",
+        )
+      : new MetaCloudWhatsAppProvider(metaConfig);
 const product = new ProductService();
 const signedActions = new SignedActionService(
   {
@@ -94,7 +100,20 @@ const whatsapp = new WhatsAppWebhookService(
     await whatsappStore.saveOutbound(outbound, traceId);
   },
 );
-const app = buildApp({ product, signedActions, whatsapp });
+const app = buildApp({
+  product,
+  signedActions,
+  whatsapp,
+  ...(twilioConfig === null
+    ? {}
+    : {
+        twilio: {
+          inboundWebhookUrl: twilioConfig.inboundWebhookUrl,
+          service: whatsapp,
+          statusCallbackUrl: twilioConfig.statusCallbackUrl,
+        },
+      }),
+});
 
 try {
   await app.listen({ host: environment.API_HOST, port: environment.API_PORT });

@@ -1,5 +1,9 @@
 import swagger from "@fastify/swagger";
-import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
 import rawBody from "fastify-raw-body";
 import type { WhatsAppWebhookService } from "@dogos/whatsapp";
 import {
@@ -113,6 +117,11 @@ function key(request: FastifyRequest): string {
 export interface BuildAppOptions {
   product?: ProductService;
   signedActions?: SignedActionService;
+  twilio?: {
+    inboundWebhookUrl: string;
+    service: WhatsAppWebhookService;
+    statusCallbackUrl: string;
+  };
   whatsapp?: WhatsAppWebhookService;
 }
 
@@ -140,6 +149,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     },
   });
   app.register(rawBody, { global: false, encoding: "utf8", runFirst: true });
+  app.addContentTypeParser(
+    "application/x-www-form-urlencoded",
+    { parseAs: "string" },
+    (_request, body, done) => done(null, body),
+  );
 
   app.setErrorHandler((error, request, reply) => {
     const message = error instanceof Error ? error.message : "";
@@ -209,7 +223,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       routes.swagger(),
     );
 
-    if (options.whatsapp !== undefined) {
+    if (options.whatsapp !== undefined && options.twilio === undefined) {
       routes.get(
         "/webhooks/whatsapp",
         { schema: { hide: true } },
@@ -259,6 +273,70 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           return reply.status(200).send({ received: true });
         },
       );
+    }
+
+    if (options.twilio !== undefined) {
+      const twilioHeaders = {
+        type: "object",
+        required: ["x-twilio-signature"],
+        properties: { "x-twilio-signature": { type: "string" } },
+      } as const;
+      const processTwilioWebhook = async (
+        request: FastifyRequest,
+        reply: FastifyReply,
+        kind: "inbound" | "status",
+      ) => {
+        const raw = (request as FastifyRequest & { rawBody?: string }).rawBody;
+        const signature = request.headers["x-twilio-signature"];
+        if (raw === undefined || typeof signature !== "string") {
+          return reply.status(400).send();
+        }
+        try {
+          if (kind === "inbound") {
+            await options.twilio!.service.process(raw, signature, {
+              url: options.twilio!.inboundWebhookUrl,
+            });
+          } else {
+            await options.twilio!.service.processDeliveryStatuses(
+              raw,
+              signature,
+              { url: options.twilio!.statusCallbackUrl },
+            );
+          }
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message === "WHATSAPP_SIGNATURE_INVALID"
+          ) {
+            return reply.status(403).send();
+          }
+          throw error;
+        }
+        return kind === "inbound"
+          ? reply.type("text/xml").send("<Response></Response>")
+          : reply.status(204).send();
+      };
+      routes.post(
+        "/webhooks/whatsapp/twilio",
+        {
+          config: { rawBody: true },
+          schema: { hide: true, headers: twilioHeaders },
+        },
+        async (request, reply) =>
+          processTwilioWebhook(request, reply, "inbound"),
+      );
+      routes.post(
+        "/webhooks/whatsapp/twilio/status",
+        {
+          config: { rawBody: true },
+          schema: { hide: true, headers: twilioHeaders },
+        },
+        async (request, reply) =>
+          processTwilioWebhook(request, reply, "status"),
+      );
+    }
+
+    if (options.whatsapp !== undefined) {
       routes.post(
         "/v1/whatsapp/link/confirm",
         {

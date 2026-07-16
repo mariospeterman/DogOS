@@ -1,16 +1,25 @@
 import { spawn } from "node:child_process";
-import { loadMetaWhatsAppConfig } from "@dogos/whatsapp";
+import {
+  loadMetaWhatsAppConfig,
+  loadTwilioSandboxWhatsAppConfig,
+} from "@dogos/whatsapp";
 
 const config = loadMetaWhatsAppConfig(process.env);
-if (config === null || config.mode !== "meta_test") {
-  throw new Error("WHATSAPP_MODE must be meta_test for the restricted pilot");
+const twilio = loadTwilioSandboxWhatsAppConfig(process.env);
+if (config === null && twilio === null) {
+  throw new Error(
+    "WHATSAPP_MODE must be meta_test or twilio_sandbox for the restricted pilot",
+  );
 }
-const webhook = process.env.WHATSAPP_PUBLIC_WEBHOOK_URL;
+const webhook =
+  twilio?.inboundWebhookUrl ?? process.env.WHATSAPP_PUBLIC_WEBHOOK_URL;
 if (webhook === undefined || !webhook.startsWith("https://")) {
-  throw new Error("WHATSAPP_PUBLIC_WEBHOOK_URL must be a public HTTPS URL");
+  throw new Error("The provider webhook must be a public HTTPS URL");
 }
 process.stdout.write(
-  `Restricted Meta pilot ready for ${config.allowlistedContacts.size} contact(s).\nWebhook: ${webhook}\n`,
+  `Restricted ${twilio === null ? "Meta" : "Twilio Sandbox"} pilot ready for ${String(
+    (twilio ?? config)!.allowlistedContacts.size,
+  )} contact(s).\nWebhook: ${webhook}\n`,
 );
 const child = spawn("pnpm", ["--filter", "@dogos/api", "dev"], {
   env: process.env,

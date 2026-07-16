@@ -52,6 +52,7 @@ pnpm demo:product
 - [Knowledge governance](docs/knowledge/governance.md)
 - [Safety and escalation](docs/safety/safety-escalation.md)
 - [WhatsApp, mobile, and referral flows](docs/product/whatsapp-mobile.md)
+- [Twilio WhatsApp Sandbox setup](docs/providers/twilio-whatsapp-sandbox.md)
 - [Worked training-plan examples](docs/product/worked-plan.md)
 - [Testing and approval gates](docs/testing/phase-1-approval.md)
 

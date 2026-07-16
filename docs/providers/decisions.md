@@ -9,19 +9,19 @@ source before pinning SDK/API/model versions.
 
 ## 1. Decision summary
 
-| Capability            | Phase 2 choice                         | Alternative                 | Decision                                                                                                                                   |
-| --------------------- | -------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| WhatsApp              | Meta Cloud API directly                | Twilio/WATI/ManyChat        | Direct API avoids an extra data processor and abstraction; build canonical transport adapter.                                              |
-| Database/Auth/Storage | Supabase managed EU project            | Separate Postgres/Auth/S3   | Faster coherent RLS/auth/storage foundation; use explicit schemas/grants and local CLI.                                                    |
-| Background jobs       | Trigger.dev                            | Temporal Cloud, BullMQ      | Durable retries/queues/idempotency with low operating burden. Revisit Temporal only for workflow complexity Trigger cannot express safely. |
-| Text models           | AI SDK Core plus DogOS contracts       | Direct SDKs only            | Normalize common text capabilities while keeping policy/routing and canonical outputs under DogOS control.                                 |
-| Initial text provider | Gemini stable fast model, configurable | OpenAI/Anthropic            | Product assumption; benchmark extraction, German quality, latency, cost, and privacy before production.                                    |
-| Async video later     | Gemini stable video model              | OpenAI frame/event packages | Native video semantics, but 1 FPS processing means it cannot measure timing. Deferred.                                                     |
-| Realtime later        | LiveKit + local CV                     | Daily/direct WebRTC         | Strong media/agent ecosystem and region controls; deferred due safety and current Gemini 3.1 compatibility limits.                         |
-| Billing               | Stripe Billing                         | Paddle                      | Mature subscription/webhook lifecycle. Merchant/tax structure requires business/legal confirmation.                                        |
-| Booking               | Cal.com API v2                         | Calendly/SavvyCal handoff   | API-first booking and webhooks; referral accounting remains in DogOS.                                                                      |
-| Observability         | OpenTelemetry + Sentry                 | Datadog                     | Portable traces plus errors; scrub sensitive training and household data.                                                                  |
-| Analytics/flags       | PostHog EU                             | Plausible + Unleash         | One consent-gated product analytics/flags surface; no decision-bearing training events sent by default.                                    |
+| Capability            | Phase 2 choice                         | Alternative                 | Decision                                                                                                                                                 |
+| --------------------- | -------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WhatsApp              | Meta Cloud API directly                | Twilio/WATI/ManyChat        | Meta remains the production candidate. A Twilio Sandbox adapter is available only for a restricted development pilot behind the same canonical contract. |
+| Database/Auth/Storage | Supabase managed EU project            | Separate Postgres/Auth/S3   | Faster coherent RLS/auth/storage foundation; use explicit schemas/grants and local CLI.                                                                  |
+| Background jobs       | Trigger.dev                            | Temporal Cloud, BullMQ      | Durable retries/queues/idempotency with low operating burden. Revisit Temporal only for workflow complexity Trigger cannot express safely.               |
+| Text models           | AI SDK Core plus DogOS contracts       | Direct SDKs only            | Normalize common text capabilities while keeping policy/routing and canonical outputs under DogOS control.                                               |
+| Initial text provider | Gemini stable fast model, configurable | OpenAI/Anthropic            | Product assumption; benchmark extraction, German quality, latency, cost, and privacy before production.                                                  |
+| Async video later     | Gemini stable video model              | OpenAI frame/event packages | Native video semantics, but 1 FPS processing means it cannot measure timing. Deferred.                                                                   |
+| Realtime later        | LiveKit + local CV                     | Daily/direct WebRTC         | Strong media/agent ecosystem and region controls; deferred due safety and current Gemini 3.1 compatibility limits.                                       |
+| Billing               | Stripe Billing                         | Paddle                      | Mature subscription/webhook lifecycle. Merchant/tax structure requires business/legal confirmation.                                                      |
+| Booking               | Cal.com API v2                         | Calendly/SavvyCal handoff   | API-first booking and webhooks; referral accounting remains in DogOS.                                                                                    |
+| Observability         | OpenTelemetry + Sentry                 | Datadog                     | Portable traces plus errors; scrub sensitive training and household data.                                                                                |
+| Analytics/flags       | PostHog EU                             | Plausible + Unleash         | One consent-gated product analytics/flags surface; no decision-bearing training events sent by default.                                                  |
 
 ## 2. Important verified limitations
 
@@ -105,6 +105,9 @@ All sources retrieved 2026-07-14.
 | Supabase       | [Testing overview](https://supabase.com/docs/guides/local-development/testing/overview)                  | pgTAP and application-level RLS tests.                       |
 | Supabase       | [Changelog](https://supabase.com/changelog)                                                              | Breaking-change review, exposure defaults, Postgres support. |
 | WhatsApp       | [Platform pricing](https://whatsappbusiness.com/products/platform-pricing/)                              | Delivered-message pricing, categories, service window.       |
+| Twilio         | [WhatsApp Sandbox](https://www.twilio.com/docs/whatsapp/sandbox)                                         | Development-only sender setup and Sandbox restrictions.      |
+| Twilio         | [Webhook security](https://www.twilio.com/docs/usage/webhooks/webhooks-security)                         | Exact-URL request-signature validation.                      |
+| Twilio         | [Message resource](https://www.twilio.com/docs/messaging/api/message-resource)                           | Outbound form contract and delivery states.                  |
 | Trigger.dev    | [Tasks](https://trigger.dev/docs/tasks/overview)                                                         | Retries and queues.                                          |
 | Trigger.dev    | [Idempotency](https://trigger.dev/docs/idempotency)                                                      | Scope behavior and deduplication.                            |
 | Stripe         | [Subscription webhooks](https://docs.stripe.com/billing/subscriptions/webhooks)                          | Async subscription/entitlement lifecycle.                    |
