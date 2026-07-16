@@ -48,6 +48,18 @@ describe("health routes", () => {
     expect(denied.headers["access-control-allow-origin"]).not.toBe(
       "https://attacker.test",
     );
+
+    const local = await app.inject({
+      method: "OPTIONS",
+      url: "/v1/coach/messages",
+      headers: {
+        origin: "http://127.0.0.1:3000",
+        "access-control-request-method": "POST",
+      },
+    });
+    expect(local.headers["access-control-allow-origin"]).toBe(
+      "http://127.0.0.1:3000",
+    );
   });
 });
 
@@ -57,6 +69,49 @@ const mutationHeaders = (user = "owner", key = "test-command-1") => ({
 });
 
 describe("product API", () => {
+  it("serves one idempotent authenticated Coach timeline", async () => {
+    const app = buildApp();
+    apps.push(app);
+    const dogId = "30000000-0000-0000-0000-000000000001";
+
+    const initial = await app.inject({
+      method: "GET",
+      url: `/v1/coach/conversation?dogId=${dogId}`,
+      headers: { "x-dogos-user": "owner" },
+    });
+    expect(initial.statusCode).toBe(200);
+    expect(initial.json().messages).toEqual([]);
+
+    const request = {
+      method: "POST" as const,
+      url: "/v1/coach/messages",
+      headers: mutationHeaders("owner", "coach-message-1"),
+      payload: {
+        dogId,
+        message: "Warum dieser Block?",
+        contextKind: "plan",
+      },
+    };
+    const sent = await app.inject(request);
+    const replay = await app.inject(request);
+    expect(sent.statusCode).toBe(200);
+    expect(sent.json().conversation.messages).toHaveLength(2);
+    expect(replay.json().conversation.messages).toHaveLength(2);
+    expect(
+      replay
+        .json()
+        .conversation.messages.every(
+          (message: { channel: string }) => message.channel === "web",
+        ),
+    ).toBe(true);
+
+    const viewer = await app.inject({
+      ...request,
+      headers: mutationHeaders("viewer", "coach-viewer-1"),
+    });
+    expect(viewer.statusCode).toBe(403);
+  });
+
   it("enforces local roles without weakening authentication", async () => {
     const app = buildApp();
     apps.push(app);
@@ -144,6 +199,8 @@ describe("product API", () => {
     const expectedPaths = [
       "/v1/account/locale",
       "/v1/anamneses/{id}/answers",
+      "/v1/coach/conversation",
+      "/v1/coach/messages",
       "/v1/dogs/{id}",
       "/v1/dogs/{id}/anamneses",
       "/v1/dogs/{id}/current-plan",

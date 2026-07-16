@@ -15,7 +15,12 @@ export class WhatsAppWebhookService {
     private readonly store: WhatsAppStateStore,
     private readonly accountLinkBaseUrl: string,
     private readonly onLinkedMessage?: (
-      message: { contact: ProviderContact; kind: string; text: string },
+      message: {
+        contact: ProviderContact;
+        id: string;
+        kind: string;
+        text: string;
+      },
       traceId: string,
     ) => Promise<void>,
     private readonly languageResolver: ConversationLanguageResolver = new DeterministicConversationLanguageResolver(),
@@ -64,7 +69,12 @@ export class WhatsAppWebhookService {
         await this.store.saveOutbound(outbound, traceId);
       } else if (this.onLinkedMessage !== undefined) {
         await this.onLinkedMessage(
-          { contact: claimed.contact, kind: message.kind, text: message.text },
+          {
+            contact: claimed.contact,
+            id: message.id,
+            kind: message.kind,
+            text: message.text,
+          },
           traceId,
         );
       }

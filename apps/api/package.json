@@ -13,6 +13,7 @@
     "@dogos/agent-auth": "workspace:*",
     "@dogos/agent-tools": "workspace:*",
     "@dogos/config": "workspace:*",
+    "@dogos/conversation": "workspace:*",
     "@dogos/contracts": "workspace:*",
     "@dogos/database": "workspace:*",
     "@dogos/progress-engine": "workspace:*",

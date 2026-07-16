@@ -1,4 +1,5 @@
 import { capabilitiesForTier, type SubscriptionTier } from "@dogos/contracts";
+import { composeCoachReply } from "@dogos/conversation";
 
 import {
   ConversationMachine,
@@ -202,13 +203,28 @@ export class WhatsAppConversationOrchestrator {
     if (["choice.3", "fortschritt", "progress"].includes(normalized)) {
       return this.provider.sendText(contact.externalId, links.progress);
     }
-    const copy =
-      locale === "de-CH"
-        ? `Heute trainiert ihr vier Minuten ruhige Orientierung an lockerer Leine. Starte auf einem übersichtlichen Abschnitt. Gehe erst los, wenn die Leine locker ist; jede freiwillige Orientierung bestätigt die richtige Position. So wird nicht Tempo, sondern saubere Kontrolle aufgebaut. ${links.today}`
-        : `Today you will train four minutes of calm orientation on a loose leash. Start on a clear stretch. Move only while the leash is loose; each voluntary check-in confirms the correct position. This builds clean control rather than speed. ${links.today}`;
+    const reply = composeCoachReply({
+      context: {
+        dogName: "Milo",
+        durationMinutes: 4,
+        evidenceCount: 2,
+        goal:
+          locale === "de-CH"
+            ? "lockerer Leine im Alltag"
+            : "a loose leash on daily walks",
+        latestDecision: "repeat_step",
+        stage:
+          locale === "de-CH"
+            ? "Orientierung unter wenig Ablenkung"
+            : "orientation under low distraction",
+      },
+      currentLocale: locale,
+      links: { ...links, session: links.today },
+      message: text,
+    });
     return this.provider.sendInteractive(
       contact.externalId,
-      copy,
+      `${reply.text} ${reply.actions[0]?.href ?? links.today}`,
       options.plan_ready[locale],
     );
   }

@@ -65,6 +65,9 @@ importers:
       '@dogos/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@dogos/conversation':
+        specifier: workspace:*
+        version: link:../../packages/conversation
       '@dogos/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -235,6 +238,19 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  packages/conversation:
+    dependencies:
+      postgres:
+        specifier: 3.4.8
+        version: 3.4.8
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
   packages/database:
     dependencies:
       '@dogos/contracts':
@@ -359,6 +375,9 @@ importers:
       '@dogos/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@dogos/conversation':
+        specifier: workspace:*
+        version: link:../conversation
       postgres:
         specifier: 3.4.8
         version: 3.4.8

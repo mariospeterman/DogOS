@@ -7,6 +7,10 @@ import Fastify, {
 } from "fastify";
 import rawBody from "fastify-raw-body";
 import type { AgentActorContext } from "@dogos/agent-auth";
+import {
+  CoachConversationService,
+  InMemoryCoachConversationStore,
+} from "@dogos/conversation";
 import type { WhatsAppWebhookService } from "@dogos/whatsapp";
 import { ProductService, localIdentities } from "./product-service.js";
 import {
@@ -114,6 +118,7 @@ function key(request: FastifyRequest): string {
 
 export interface BuildAppOptions {
   authenticator?: RequestAuthenticator;
+  coach?: CoachConversationService;
   product?: ProductService;
   signedActions?: SignedActionService;
   twilio?: {
@@ -131,6 +136,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     requestIdHeader: "x-request-id",
   });
   const product = options.product ?? new ProductService();
+  const coach =
+    options.coach ??
+    new CoachConversationService(new InMemoryCoachConversationStore());
   const authenticator =
     options.authenticator ?? new LocalRequestAuthenticator("test");
   const signed =
@@ -139,6 +147,19 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       { local1: "local-only-change-before-production-32-chars" },
       "local1",
     );
+  const configuredWebOrigin = options.webOrigin ?? process.env.WEB_ORIGIN;
+  const allowedWebOrigins =
+    process.env.NODE_ENV === "production"
+      ? (configuredWebOrigin ?? false)
+      : [
+          ...new Set(
+            [
+              configuredWebOrigin,
+              "http://localhost:3000",
+              "http://127.0.0.1:3000",
+            ].filter((origin): origin is string => origin !== undefined),
+          ),
+        ];
   app.register(swagger, {
     openapi: {
       openapi: "3.1.0",
@@ -161,8 +182,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     ],
     maxAge: 600,
     methods: ["GET", "POST", "OPTIONS"],
-    origin:
-      options.webOrigin ?? process.env.WEB_ORIGIN ?? "http://localhost:3000",
+    origin: allowedWebOrigins,
   });
   app.register(rawBody, { global: false, encoding: "utf8", runFirst: true });
   app.addContentTypeParser(
@@ -489,6 +509,130 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           authMode: actor.authMode,
           locale: product.snapshot().locale,
         };
+      },
+    );
+
+    routes.get(
+      "/v1/coach/conversation",
+      {
+        schema: {
+          operationId: "getCoachConversation",
+          tags: ["coach"],
+          headers: authHeaders,
+          querystring: {
+            type: "object",
+            additionalProperties: false,
+            required: ["dogId"],
+            properties: { dogId: { type: "string", format: "uuid" } },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        const dogId = (request.query as { dogId: string }).dogId;
+        const snapshot = product.snapshot();
+        if (
+          actor.householdId !== snapshot.household.id ||
+          dogId !== snapshot.dog.id ||
+          actor.identity === "unrelated"
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        return coach.ensure({
+          actorUserId: actor.actorId,
+          dogId,
+          householdId: actor.householdId,
+          locale: snapshot.locale,
+        });
+      },
+    );
+
+    routes.post(
+      "/v1/coach/messages",
+      {
+        schema: {
+          operationId: "sendCoachMessage",
+          tags: ["coach"],
+          headers: mutationHeaders,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["dogId", "message"],
+            properties: {
+              dogId: { type: "string", format: "uuid" },
+              message: { type: "string", minLength: 1, maxLength: 2000 },
+              contextKind: {
+                type: "string",
+                enum: ["today", "plan", "session", "progress", "general"],
+              },
+              contextSubjectId: { type: "string", format: "uuid" },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
+        const body = request.body as {
+          dogId: string;
+          message: string;
+          contextKind?: "today" | "plan" | "session" | "progress" | "general";
+          contextSubjectId?: string;
+        };
+        const snapshot = product.snapshot();
+        if (
+          actor.householdId !== snapshot.household.id ||
+          body.dogId !== snapshot.dog.id ||
+          actor.identity === "unrelated"
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        return coach.send({
+          channel: "web",
+          clientMessageId: key(request),
+          context: {
+            dogName: snapshot.dog.name,
+            durationMinutes: 4,
+            evidenceCount: snapshot.sessions.length,
+            goal:
+              snapshot.locale === "de-CH"
+                ? "lockerer Leine im Alltag"
+                : "a loose leash on daily walks",
+            latestDecision: snapshot.latestDecision,
+            stage:
+              snapshot.locale === "de-CH"
+                ? "Orientierung unter wenig Ablenkung"
+                : "orientation under low distraction",
+          },
+          ...(body.contextKind === undefined
+            ? {}
+            : { contextKind: body.contextKind }),
+          ...(body.contextSubjectId === undefined
+            ? {}
+            : { contextSubjectId: body.contextSubjectId }),
+          links: {
+            plan: "/app/plan",
+            progress: "/app/progress",
+            session: "/app/session/session-1",
+            today: "/app/today",
+          },
+          message: body.message,
+          scope: {
+            actorUserId: actor.actorId,
+            dogId: body.dogId,
+            householdId: actor.householdId,
+            locale: snapshot.locale,
+          },
+          traceId: request.id,
+        });
       },
     );
 

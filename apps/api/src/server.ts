@@ -10,6 +10,11 @@ import {
   WhatsAppConversationOrchestrator,
   WhatsAppWebhookService,
 } from "@dogos/whatsapp";
+import {
+  CoachConversationService,
+  InMemoryCoachConversationStore,
+  PostgresCoachConversationStore,
+} from "@dogos/conversation";
 
 import { buildApp } from "./app.js";
 import { createRequestAuthenticator } from "./auth.js";
@@ -43,6 +48,10 @@ const whatsappProvider =
         )
       : new MetaCloudWhatsAppProvider(metaConfig);
 const product = new ProductService();
+const coachStore = environment.DATABASE_URL
+  ? new PostgresCoachConversationStore(environment.DATABASE_URL)
+  : new InMemoryCoachConversationStore();
+const coach = new CoachConversationService(coachStore);
 const signedActions = new SignedActionService(
   {
     pilot1:
@@ -86,13 +95,28 @@ const whatsapp = new WhatsAppWebhookService(
   whatsappStore,
   process.env.WHATSAPP_ACCOUNT_LINK_URL ??
     "http://127.0.0.1:3000/app/account/link",
-  async ({ contact, text }, traceId) => {
+  async ({ contact, id, text }, traceId) => {
     const outbound = await conversation.handle(contact, text);
     await whatsappStore.saveOutbound(outbound, traceId);
+    await coach.recordWhatsAppExchange({
+      contactId: contact.id,
+      inboundId: id,
+      inboundText: text,
+      outboundId: outbound.id,
+      outboundText: outbound.text,
+      scope: {
+        actorUserId: contact.userId!,
+        dogId,
+        householdId: contact.householdId!,
+        locale: contact.locale,
+      },
+      traceId,
+    });
   },
 );
 const app = buildApp({
   authenticator,
+  coach,
   product,
   signedActions,
   whatsapp,
