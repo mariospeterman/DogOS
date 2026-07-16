@@ -162,7 +162,10 @@ export class InMemoryWhatsAppStateStore implements WhatsAppStateStore {
 export class PostgresWhatsAppStateStore implements WhatsAppStateStore {
   readonly #sql: Sql;
 
-  constructor(connectionString: string) {
+  constructor(
+    connectionString: string,
+    private readonly provider: "meta_cloud" | "twilio_sandbox" = "meta_cloud",
+  ) {
     this.#sql = postgres(connectionString, { max: 5, prepare: false });
   }
 
@@ -178,8 +181,8 @@ export class PostgresWhatsAppStateStore implements WhatsAppStateStore {
       const sql = transaction as unknown as TransactionQuery;
       const [contact] = await sql`
         insert into private.whatsapp_provider_contacts
-          (external_contact_id, external_contact_hash, allowlisted)
-        values (${message.contactId}, ${hash(message.contactId)}, true)
+          (provider, external_contact_id, external_contact_hash, allowlisted)
+        values (${this.provider}, ${message.contactId}, ${hash(message.contactId)}, true)
         on conflict (provider, external_contact_id) do update set updated_at = now()
         returning id, external_contact_id, user_id, household_id, locale, status
       `;
@@ -199,7 +202,7 @@ export class PostgresWhatsAppStateStore implements WhatsAppStateStore {
   async getContact(externalId: string): Promise<ProviderContact | null> {
     const [row] = await this.#sql`
       select id, external_contact_id, user_id, household_id, locale, status
-      from private.whatsapp_provider_contacts where provider = 'meta_cloud'
+      from private.whatsapp_provider_contacts where provider = ${this.provider}
         and external_contact_id = ${externalId}
     `;
     return row === undefined ? null : this.contact(row);
@@ -210,7 +213,7 @@ export class PostgresWhatsAppStateStore implements WhatsAppStateStore {
       insert into private.whatsapp_outbound_messages
         (provider_message_id, contact_id, message_kind, message_body, delivery_state, trace_id)
       select ${message.id}, id, ${message.kind}, ${message.text.slice(0, 2000)}, ${message.state}, ${traceId}
-      from private.whatsapp_provider_contacts where provider = 'meta_cloud'
+      from private.whatsapp_provider_contacts where provider = ${this.provider}
         and external_contact_id = ${message.contactId}
       on conflict (provider_message_id) do nothing
     `;
