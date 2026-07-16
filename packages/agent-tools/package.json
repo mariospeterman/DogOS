@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@dogos/agent-auth": "workspace:*",
+    "@dogos/contracts": "workspace:*",
     "zod": "4.4.3"
   },
   "devDependencies": {

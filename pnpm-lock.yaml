@@ -198,6 +198,9 @@ importers:
       '@dogos/agent-auth':
         specifier: workspace:*
         version: link:../agent-auth
+      '@dogos/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       zod:
         specifier: 4.4.3
         version: 4.4.3

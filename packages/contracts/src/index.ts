@@ -1,4 +1,5 @@
 export * from "./common.js";
+export * from "./coaching.js";
 export * from "./context.js";
 export * from "./decisions.js";
 export * from "./entitlements.js";
