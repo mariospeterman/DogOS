@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import Fastify, {
   type FastifyInstance,
@@ -122,6 +123,7 @@ export interface BuildAppOptions {
     service: WhatsAppWebhookService;
     statusCallbackUrl: string;
   };
+  webOrigin?: string;
   whatsapp?: WhatsAppWebhookService;
 }
 
@@ -147,6 +149,18 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         },
       },
     },
+  });
+  app.register(cors, {
+    allowedHeaders: [
+      "content-type",
+      "idempotency-key",
+      "x-dogos-user",
+      "x-request-id",
+    ],
+    maxAge: 600,
+    methods: ["GET", "POST", "OPTIONS"],
+    origin:
+      options.webOrigin ?? process.env.WEB_ORIGIN ?? "http://localhost:3000",
   });
   app.register(rawBody, { global: false, encoding: "utf8", runFirst: true });
   app.addContentTypeParser(

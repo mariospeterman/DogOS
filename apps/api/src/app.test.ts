@@ -18,6 +18,37 @@ describe("health routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: "ok" });
   }, 10_000);
+
+  it("allows browser API calls only from the configured web origin", async () => {
+    const app = buildApp({ webOrigin: "https://mobile.dogos.test" });
+    apps.push(app);
+
+    const allowed = await app.inject({
+      method: "OPTIONS",
+      url: "/v1/whatsapp/link/confirm",
+      headers: {
+        origin: "https://mobile.dogos.test",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,x-dogos-user",
+      },
+    });
+    const denied = await app.inject({
+      method: "OPTIONS",
+      url: "/v1/whatsapp/link/confirm",
+      headers: {
+        origin: "https://attacker.test",
+        "access-control-request-method": "POST",
+      },
+    });
+
+    expect(allowed.statusCode).toBe(204);
+    expect(allowed.headers["access-control-allow-origin"]).toBe(
+      "https://mobile.dogos.test",
+    );
+    expect(denied.headers["access-control-allow-origin"]).not.toBe(
+      "https://attacker.test",
+    );
+  });
 });
 
 const mutationHeaders = (user = "owner", key = "test-command-1") => ({
