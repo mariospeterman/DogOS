@@ -18,18 +18,22 @@ production. Until then the entire matrix is `pending_professional_review`.
 6. A stop or escalation decision is never weakened by subscription entitlement.
 7. Trainer ranking uses suitability before availability, price, or commission.
 8. Every decision is explainable from rule IDs and evidence IDs.
+9. A hold applies to the affected autonomous exercise or progression, not to
+   account access, conversation, records, referrals, or reporting a new fact.
+10. A disclaimer explains limits but never substitutes for a safe product
+    action.
 
 ## 2. Dispositions
 
-| Disposition          | Product action                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------ |
-| `continue_low_risk`  | Continue the approved step at unchanged difficulty.                                  |
-| `pause_and_question` | Pause and collect specific missing safety/context data.                              |
-| `regress_or_manage`  | Reduce difficulty or use an approved management step.                                |
-| `trainer_review`     | Stop autonomous progression and offer a qualified trainer.                           |
-| `veterinary_review`  | Stop relevant training and advise veterinary assessment.                             |
-| `urgent_local_help`  | Show a jurisdiction-reviewed urgent safety message; do not provide remote treatment. |
-| `unsupported`        | Explain that DogOS has no approved protocol for the case.                            |
+| Disposition          | Product action                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| `continue_low_risk`  | Continue the approved step at unchanged difficulty.                                            |
+| `pause_and_question` | Pause and collect specific missing safety/context data.                                        |
+| `regress_or_manage`  | Reduce difficulty or use an approved management step.                                          |
+| `trainer_review`     | Hold autonomous progression; keep chat and records available and offer a qualified trainer.    |
+| `veterinary_review`  | Hold the affected exercise; keep chat and records available and suggest veterinary assessment. |
+| `urgent_local_help`  | Show a jurisdiction-reviewed urgent safety message; do not provide remote treatment.           |
+| `unsupported`        | Explain that DogOS has no approved protocol for the case.                                      |
 
 ## 3. Draft escalation matrix
 
@@ -82,6 +86,12 @@ safer outcome and create a review event.
 The German explanation must say what DogOS observed/reported, what it cannot
 determine, what action was stopped, and what kind of professional help is
 appropriate. It must not name a condition.
+
+The explanation is event-triggered and concise. Routine low-risk sessions do
+not repeat generic injury, equipment, or emergency warnings. After escalation,
+the user can still open history, report an update, manage the account, and
+request a trainer. A new autonomous exercise requires a new qualifying
+assessment; the workflow must never become a terminal chat state.
 
 ## 6. Privacy and AI safety
 

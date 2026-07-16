@@ -68,6 +68,7 @@ const acutePattern = /schmerz|pain|lahm|limp|plötzlich|sudden|akut|acute/i;
 export interface ConversationLinks {
   plan: string;
   progress: string;
+  referral: string;
   today: string;
 }
 
@@ -131,6 +132,10 @@ export class WhatsAppConversationOrchestrator {
       return this.presentPlan(contact, text, current.locale);
     }
 
+    if (current.state === "professional_escalation") {
+      return this.presentEscalation(contact, text, current.locale);
+    }
+
     if (
       (current.state === "health_screen" &&
         (acutePattern.test(text) || text === "choice.2")) ||
@@ -138,11 +143,20 @@ export class WhatsAppConversationOrchestrator {
     ) {
       machine.escalate();
       await this.persist(contact.id, machine.view());
-      return this.provider.sendText(
+      const links = await this.links(contact);
+      const injury = current.state === "health_screen";
+      return this.provider.sendInteractive(
         contact.externalId,
         current.locale === "de-CH"
-          ? "Training pausiert. Die neue Beobachtung braucht zuerst eine tierärztliche oder qualifizierte fachliche Beurteilung. DogOS stellt bis dahin keine nächste Übung bereit."
-          : "Training is paused. The new observation needs veterinary or qualified professional review first. DogOS will not provide another exercise until then.",
+          ? injury
+            ? "Diese akute Veränderung kann DogOS nicht beurteilen. Setze die heutige Übung vorsichtshalber aus und lass Milo tierärztlich abklären. Das ist keine Diagnose; Plan, Verlauf und Chat bleiben verfügbar."
+            : "Bei einem Biss mit Kind empfiehlt DogOS keine neue autonome Übung. Lass den Fall durch eine qualifizierte Fachperson beurteilen. Das ist keine Diagnose; Chat, Verlauf und Terminzugang bleiben verfügbar."
+          : injury
+            ? "DogOS cannot assess this acute change. Skip today's exercise as a precaution and seek veterinary assessment. This is not a diagnosis; your plan, history, and chat remain available."
+            : "After a bite involving a child, DogOS will not suggest a new autonomous exercise. Have the case assessed by a qualified professional. This is not a diagnosis; chat, history, and booking access remain available.",
+        current.locale === "de-CH"
+          ? ["Fachperson finden", "Verlauf öffnen", "Update melden"]
+          : ["Find professional", "Open history", "Report update"],
       );
     }
 
@@ -182,6 +196,27 @@ export class WhatsAppConversationOrchestrator {
       contact.externalId,
       copy,
       options.plan_ready[locale],
+    );
+  }
+
+  private async presentEscalation(
+    contact: ProviderContact,
+    text: string,
+    locale: "de-CH" | "en",
+  ): Promise<OutboundMessage> {
+    const links = await this.links(contact);
+    const normalized = text.trim().toLowerCase();
+    if (normalized === "choice.1") {
+      return this.provider.sendText(contact.externalId, links.referral);
+    }
+    if (normalized === "choice.2") {
+      return this.provider.sendText(contact.externalId, links.progress);
+    }
+    return this.provider.sendText(
+      contact.externalId,
+      locale === "de-CH"
+        ? "Beschreibe kurz nur die neue Beobachtung. DogOS speichert sie als Bericht; eine Diagnose oder Freigabe erfolgt daraus nicht automatisch."
+        : "Briefly describe only the new observation. DogOS records it as a report; it does not automatically create a diagnosis or clearance.",
     );
   }
 

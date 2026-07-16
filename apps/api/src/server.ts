@@ -60,7 +60,7 @@ const conversation = new WhatsAppConversationOrchestrator(
     const actorId = contact.userId!;
     const householdId = contact.householdId!;
     const issue = async (
-      purpose: "open_plan" | "open_progress" | "open_today",
+      purpose: "open_plan" | "open_progress" | "open_today" | "open_trainers",
       path: string,
     ) => {
       const token = await signedActions.issue({
@@ -72,12 +72,13 @@ const conversation = new WhatsAppConversationOrchestrator(
       });
       return `${webBase}${path}?action=${encodeURIComponent(token)}`;
     };
-    const [today, plan, progress] = await Promise.all([
+    const [today, plan, progress, referral] = await Promise.all([
       issue("open_today", "/app/today"),
       issue("open_plan", "/app/plan"),
       issue("open_progress", "/app/progress"),
+      issue("open_trainers", "/app/trainers"),
     ]);
-    return { plan, progress, today };
+    return { plan, progress, referral, today };
   },
 );
 const whatsapp = new WhatsAppWebhookService(

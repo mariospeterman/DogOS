@@ -117,6 +117,7 @@ describe("WhatsApp conversation orchestration", () => {
       async () => ({
         plan: "https://dogos.test/plan",
         progress: "https://dogos.test/progress",
+        referral: "https://dogos.test/trainers",
         today: "https://dogos.test/today",
       }),
     );
@@ -150,7 +151,12 @@ describe("WhatsApp conversation orchestration", () => {
     const { prompt: _prompt, ...snapshot } = machine.view();
     await store.saveConversation(contact.id, snapshot);
     const stopped = await orchestrator.handle(contact, "Er lahmt plötzlich");
-    expect(stopped.text).toMatch(/Training pausiert/);
+    expect(stopped.text).toMatch(/tierärztlich abklären/);
+    expect(stopped.options).toEqual([
+      "Fachperson finden",
+      "Verlauf öffnen",
+      "Update melden",
+    ]);
     expect((await store.loadConversation(contact.id))?.state).toBe(
       "professional_escalation",
     );
