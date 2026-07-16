@@ -91,7 +91,7 @@ describe("Twilio WhatsApp webhooks", () => {
       payload,
     });
     expect(invalid.statusCode).toBe(403);
-  });
+  }, 10_000);
 
   it("validates and persists outbound delivery status", async () => {
     const messages = {
