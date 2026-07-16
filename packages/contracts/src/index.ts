@@ -2,6 +2,7 @@ export * from "./common.js";
 export * from "./coaching.js";
 export * from "./context.js";
 export * from "./decisions.js";
+export * from "./distribution.js";
 export * from "./entitlements.js";
 export * from "./evidence.js";
 export * from "./knowledge.js";
