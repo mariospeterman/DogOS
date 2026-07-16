@@ -10,18 +10,22 @@ export function AccountLinkConfirmation({ token }: { token: string }) {
   );
   async function confirm() {
     setStatus("working");
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000"}/v1/whatsapp/link/confirm`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-dogos-user": "owner",
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000"}/v1/whatsapp/link/confirm`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-dogos-user": "owner",
+          },
+          body: JSON.stringify({ token }),
         },
-        body: JSON.stringify({ token }),
-      },
-    );
-    setStatus(response.ok ? "linked" : "error");
+      );
+      setStatus(response.ok ? "linked" : "error");
+    } catch {
+      setStatus("error");
+    }
   }
   return (
     <AppShell title="WhatsApp verbinden" eyebrow="Sichere Kontoverknüpfung">
@@ -55,7 +59,8 @@ export function AccountLinkConfirmation({ token }: { token: string }) {
       )}
       {status === "error" ? (
         <p className="error-note">
-          Der Link ist ungültig, abgelaufen oder bereits verwendet.
+          Die Verbindung war nicht möglich. Öffne den neuesten Link aus WhatsApp
+          und versuche es erneut.
         </p>
       ) : null}
     </AppShell>

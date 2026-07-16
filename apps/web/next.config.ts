@@ -6,9 +6,21 @@ const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
+const configuredWebHostname = (() => {
+  try {
+    return process.env.WEB_ORIGIN
+      ? new URL(process.env.WEB_ORIGIN).hostname
+      : null;
+  } catch {
+    return null;
+  }
+})();
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["127.0.0.1"],
+  allowedDevOrigins: [
+    "127.0.0.1",
+    ...(configuredWebHostname === null ? [] : [configuredWebHostname]),
+  ],
   poweredByHeader: false,
   reactStrictMode: true,
   turbopack: {

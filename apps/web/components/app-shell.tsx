@@ -1,7 +1,6 @@
 import {
   CalendarDays,
   CircleUserRound,
-  MessageCircle,
   PawPrint,
   Route,
   TrendingUp,
@@ -35,14 +34,6 @@ export function AppShell({
           <span>DogOS</span>
         </Link>
         <div className="top-actions">
-          <Link
-            className="icon-link"
-            href="/simulator"
-            aria-label="Chat-Simulator"
-            title="Chat-Simulator"
-          >
-            <MessageCircle size={20} />
-          </Link>
           <Link
             className="icon-link"
             href="/app/account"

@@ -1,4 +1,4 @@
-# Slice 2.5: Local WhatsApp Simulator and Mobile Product
+# Slice 2.5: Mobile Product and Provider Test Harness
 
 ## Status
 
@@ -7,7 +7,7 @@ Implemented and locally testable with `pnpm demo:product`.
 ## Conversation
 
 `@dogos/whatsapp` defines the provider-neutral `WhatsAppProvider` interface and
-a local simulator adapter. The adapter verifies HMAC webhook signatures,
+a local simulator adapter used only by automated tests. The adapter verifies HMAC webhook signatures,
 deduplicates inbound message IDs, renders text, interactive, template, and media
 messages, tracks delivery states, and retains resettable local history.
 
@@ -20,8 +20,6 @@ simulated voice transcripts are notes, not authoritative extracted facts.
 
 ## Mobile surfaces
 
-- `/simulator`: chat choices, language switch, transcripts, media placeholder,
-  duplicate and invalid webhook controls, history, resume, reset, signed action.
 - `/app/today`: today's bounded exercise, setup, criteria, caps, and stop rules.
 - `/app/plan`: owner and canonical goal, baseline, target, stage, prerequisites,
   schedule, evidence, latest adjustment, and explanation.
@@ -52,8 +50,8 @@ security branch and provider simulator behavior.
 
 ## Deferred release work
 
-Real WhatsApp, Stripe, Cal.com, LLM extraction, video analysis, and production
-deployment are intentionally absent. Technical adapter boundaries are ready,
-but provider credentials, DPAs/privacy controls, professional protocol approval,
-legal/commercial decisions, production authentication, durable signed-action
-storage, and real trainer supply must be approved first.
+Stripe, Cal.com, LLM extraction, video analysis, and production deployment are
+intentionally absent. Meta WhatsApp is available only as a restricted pilot.
+DPAs/privacy controls, professional protocol approval, legal/commercial
+decisions, production authentication, durable signed-action storage, and real
+trainer supply must be approved before public release.

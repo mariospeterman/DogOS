@@ -36,58 +36,26 @@ test.beforeAll(async () => mkdir(screenshots, { recursive: true }));
 
 test("scenario 1: German low-risk owner reaches and uses the plan", async ({
   page,
+  request,
 }, testInfo) => {
-  await page.goto("/simulator");
-  for (const choice of [
-    "Los geht's",
-    "Verstanden",
-    "Deutsch",
-    "Keine Kinder",
-    "Gemischt / unbekannt",
-    "Keine",
-    "Nein",
-    "Nein",
-    "Ziehen an der Leine",
-    "8 von 10 Abschnitten locker",
-    "6 von 10",
-    "Plan öffnen",
-  ])
-    await clickButton(page, choice);
-
+  await reset(request);
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/app\/today$/);
   await expect(
-    page.getByRole("link", { name: "Heutiges Training öffnen" }),
+    page.getByRole("heading", { name: "Heute mit Milo" }),
   ).toBeVisible();
   if (testInfo.project.name === "chromium")
     await page.screenshot({
       path: resolve(screenshots, "german-flow.png"),
       fullPage: true,
     });
-  await page.getByRole("link", { name: "Heutiges Training öffnen" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Heute mit Milo" }),
-  ).toBeVisible();
   await expect(page.getByText("Stufe 1 · ruhige Strasse")).toBeVisible();
 });
 
 test("scenario 2: English owner remains in Switzerland and CHF", async ({
-  page,
   request,
-}, testInfo) => {
+}) => {
   await reset(request, "en");
-  await page.goto("/simulator");
-  await clickButton(page, "Sprache wechseln");
-  await expect(page.getByText("Switzerland")).toHaveCount(0);
-  await expect(page.getByText("Schweiz · CHF · Europe/Zurich")).toBeVisible();
-  await expect(
-    page.getByText(
-      "Hi! I will guide you and Milo through short, safe training steps.",
-    ),
-  ).toBeVisible();
-  if (testInfo.project.name === "chromium")
-    await page.screenshot({
-      path: resolve(screenshots, "english-flow.png"),
-      fullPage: true,
-    });
 
   const state = await request.get(`${api}/v1/dogs/dog-1/current-plan`, {
     headers: { "x-dogos-user": "owner" },
@@ -295,19 +263,40 @@ test("scenario 9: duplicate commands create one result", async ({
   expect((await duplicateAdjustment.json()).planVersion).toBe(2);
 });
 
-test("scenario 10: language switch preserves answers and workflow", async ({
+test("scenario 10: language switch preserves account and workflow", async ({
+  request,
+}) => {
+  await reset(request);
+  const response = await request.post(`${api}/v1/account/locale`, {
+    headers: headers("language-switch"),
+    data: { locale: "en" },
+  });
+  expect(await response.json()).toMatchObject({
+    locale: "en",
+    country: "CH",
+    currency: "CHF",
+    timezone: "Europe/Zurich",
+    workflowState: "plan_ready",
+    audit: [expect.objectContaining({ action: "locale.switched" })],
+  });
+});
+
+test("account link hydrates and confirms without exposing a web chat", async ({
   page,
 }) => {
-  await page.goto("/simulator");
-  await clickButton(page, "Los geht's");
-  await clickButton(page, "Verstanden");
-  await clickButton(page, "Sprache wechseln");
-  await expect(page.getByText("Los geht's")).toBeVisible();
-  await expect(page.getByText("Verstanden")).toBeVisible();
-  await expect(
-    page.getByText("Would you like to continue in English?"),
-  ).toBeVisible();
-  await expect(page.getByText("Schweiz · CHF · Europe/Zurich")).toBeVisible();
+  await page.route("**/v1/whatsapp/link/confirm", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ linked: true }),
+    });
+  });
+  await page.goto(`/app/account/link?token=${"a".repeat(32)}`);
+  await clickButton(page, "Verbindung bestätigen");
+  await expect(page.getByText("WhatsApp ist verbunden.")).toBeVisible();
+
+  const simulator = await page.goto("/simulator");
+  expect(simulator?.status()).toBe(404);
 });
 
 test("calendar supports bounded rescheduling and a revocable ICS feed", async ({

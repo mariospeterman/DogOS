@@ -4,19 +4,19 @@
 
 `pnpm demo:product`
 
-Open [the simulator](http://127.0.0.1:3000/simulator). The command resets and seeds local data, starts the API and web product, and prints the deterministic local identities.
+Open [Today](http://127.0.0.1:3000/app/today). The command resets and seeds local data, starts the API and web product, and prints the deterministic local identities. WhatsApp conversations are exercised through provider contract and webhook tests rather than a user-facing web simulator.
 
-## German low-risk journey
+## Restricted WhatsApp pilot
 
-1. Choose **Los geht's**, **Verstanden**, **Deutsch**, **Keine Kinder**, **Gemischt / unbekannt**, **Keine**, **Nein**, and **Nein**.
-2. Choose **Ziehen an der Leine**, **8 von 10 Abschnitten locker**, and baseline **6 von 10**.
-3. Open **Plan öffnen** and then **Heutiges Training öffnen**.
-4. Start the session. Record only observed repetitions and successes; leave measurements unknown when they were not observed.
-5. Complete the check-in and open progress. The first decision remains **Stufe beibehalten** until enough comparable evidence exists.
+1. Run `pnpm whatsapp:verify-config`, start the API and web app, and expose both through HTTPS pilot tunnels.
+2. Send **Hello** from the allowlisted WhatsApp number.
+3. Open the newest one-time HTTPS account link and choose **Verbindung bestätigen**.
+4. Return to WhatsApp and send **Today**. Open the signed Today link.
+5. Use the mobile product for the plan, calendar, session execution, progress, and account management. The web product contains no chat simulator.
 
 ## Language continuity
 
-Reset the test account, proceed through dog identity in German, then use the language icon. Future prompts switch to English while prior German answers remain visible. Switzerland, CHF, Europe/Zurich, canonical answers, and workflow position remain unchanged.
+The account locale command and WhatsApp state-machine tests prove that future presentation switches to English while Switzerland, CHF, Europe/Zurich, canonical state, and workflow position remain unchanged.
 
 ## Safety review
 
@@ -41,11 +41,11 @@ pnpm audit
 pnpm demo:product:check
 ```
 
-Executed on 2026-07-15: 112 unit, 2 integration, 22 browser E2E (Desktop Chrome and Pixel 7), and 66 pgTAP tests passed: 202 automated tests total. Clean database reset, generated database types, application builds, and the dependency audit also passed.
+Executed on 2026-07-16: 141 unit, 2 integration, 24 browser E2E (Desktop Chrome and Pixel 7), and 87 pgTAP tests passed: 254 automated tests total. Clean database reset, generated database types, application builds, and the dependency audit also passed.
 
 ## Owner-review findings
 
-- The complete low-risk journey, check-in, progress view, language continuity, and suspected-pain stop were manually verified at a 390 x 844 mobile viewport.
+- Account-link hydration, explicit failure feedback, Today, check-in, progress, language continuity, and the suspected-pain stop were verified at a 390 x 844 mobile viewport.
 - The deterministic core is language-neutral; the current German and English copy is a development fallback, not the intended long-term conversational intelligence.
 - Safety gates behave correctly, but the development warning is too prominent for the final training-first product.
 - The loose-leash protocol is still development-only and has not received professional protocol approval. This build must not be marketed as proven personalized dog training yet.
@@ -56,4 +56,4 @@ Send `x-dogos-user: owner|caregiver|viewer|trainer|unrelated` to the API. Mutati
 
 ## Warnings
 
-Protocols are development-only and await professional approval. Trainers and booking are mock data. Video analysis and real WhatsApp, Stripe, Cal.com, and production deployment are not implemented.
+Protocols are development-only and await professional approval. Meta WhatsApp is a restricted pilot. Trainers and booking are mock data. Video analysis, Stripe, Cal.com, and production deployment are not implemented.

@@ -60,25 +60,25 @@ run("node", ["scripts/generate-slice-2-5-artifacts.mjs"]);
 
 if (!(await available("http://127.0.0.1:4000/health/ready")))
   start(["--filter", "@dogos/api", "dev"]);
-if (!(await available("http://127.0.0.1:3000/simulator")))
+if (!(await available("http://127.0.0.1:3000/app/today")))
   start(["--filter", "@dogos/web", "dev", "--hostname", "127.0.0.1"]);
 
 await Promise.all([
   waitFor("http://127.0.0.1:4000/health/ready"),
-  waitFor("http://127.0.0.1:3000/simulator"),
+  waitFor("http://127.0.0.1:3000/app/today"),
 ]);
 
 console.log(`
 DogOS local product is ready
 
-Simulator: http://127.0.0.1:3000/simulator
 Today:    http://127.0.0.1:3000/app/today
+Account:  http://127.0.0.1:3000/app/account
 API:      http://127.0.0.1:4000/openapi.json
 
 Local identity header (x-dogos-user):
   owner | caregiver | viewer | trainer | unrelated
 
-No password is used in the local simulator. Production authentication is unchanged.
+Local identity headers are development-only. Production authentication is unchanged.
 Press Ctrl+C to stop services started by this command.
 `);
 
