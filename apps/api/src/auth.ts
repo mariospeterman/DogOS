@@ -45,11 +45,11 @@ export class LocalRequestAuthenticator implements RequestAuthenticator {
     traceId: string,
   ): Promise<AgentActorContext> {
     if (this.environment === "production") {
-      throw new AuthenticationError("AUTH_REQUIRED");
+      return Promise.reject(new AuthenticationError("AUTH_REQUIRED"));
     }
     const value = headers["x-dogos-user"];
     if (typeof value !== "string" || !(value in localIdentities)) {
-      throw new AuthenticationError("AUTH_REQUIRED");
+      return Promise.reject(new AuthenticationError("AUTH_REQUIRED"));
     }
     const identity = value as LocalAgentIdentity;
     const actor = localIdentities[identity];
