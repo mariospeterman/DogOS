@@ -143,7 +143,6 @@ export class WhatsAppConversationOrchestrator {
     ) {
       machine.escalate();
       await this.persist(contact.id, machine.view());
-      const links = await this.links(contact);
       const injury = current.state === "health_screen";
       return this.provider.sendInteractive(
         contact.externalId,
@@ -234,7 +233,15 @@ export class WhatsAppConversationOrchestrator {
     contactId: string,
     view: ReturnType<ConversationMachine["view"]>,
   ): Promise<void> {
-    const { prompt: _prompt, ...snapshot } = view;
+    const snapshot: ConversationSnapshot = {
+      answers: view.answers,
+      audit: view.audit,
+      country: view.country,
+      currency: view.currency,
+      locale: view.locale,
+      state: view.state,
+      timezone: view.timezone,
+    };
     return this.store.saveConversation(contactId, snapshot);
   }
 }

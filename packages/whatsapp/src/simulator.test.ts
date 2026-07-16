@@ -148,8 +148,7 @@ describe("WhatsApp conversation orchestration", () => {
     const machine = new ConversationMachine("de-CH");
     for (let index = 0; index < 6; index += 1) machine.answer("answer.test");
     expect(machine.view().state).toBe("health_screen");
-    const { prompt: _prompt, ...snapshot } = machine.view();
-    await store.saveConversation(contact.id, snapshot);
+    await store.saveConversation(contact.id, machine.view());
     const stopped = await orchestrator.handle(contact, "Er lahmt plötzlich");
     expect(stopped.text).toMatch(/tierärztlich abklären/);
     expect(stopped.options).toEqual([

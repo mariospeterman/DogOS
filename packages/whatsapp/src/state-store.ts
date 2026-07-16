@@ -74,8 +74,10 @@ export class InMemoryWhatsAppStateStore implements WhatsAppStateStore {
 
   claimInbound(
     message: CanonicalInboundMessage,
-    _traceId: string,
+    traceId: string,
   ): Promise<{ contact: ProviderContact; eventId: string } | null> {
+    if (traceId.length === 0)
+      return Promise.reject(new Error("TRACE_ID_REQUIRED"));
     if (this.#events.has(message.id)) return Promise.resolve(null);
     this.#events.add(message.id);
     let contact = this.#contacts.get(message.contactId);
