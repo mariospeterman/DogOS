@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
+import { whatsappCoachUrl } from "../../../lib/whatsapp";
 
 export default function TrainersPage() {
   return (
@@ -61,9 +62,14 @@ export default function TrainersPage() {
         </span>
       </div>
 
-      <Link className="button secondary wide" href="/app/coach">
+      <a
+        className="button secondary wide"
+        href={whatsappCoachUrl(
+          "Hilf mir, den Bedarf für eine passende Fachperson einzuordnen.",
+        )}
+      >
         <CalendarClock size={18} /> Bedarf im Coach klären
-      </Link>
+      </a>
       <Link className="text-link" href="/app/plan">
         Zurück zum Plan <ArrowRight size={16} />
       </Link>

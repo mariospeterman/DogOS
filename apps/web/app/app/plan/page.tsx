@@ -1,10 +1,10 @@
 "use client";
 
 import { Info, MessageCircle, Target } from "lucide-react";
-import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
 import { PlanTabs } from "../../../components/plan-tabs";
 import { useProductDashboard } from "../../../lib/product";
+import { whatsappCoachUrl } from "../../../lib/whatsapp";
 
 export default function PlanPage() {
   const { loading, product } = useProductDashboard();
@@ -71,12 +71,14 @@ export default function PlanPage() {
           <span>Entwicklungsprotokoll · professionelle Prüfung ausstehend</span>
         </div>
       </section>
-      <Link
+      <a
         className="button secondary wide"
-        href={`/app/coach?context=plan&prompt=${encodeURIComponent("Warum passt dieser Block jetzt?")}`}
+        href={whatsappCoachUrl(
+          `Erkläre mir ${product.dogName}s vollständigen Trainingsplan und warum der aktuelle Block jetzt passt.`,
+        )}
       >
         <MessageCircle size={18} /> Plan mit Coach besprechen
-      </Link>
+      </a>
     </AppShell>
   );
 }

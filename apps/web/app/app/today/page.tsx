@@ -4,6 +4,7 @@ import { Clock3, MessageCircle, Play, Target } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
 import { useProductDashboard } from "../../../lib/product";
+import { whatsappCoachUrl } from "../../../lib/whatsapp";
 
 export default function TodayPage() {
   const { error, loading, product } = useProductDashboard();
@@ -16,13 +17,7 @@ export default function TodayPage() {
         <section className="success-panel">
           <strong>Erzähl DogOS zuerst von deinem Hund</strong>
           <p>{error ?? "Die kurze Aufnahme läuft direkt in WhatsApp."}</p>
-          <a
-            className="button primary"
-            href={
-              process.env.NEXT_PUBLIC_WHATSAPP_CHAT_URL ??
-              "https://wa.me/15551617622"
-            }
-          >
+          <a className="button primary" href={whatsappCoachUrl()}>
             WhatsApp öffnen
           </a>
         </section>
@@ -80,17 +75,24 @@ export default function TodayPage() {
           <Link className="button primary" href={sessionHref}>
             <Play size={18} /> Starten
           </Link>
-          <Link
+          <a
             className="button secondary"
-            href={`/app/coach?context=today&prompt=${encodeURIComponent(`Erkläre mir ${product.dogName}s heutigen Trainingsblock.`)}`}
+            href={whatsappCoachUrl(
+              `Erkläre mir ${product.dogName}s heutigen Trainingsblock.`,
+            )}
           >
             <MessageCircle size={18} /> Coach fragen
-          </Link>
+          </a>
         </div>
       </section>
-      <Link className="reactive-note" href="/app/coach?context=today">
+      <a
+        className="reactive-note"
+        href={whatsappCoachUrl(
+          `Ich möchte eine neue Beobachtung zu ${product.dogName} festhalten.`,
+        )}
+      >
         Neue Beobachtung zu {product.dogName} im Coach festhalten
-      </Link>
+      </a>
     </AppShell>
   );
 }

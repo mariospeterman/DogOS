@@ -2,6 +2,7 @@ import { CircleUserRound, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppNavigation } from "./app-navigation";
+import { whatsappCoachUrl } from "../lib/whatsapp";
 
 export function AppShell({
   children,
@@ -26,10 +27,7 @@ export function AppShell({
         <div className="top-actions">
           <a
             className="icon-link coach-link"
-            href={
-              process.env.NEXT_PUBLIC_WHATSAPP_CHAT_URL ??
-              "https://wa.me/15551617622"
-            }
+            href={whatsappCoachUrl()}
             aria-label="DogOS Coach in WhatsApp"
             title="DogOS Coach in WhatsApp"
           >

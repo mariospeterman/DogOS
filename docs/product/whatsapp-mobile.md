@@ -3,11 +3,11 @@
 - Status: implemented foundation
 - Last reviewed: 2026-07-17
 
-DogOS and WhatsApp are two clients for one canonical Coach. WhatsApp supports
-discovery, quick questions, reminders, and check-ins. The authenticated Coach
-supports the same conversation when longer explanations, history, video, or
-account context benefit from the app. The user should experience one product,
-not two agents or a chatbot plus a separate dashboard.
+WhatsApp is the conversational Coach for discovery, onboarding, instructions,
+questions, reminders, and check-ins. The authenticated web app is the thin
+management layer for durable plans, history, sessions, progress, billing,
+professional appointments, and future live coaching. The user should
+experience one product without a duplicate web chat.
 
 Web messages are never mirrored to WhatsApp by default. The user explicitly
 chooses `In WhatsApp fortsetzen`; notification delivery remains a separate,
@@ -60,7 +60,7 @@ it never advances the plan implicitly.
 | Medication, bite history, household/children, long history | Authenticated signed page                           |
 | Consent, export, deletion, account linking                 | Authenticated signed page                           |
 | Payment and subscription management                        | Stripe-hosted or authenticated signed page          |
-| Full plan, progress chart, calendar, booking               | Signed mobile page                                  |
+| Full plan, progress chart, calendar, booking               | Signed mobile page; explanation remains in WhatsApp |
 
 ## 3. Shared Coach timeline
 
@@ -70,11 +70,10 @@ private.coach_conversations (system of record)
   -> private.coach_channel_bindings (web and WhatsApp routing only)
 ```
 
-Provider message IDs deduplicate WhatsApp delivery. Client idempotency IDs
-deduplicate web retries. Each message retains its channel of origin, context
-kind, trace, and optional subject without making provider state authoritative.
-WhatsApp onboarding state remains explicit and deterministic; after plan-ready,
-the same channel-neutral reply composer serves both surfaces.
+Provider message IDs deduplicate WhatsApp delivery. Each message retains its
+channel of origin, context kind, trace, and optional subject without making
+provider state authoritative. The server-side timeline supports audit and
+future professional handover; it is not rendered as another owner chat.
 
 ## 4. Daily loop
 
@@ -95,7 +94,7 @@ message-category rules are treated as provider policy, not hard-coded forever.
 
 | Route                   | Purpose                                               | Key states                                             |
 | ----------------------- | ----------------------------------------------------- | ------------------------------------------------------ |
-| `/app/coach`            | Shared conversation, contextual questions, handoff    | loading, empty, active, retry                          |
+| `/app/coach`            | Legacy redirect to Today                              | redirect                                               |
 | `/app/today`            | Current step, timer, instructions, start/stop         | loading, unavailable, safety stop, active, completed   |
 | `/app/plan`             | Frozen plan version and rationale                     | active, superseded, paused, pending review             |
 | `/app/calendar`         | Sessions, recovery, reviews, reschedule, `.ics`       | empty, scheduled, changed, export revoked              |

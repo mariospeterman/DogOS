@@ -7,7 +7,7 @@ import { PwaRegistration } from "../components/pwa-registration";
 export const metadata: Metadata = {
   applicationName: "DogOS",
   title: { default: "DogOS", template: "%s | DogOS" },
-  description: "One dog-training Coach across the DogOS app and WhatsApp.",
+  description: "Training plans, sessions, progress, and account management.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -20,7 +20,8 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "DogOS",
-    description: "In DogOS oder WhatsApp starten. Im selben Verlauf bleiben.",
+    description:
+      "Training in WhatsApp begleiten und Fortschritt in DogOS verwalten.",
     siteName: "DogOS",
     type: "website",
   },

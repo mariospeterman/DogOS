@@ -1,7 +1,7 @@
 # DogOS
 
-DogOS is a multilingual dog-training platform with one Coach across its web app
-and WhatsApp. It is
+DogOS is a multilingual dog-training platform with coaching in WhatsApp and a
+thin web workspace for training, plans, progress, billing, and account data. It is
 Swiss-positioned and DACH-first commercially. German is the first reviewed
 launch content locale, not a technical product boundary. Its core is a
 contextual, deterministic training engine that turns anamnesis, safety checks,
@@ -17,7 +17,7 @@ development content and are not approved for production use.
 Phase 2 Slices 2.1 through 2.7 provide the pinned monorepo, local Supabase
 schema and RLS, deterministic multilingual engines, strict persistence mappers,
 transactional repositories, typed Fastify API and OpenAPI, signed actions, a
-provider-neutral WhatsApp integration, a canonical omnichannel Coach timeline,
+provider-neutral WhatsApp integration, a canonical server-side Coach timeline,
 and the first mobile owner journey. Professional
 protocol, safety, legal, privacy, provider, and launch translation review remain
 production release blockers.
@@ -41,7 +41,7 @@ The web app runs at <http://localhost:3000> and the API health endpoint at
 [local development runbook](docs/runbooks/local-development.md) for all checks
 and the current database workflow.
 
-For the complete reset, seed, API, Coach, and mobile review experience:
+For the complete reset, seed, API, WhatsApp onboarding, and mobile review experience:
 
 ```bash
 pnpm demo:product

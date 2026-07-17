@@ -317,34 +317,29 @@ test("account link hydrates and confirms without exposing a simulator", async ({
   expect(simulator?.status()).toBe(404);
 });
 
-test("web Coach shares a focused timeline and keeps WhatsApp handoff explicit", async ({
+test("web product keeps coaching in WhatsApp and management in the app", async ({
   page,
-}, testInfo) => {
+}) => {
   await page.goto("/app/coach");
-  await expect(page.getByRole("heading", { name: "Coach" })).toBeVisible();
-  await expect(page.getByText("Rex · Coach aktiv")).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/today$/);
+  await expect(
+    page.getByRole("heading", { name: "Rex / Heute" }),
+  ).toBeVisible();
   const navigation = page.getByRole("navigation", {
     name: "Produktnavigation",
   });
-  for (const name of ["Coach", "Heute", "Plan", "Fortschritt", "Konto"]) {
+  for (const name of ["Heute", "Plan", "Fortschritt", "Konto"]) {
     await expect(
       navigation.getByRole("link", { name, exact: true }),
     ).toBeVisible();
   }
-  await page.getByRole("button", { name: "Warum dieser Block?" }).click();
-  await page.getByRole("button", { name: "Senden" }).click();
   await expect(
-    page.getByText("Rex arbeitet gerade an", { exact: false }).last(),
-  ).toBeVisible();
-  await expect(page.getByText("goal.loose_leash_walking")).toHaveCount(0);
-  await expect(page.getByText("step.low_distraction_baseline")).toHaveCount(0);
-  await expect(page.getByText("DogOS", { exact: true }).last()).toBeVisible();
-  await page.screenshot({
-    path: resolve(
-      distributionScreenshots,
-      `coach-${testInfo.project.name}.png`,
-    ),
-  });
+    navigation.getByRole("link", { name: "Coach", exact: true }),
+  ).toHaveCount(0);
+  await page.goto("/app/plan");
+  await expect(
+    page.getByRole("link", { name: "Plan mit Coach besprechen" }),
+  ).toHaveAttribute("href", /wa\.me\/.*text=.*vollst%C3%A4ndigen/);
 });
 
 test("account language follows conversation without a selector", async ({
@@ -415,13 +410,13 @@ test("PWA manifest exposes install and durable product shortcuts", async ({
     start_url: string;
   };
   expect(manifest.display).toBe("standalone");
-  expect(manifest.start_url).toContain("/app/coach");
+  expect(manifest.start_url).toContain("/app/today");
   expect(manifest.icons.map((icon) => icon.sizes)).toEqual(
     expect.arrayContaining(["192x192", "512x512"]),
   );
   expect(manifest.shortcuts.map((shortcut) => shortcut.url)).toEqual(
     expect.arrayContaining([
-      "/app/coach?source=app_shortcut",
+      "/app/plan?source=app_shortcut",
       "/app/today?source=app_shortcut",
       "/app/progress?source=app_shortcut",
     ]),

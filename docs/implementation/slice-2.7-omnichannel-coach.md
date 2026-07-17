@@ -5,13 +5,14 @@
 
 ## Product decision
 
-DogOS has one Coach exposed through the authenticated web app and WhatsApp.
-WhatsApp remains the low-friction acquisition, reminder, and quick-response
-channel. The web Coach supports durable history, longer explanations,
-contextual plan questions, future video, and sensitive authenticated actions.
+DogOS has one conversational Coach exposed through WhatsApp. The authenticated
+web app is the durable management and training workspace for Today, Plan,
+Calendar, Progress, Account, billing, and future live sessions. Contextual web
+actions open WhatsApp with a prefilled question instead of creating a second
+chat surface.
 
-The web product is still a thin training layer. Its five primary destinations
-are Coach, Today, Plan, Progress, and Account. Calendar is nested under Plan.
+The web product is a thin training layer. Its four primary destinations are
+Today, Plan, Progress, and Account. Calendar is nested under Plan.
 
 ## Data model
 
@@ -38,8 +39,8 @@ builds the compact current training context and returns a canonical timeline.
 ## Channel behavior
 
 - linked inbound/outbound WhatsApp exchanges append to the same timeline;
-- web messages remain in DogOS unless the user explicitly chooses the WhatsApp
-  handoff;
+- legacy `/app/coach` links redirect to Today;
+- contextual actions explicitly hand off to WhatsApp;
 - language is inferred from normal messages and changes presentation only;
 - current deterministic post-plan replies are shared across channels;
 - LLM selection, streaming, video analysis, and proactive templates remain
@@ -52,5 +53,5 @@ builds the compact current training context and returns a canonical timeline.
 - API tests cover authentication, role permissions, OpenAPI, and idempotency;
 - PostgreSQL integration proves one web/WhatsApp timeline and two bindings;
 - pgTAP verifies the server-only schema and constraints;
-- Playwright verifies desktop/mobile navigation, Coach exchange, contextual
-  handoff, explicit WhatsApp continuation, and PWA start behavior.
+- Playwright verifies desktop/mobile navigation, removal of the duplicate web
+  chat, contextual WhatsApp handoff, and Today-first PWA behavior.

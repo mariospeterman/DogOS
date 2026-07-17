@@ -70,7 +70,7 @@ run("pnpm", ["db:reset"]);
 if (await available(`${apiOrigin}/health/ready`)) {
   throw new Error(`Review API port is already in use: ${apiOrigin}`);
 }
-if (await available(`${webOrigin}/app/coach`)) {
+if (await available(`${webOrigin}/app/today`)) {
   throw new Error(`Review web port is already in use: ${webOrigin}`);
 }
 
@@ -106,13 +106,12 @@ start(
 
 await Promise.all([
   waitFor(`${apiOrigin}/health/ready`),
-  waitFor(`${webOrigin}/app/coach`),
+  waitFor(`${webOrigin}/app/today`),
 ]);
 
 console.log(`
 DogOS local product is ready
 
-Coach:    ${webOrigin}/app/coach
 Today:    ${webOrigin}/app/today
 Plan:     ${webOrigin}/app/plan
 Account:  ${webOrigin}/app/account
