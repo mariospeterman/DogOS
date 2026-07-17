@@ -67,6 +67,7 @@ jobs:
       - run: pnpm dev:services
       - run: pnpm db:reset
       - run: pnpm test:integration
+      - run: pnpm db:reset
       - run: pnpm db:test
       - run: pnpm db:lint
       - run: pnpm db:types
