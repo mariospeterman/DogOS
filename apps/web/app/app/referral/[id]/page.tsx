@@ -1,40 +1,46 @@
-import { ArrowRight, HeartPulse, PhoneCall, ShieldAlert } from "lucide-react";
+import {
+  ArrowRight,
+  HeartPulse,
+  MessageCircle,
+  ShieldAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../../../components/app-shell";
 
 export default function ReferralPage() {
   return (
-    <AppShell title="Training pausiert" eyebrow="Sicherheitsprüfung">
+    <AppShell title="Fachliche Abklärung" eyebrow="Hinweis zum gemeldeten Fall">
       <section className="referral-hero">
         <HeartPulse />
-        <h2>Tiermedizinische Abklärung empfohlen</h2>
+        <h2>Beobachtung professionell einordnen lassen</h2>
         <p>
-          Du hast mögliche Schmerzzeichen gemeldet. DogOS stellt keine Diagnose
-          und startet bis zur Abklärung keine weitere Einheit.
+          Die gemeldeten Anzeichen können hier nicht diagnostiziert werden. Lass
+          die betroffene Belastung aus und kläre die weitere Durchführung mit
+          einer tiermedizinischen Fachperson.
         </p>
       </section>
       <section className="plain-section">
-        <h2>Nächste Schritte</h2>
+        <h2>Für die Abklärung</h2>
         <ol className="step-list">
           <li>
             <span>1</span>
             <div>
-              <strong>Training pausieren</strong>
-              <p>Keine neue Belastung oder schwierige Situation provozieren.</p>
+              <strong>Situation nicht wiederholen</strong>
+              <p>Vermeide vorerst genau die Bewegung oder Belastung.</p>
             </div>
           </li>
           <li>
             <span>2</span>
             <div>
-              <strong>Beobachtungen notieren</strong>
-              <p>Zeitpunkt, Bewegung und sichtbare Reaktion festhalten.</p>
+              <strong>Beobachtung festhalten</strong>
+              <p>Zeitpunkt, Bewegung und sichtbare Reaktion reichen aus.</p>
             </div>
           </li>
           <li>
             <span>3</span>
             <div>
-              <strong>Tierarztpraxis kontaktieren</strong>
-              <p>Die Dringlichkeit muss eine Fachperson beurteilen.</p>
+              <strong>Fachperson kontaktieren</strong>
+              <p>Nur sie kann Ursache und Dringlichkeit beurteilen.</p>
             </div>
           </li>
         </ol>
@@ -42,15 +48,15 @@ export default function ReferralPage() {
       <div className="emergency-note">
         <ShieldAlert />
         <span>
-          <strong>Kein Notfalldienst</strong>Bei akuter Gefahr kontaktiere den
-          lokalen tiermedizinischen Notdienst.
+          <strong>Kein Notfalldienst</strong>
+          Bei akuter Gefahr nutze den lokalen tiermedizinischen Notdienst.
         </span>
       </div>
-      <button className="button secondary wide">
-        <PhoneCall size={18} /> Mock-Kontakt öffnen
-      </button>
+      <Link className="button secondary wide" href="/app/coach">
+        <MessageCircle size={18} /> Beobachtung im Coach ergänzen
+      </Link>
       <Link className="text-link" href="/app/trainers">
-        Trainer-Unterstützung ansehen <ArrowRight size={16} />
+        Fachnetzwerk ansehen <ArrowRight size={16} />
       </Link>
     </AppShell>
   );

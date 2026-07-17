@@ -593,6 +593,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           role: actor.role,
           householdId: actor.householdId,
           authMode: actor.authMode,
+          billingAvailable: options.billing !== undefined,
           locale: account?.locale ?? product.snapshot().locale,
           ...(account === null
             ? {}
@@ -717,9 +718,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         if (actor.householdId === null) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }
-        const dashboard = await options.products?.findPrimaryByHousehold(
-          actor.householdId,
-        );
+        if (
+          options.products === undefined &&
+          (actor.householdId !== product.snapshot().household.id ||
+            actor.identity === "unrelated")
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dashboard =
+          options.products === undefined
+            ? product.dashboard()
+            : await options.products.findPrimaryByHousehold(actor.householdId);
         return dashboard === null || dashboard === undefined
           ? { status: "onboarding_required", householdId: actor.householdId }
           : { status: "ready", ...dashboard };

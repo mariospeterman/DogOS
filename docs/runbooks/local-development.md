@@ -59,9 +59,11 @@ pnpm demo:product
 ```
 
 This command starts Supabase when needed, resets only the local project, applies
-all migrations and deterministic seeds, starts or reuses the API and web app,
-generates Slice 2.5 review evidence, and prints URLs and local identity headers.
-It does not touch hosted data or external providers. Use
+all migrations and deterministic seeds, then starts an isolated review API on
+port 4100 and web app on port 3100. It uses local authentication, the simulator
+provider, deterministic coaching, and a separate Next.js build directory even
+when normal development servers are running. It does not touch hosted data or
+external providers. Use
 `pnpm demo:product:check` in automation to perform the same readiness check and
 exit after services respond.
 

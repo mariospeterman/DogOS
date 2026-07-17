@@ -5,6 +5,8 @@ import {
   germanOwnerCase,
   runCanonicalCase,
 } from "@dogos/testing";
+import type { ProductDashboard } from "@dogos/database";
+import type { SafetyDisposition } from "@dogos/contracts";
 
 export interface LocalProductSnapshot {
   locale: "de-CH" | "en";
@@ -14,7 +16,7 @@ export interface LocalProductSnapshot {
   household: { id: string; name: string };
   dog: { id: string; name: string; breed: string };
   workflowState: string;
-  safety: string;
+  safety: SafetyDisposition;
   goal: string;
   planStatus: string;
   planVersion: number;
@@ -74,6 +76,48 @@ export class LocalProductFixture {
   }
   snapshot(): LocalProductSnapshot {
     return structuredClone(this.#state);
+  }
+  dashboard(): ProductDashboard {
+    const snapshot = this.snapshot();
+    const start = new Date();
+    start.setHours(18, 0, 0, 0);
+    const calendar = Array.from({ length: 3 }, (_, index) => {
+      const plannedStart = new Date(start);
+      plannedStart.setDate(start.getDate() + index);
+      return {
+        durationSeconds: 240,
+        id: `session-${index + 1}`,
+        isRecovery: index === 2,
+        plannedStart: plannedStart.toISOString(),
+        purposeCode:
+          index === 2 ? "session.observation" : "session.micro_training",
+        status: "planned",
+      };
+    });
+    return {
+      baselineSuccessRate: 50,
+      calendar,
+      currentStep: {
+        difficulty: snapshot.difficulty,
+        durationSeconds: 240,
+        repetitions: 6,
+        stepCode: "step.low_distraction_baseline",
+        stopConditionCodes: [],
+      },
+      dogId: snapshot.dog.id,
+      dogName: snapshot.dog.name,
+      goal: snapshot.goal,
+      goalText:
+        snapshot.locale === "en"
+          ? "Walk on a loose lead around other dogs"
+          : "Locker an anderen Hunden vorbeigehen",
+      latestDecision: snapshot.latestDecision,
+      planId: "plan-1",
+      planStatus: snapshot.planStatus === "blocked" ? "blocked" : "active",
+      riskDisposition: snapshot.safety,
+      sessionCount: snapshot.sessions.length,
+      todaySessionId: "session-1",
+    };
   }
   switchLocale(locale: "de-CH" | "en", traceId: string): LocalProductSnapshot {
     this.#state.locale = locale;

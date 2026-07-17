@@ -11,6 +11,10 @@ a local simulator adapter used only by automated tests. The adapter verifies HMA
 deduplicates inbound message IDs, renders text, interactive, template, and media
 messages, tracks delivery states, and retains resettable local history.
 
+Meta Cloud and Twilio Sandbox adapters implement the same boundary. Meta is the
+restricted real-phone pilot; neither provider changes canonical onboarding,
+training, progress, or safety decisions.
+
 Structured onboarding is an explicit deterministic state machine from welcome
 through plan, daily session, progress, adjustment, and professional escalation.
 German Swiss and English prompts map to the same canonical facts. A locale
@@ -29,9 +33,18 @@ simulated voice transcripts are notes, not authoritative extracted facts.
   remain unknown.
 - `/app/progress`: separate progress dimensions, evidence, missing data,
   confidence context, decision reason, and non-causal correlation warning.
-- `/app/trainers` and `/app/referral/[id]`: explainable mock ranking, mock
-  booking, veterinary/trainer escalation, and safety limitations.
-- `/app/account`: presentation locale and fixed Swiss account context.
+- `/app/trainers` and `/app/referral/[id]`: the verified-network policy and
+  professional handoff without invented people, availability, or prices.
+- `/app/account`: authenticated household context, automatic language
+  presentation, persisted tier, distribution controls, and billing access when
+  configured.
+
+Public sign-up, email confirmation, password recovery, JWT verification, and
+atomic account bootstrap are implemented through Supabase Auth and PostgreSQL.
+WhatsApp onboarding projects once into the durable household, dog, anamnesis,
+goal, baseline, plan, plan-version, step, and schedule graph. Product pages and
+session completion read and write that graph instead of the original pilot
+fixture.
 
 ## Safety and product honesty
 
@@ -50,8 +63,15 @@ security branch and provider simulator behavior.
 
 ## Deferred release work
 
-Stripe, Cal.com, LLM extraction, video analysis, and production deployment are
-intentionally absent. Meta WhatsApp is available only as a restricted pilot.
+Stripe Checkout, Customer Portal, signed webhooks, and entitlement projection
+are implemented but stay unavailable until a real catalog and secrets are
+configured. A bounded OpenAI coaching adapter can rewrite deterministic drafts;
+it has no tools and cannot change canonical plans or safety outcomes. The local
+default remains deterministic.
+
+Cal.com is intentionally optional: DogOS owns referral ranking, booking state,
+attribution, and commission disclosure; Cal.com may later supply availability
+and appointment operations. Video analysis and live coaching remain absent.
 DPAs/privacy controls, professional protocol approval, legal/commercial
-decisions, production authentication, durable signed-action storage, and real
-trainer supply must be approved before public release.
+decisions, video retention policy, provider credentials, and verified trainer
+supply remain release gates.

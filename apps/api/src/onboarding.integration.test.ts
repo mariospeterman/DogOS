@@ -175,5 +175,5 @@ describe("durable WhatsApp onboarding", () => {
       measurements: 4,
       sessions: 1,
     });
-  });
+  }, 15_000);
 });

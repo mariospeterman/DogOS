@@ -205,6 +205,13 @@ insert into api.goal_measurements (
   ('72000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000001', 'metric.continuous_loose_steps', 4, false, 'unit.count', 'owner_report', 'method.direct_count', 'environment.low_distraction', now(), 'moderate'),
   ('72000000-0000-0000-0000-000000000002', '71000000-0000-0000-0000-000000000002', 'metric.continuous_loose_steps', 4, false, 'unit.count', 'owner_report', 'method.direct_count', 'environment.low_distraction', now(), 'moderate');
 
+insert into api.goal_measurements (
+  id, goal_version_id, metric_code, value_numeric, is_unknown, unit_code,
+  source, method_code, environment_code, measured_at, quality
+) values
+  ('72000000-0000-0000-0000-000000000003', '71000000-0000-0000-0000-000000000001', 'metric.success_rate', 50, false, 'unit.percent', 'owner_report', 'method.owner_estimate', 'environment.low_distraction', now(), 'moderate'),
+  ('72000000-0000-0000-0000-000000000004', '71000000-0000-0000-0000-000000000002', 'metric.success_rate', 50, false, 'unit.percent', 'owner_report', 'method.owner_estimate', 'environment.low_distraction', now(), 'moderate');
+
 insert into api.plans (id, dog_id, goal_version_id, status) values
   ('73000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000001', 'active'),
   ('73000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002', '71000000-0000-0000-0000-000000000002', 'active');
@@ -225,6 +232,15 @@ insert into api.plan_steps (
 ) values
   ('75000000-0000-0000-0000-000000000001', '74000000-0000-0000-0000-000000000001', 'step.low_distraction_baseline', 1, '{"distanceMeters":20}', 5, 180, array['stop.distress']::api.canonical_code[]),
   ('75000000-0000-0000-0000-000000000002', '74000000-0000-0000-0000-000000000002', 'step.low_distraction_baseline', 1, '{"distanceMeters":20}', 5, 180, array['stop.distress']::api.canonical_code[]);
+
+insert into api.scheduled_sessions (
+  id, plan_step_id, planned_start, planned_end, duration_seconds,
+  purpose_code, is_recovery, status
+) values
+  ('75100000-0000-0000-0000-000000000001', '75000000-0000-0000-0000-000000000001', date_trunc('day', now()) + interval '18 hours', date_trunc('day', now()) + interval '18 hours 3 minutes', 180, 'session.micro_training', false, 'planned'),
+  ('75100000-0000-0000-0000-000000000002', '75000000-0000-0000-0000-000000000001', date_trunc('day', now()) + interval '1 day 18 hours', date_trunc('day', now()) + interval '1 day 18 hours 3 minutes', 180, 'session.micro_training', false, 'planned'),
+  ('75100000-0000-0000-0000-000000000003', '75000000-0000-0000-0000-000000000001', date_trunc('day', now()) + interval '2 days 18 hours', date_trunc('day', now()) + interval '2 days 18 hours 3 minutes', 180, 'session.observation', true, 'planned'),
+  ('75100000-0000-0000-0000-000000000004', '75000000-0000-0000-0000-000000000002', date_trunc('day', now()) + interval '18 hours', date_trunc('day', now()) + interval '18 hours 3 minutes', 180, 'session.micro_training', false, 'planned');
 
 insert into api.sessions (
   id, dog_id, handler_user_id, started_at, ended_at, completion_status
@@ -260,6 +276,29 @@ insert into api.risk_assessments (
 ) values
   ('63000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'risk.low', array['rule.no_reported_injury']::api.canonical_code[], 'disposition.continue_development_only', array['action.low_distraction_training']::api.canonical_code[], '{}', '{}', '52000000-0000-0000-0000-000000000001', now()),
   ('63000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002', '70000000-0000-0000-0000-000000000002', 'risk.low', array['rule.no_reported_injury']::api.canonical_code[], 'disposition.continue_development_only', array['action.low_distraction_training']::api.canonical_code[], '{}', '{}', '52000000-0000-0000-0000-000000000001', now());
+
+insert into private.whatsapp_provider_contacts (
+  id, provider, external_contact_id, external_contact_hash, status, user_id,
+  household_id, locale, allowlisted, linked_at
+) values (
+  '82000000-0000-0000-0000-000000000001', 'meta_cloud',
+  'local-demo-owner', 'local-demo-owner-hash', 'linked',
+  '10000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000001', 'de-CH', true, now()
+);
+
+insert into private.onboarding_projections (
+  id, contact_id, snapshot_hash, dog_id, anamnesis_id, goal_id, plan_id,
+  risk_assessment_id
+) values (
+  '83000000-0000-0000-0000-000000000001',
+  '82000000-0000-0000-0000-000000000001', repeat('0', 64),
+  '30000000-0000-0000-0000-000000000001',
+  '60000000-0000-0000-0000-000000000001',
+  '70000000-0000-0000-0000-000000000001',
+  '73000000-0000-0000-0000-000000000001',
+  '63000000-0000-0000-0000-000000000001'
+);
 
 insert into api.trainers (
   id, user_id, display_name, service_countries, supported_locales,

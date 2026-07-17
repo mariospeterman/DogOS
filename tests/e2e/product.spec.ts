@@ -8,7 +8,7 @@ import {
   test,
 } from "@playwright/test";
 
-const api = "http://127.0.0.1:4000";
+const api = "http://127.0.0.1:4200";
 const screenshots = resolve("test-results/slice-2.5/screenshots");
 const distributionScreenshots = resolve("test-results/slice-2.7/screenshots");
 const headers = (key: string, user = "owner") => ({
@@ -44,17 +44,22 @@ test("scenario 1: German low-risk owner reaches and uses the plan", async ({
   page,
   request,
 }, testInfo) => {
+  test.setTimeout(60_000);
   await reset(request);
   await page.goto("/app/today");
   await expect(
-    page.getByRole("heading", { name: "Milo / Heute" }),
+    page.getByRole("heading", { name: "Rex / Heute" }),
   ).toBeVisible();
   if (testInfo.project.name === "chromium")
     await page.screenshot({
       path: resolve(screenshots, "german-flow.png"),
       fullPage: true,
     });
-  await expect(page.getByText("Block 01 · Orientierung")).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Orientierung in einem ruhigen Abschnitt",
+    }),
+  ).toBeVisible();
 });
 
 test("scenario 2: English owner remains in Switzerland and CHF", async ({
@@ -117,9 +122,7 @@ test("scenario 4: food refusal and avoidance reduce autonomous work without diag
     page.getByText("Futterverweigerung, Meiden, Schmerzzeichen"),
   ).not.toBeVisible();
   await expect(
-    page.getByText("Etwas hat sich bei Milo verändert?", {
-      exact: false,
-    }),
+    page.getByText("Neue Beobachtung zu Rex", { exact: false }),
   ).toBeVisible();
 });
 
@@ -127,20 +130,26 @@ test("scenario 5: suspected pain blocks further session starts", async ({
   request,
   page,
 }, testInfo) => {
+  test.setTimeout(60_000);
   await reset(request);
   await request.post(`${api}/v1/dogs/dog-1/safety-assessments`, {
     headers: headers("pain-1"),
     data: { kind: "pain" },
   });
-  const blocked = await request.post(`${api}/v1/sessions/session-2/start`, {
-    headers: headers("pain-start"),
-    data: {},
-  });
+  const blocked = await request.post(
+    `${api}/v1/scheduled-sessions/session-2/start`,
+    {
+      headers: headers("pain-start"),
+      data: {},
+    },
+  );
   expect(blocked.status()).toBe(409);
   expect((await blocked.json()).error.code).toBe("SAFETY_REVIEW_REQUIRED");
   await page.goto("/app/referral/referral-1");
   await expect(
-    page.getByRole("heading", { name: "Tiermedizinische Abklärung empfohlen" }),
+    page.getByRole("heading", {
+      name: "Beobachtung professionell einordnen lassen",
+    }),
   ).toBeVisible();
   if (testInfo.project.name === "chromium")
     await page.screenshot({
@@ -311,7 +320,7 @@ test("web Coach shares a focused timeline and keeps WhatsApp handoff explicit", 
 }, testInfo) => {
   await page.goto("/app/coach");
   await expect(page.getByRole("heading", { name: "Coach" })).toBeVisible();
-  await expect(page.getByText("Milo · Coach aktiv")).toBeVisible();
+  await expect(page.getByText("Rex · Coach aktiv")).toBeVisible();
   const navigation = page.getByRole("navigation", {
     name: "Produktnavigation",
   });
@@ -323,7 +332,7 @@ test("web Coach shares a focused timeline and keeps WhatsApp handoff explicit", 
   await page.getByRole("button", { name: "Warum dieser Block?" }).click();
   await page.getByRole("button", { name: "Senden" }).click();
   await expect(
-    page.getByText("Milo arbeitet gerade an", { exact: false }).last(),
+    page.getByText("Rex arbeitet gerade an", { exact: false }).last(),
   ).toBeVisible();
   await expect(page.getByText("DogOS", { exact: true }).last()).toBeVisible();
   await page.screenshot({

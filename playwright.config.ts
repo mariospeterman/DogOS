@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   outputDir: "test-results/playwright",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: "http://127.0.0.1:3200",
     trace: "on-first-retry",
   },
   projects: [
@@ -18,15 +18,17 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "pnpm --filter @dogos/web dev --hostname 127.0.0.1",
-      url: "http://127.0.0.1:3000",
-      reuseExistingServer: !process.env.CI,
+      command:
+        "NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_URL=http://127.0.0.1:4200 NEXT_PUBLIC_DOGOS_ENV=local WEB_ORIGIN=http://127.0.0.1:3200 pnpm --filter @dogos/web dev --hostname 127.0.0.1 --port 3200",
+      url: "http://127.0.0.1:3200",
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {
-      command: "pnpm --filter @dogos/api dev",
-      url: "http://127.0.0.1:4000/health/ready",
-      reuseExistingServer: !process.env.CI,
+      command:
+        "API_PORT=4200 DOGOS_AUTH_MODE=local DOGOS_ENV=test USE_MOCK_PROVIDERS=true WEB_ORIGIN=http://127.0.0.1:3200 WHATSAPP_MODE=simulator pnpm --filter @dogos/api exec tsx src/server.ts",
+      url: "http://127.0.0.1:4200/health/ready",
+      reuseExistingServer: false,
       timeout: 120_000,
     },
   ],

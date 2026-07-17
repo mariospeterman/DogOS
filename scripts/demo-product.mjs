@@ -4,6 +4,12 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const checkOnly = process.argv.includes("--check");
 const children = [];
+const apiPort = 4100;
+const webPort = 3100;
+const apiOrigin = `http://127.0.0.1:${apiPort}`;
+const webOrigin = `http://127.0.0.1:${webPort}`;
+const localDatabaseUrl =
+  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
@@ -19,17 +25,21 @@ async function available(url) {
 }
 
 async function waitFor(url) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     if (await available(url)) return;
     await new Promise((resolveWait) => setTimeout(resolveWait, 500));
   }
   throw new Error(`Local service did not become ready: ${url}`);
 }
 
-function start(args) {
+function start(args, environment) {
   const child = spawn("pnpm", args, {
     cwd: root,
+    env: { ...process.env, ...environment },
     stdio: checkOnly ? "ignore" : "inherit",
+  });
+  child.on("error", (error) => {
+    console.error(`Unable to start ${args.join(" ")}:`, error);
   });
   children.push(child);
 }
@@ -56,26 +66,55 @@ if (
   run("pnpm", ["dev:services"]);
 
 run("pnpm", ["db:reset"]);
-run("node", ["scripts/generate-slice-2-5-artifacts.mjs"]);
 
-if (!(await available("http://127.0.0.1:4000/health/ready")))
-  start(["--filter", "@dogos/api", "dev"]);
-if (!(await available("http://127.0.0.1:3000/app/coach")))
-  start(["--filter", "@dogos/web", "dev", "--hostname", "127.0.0.1"]);
+if (await available(`${apiOrigin}/health/ready`)) {
+  throw new Error(`Review API port is already in use: ${apiOrigin}`);
+}
+if (await available(`${webOrigin}/app/coach`)) {
+  throw new Error(`Review web port is already in use: ${webOrigin}`);
+}
+
+start(["--filter", "@dogos/api", "exec", "tsx", "src/server.ts"], {
+  API_PORT: String(apiPort),
+  DATABASE_URL: localDatabaseUrl,
+  DOGOS_AUTH_MODE: "local",
+  DOGOS_ENV: "local",
+  DOGOS_LLM_MODE: "deterministic",
+  USE_MOCK_PROVIDERS: "true",
+  WEB_ORIGIN: webOrigin,
+  WHATSAPP_MODE: "simulator",
+});
+start(
+  [
+    "--filter",
+    "@dogos/web",
+    "dev",
+    "--hostname",
+    "127.0.0.1",
+    "--port",
+    String(webPort),
+  ],
+  {
+    NEXT_DIST_DIR: ".next-demo",
+    NEXT_PUBLIC_API_URL: apiOrigin,
+    NEXT_PUBLIC_DOGOS_ENV: "local",
+    WEB_ORIGIN: webOrigin,
+  },
+);
 
 await Promise.all([
-  waitFor("http://127.0.0.1:4000/health/ready"),
-  waitFor("http://127.0.0.1:3000/app/coach"),
+  waitFor(`${apiOrigin}/health/ready`),
+  waitFor(`${webOrigin}/app/coach`),
 ]);
 
 console.log(`
 DogOS local product is ready
 
-Coach:    http://127.0.0.1:3000/app/coach
-Today:    http://127.0.0.1:3000/app/today
-Plan:     http://127.0.0.1:3000/app/plan
-Account:  http://127.0.0.1:3000/app/account
-API:      http://127.0.0.1:4000/openapi.json
+Coach:    ${webOrigin}/app/coach
+Today:    ${webOrigin}/app/today
+Plan:     ${webOrigin}/app/plan
+Account:  ${webOrigin}/app/account
+API:      ${apiOrigin}/openapi.json
 
 Local identity header (x-dogos-user):
   owner | caregiver | viewer | trainer | unrelated
