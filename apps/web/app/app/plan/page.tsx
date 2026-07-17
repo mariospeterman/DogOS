@@ -4,6 +4,7 @@ import { Info, MessageCircle, Target } from "lucide-react";
 import { AppShell } from "../../../components/app-shell";
 import { PlanTabs } from "../../../components/plan-tabs";
 import { useProductDashboard } from "../../../lib/product";
+import { trainingPresentation } from "../../../lib/training-presentation";
 import { whatsappCoachUrl } from "../../../lib/whatsapp";
 
 export default function PlanPage() {
@@ -23,6 +24,9 @@ export default function PlanPage() {
     );
   }
   const duration = Math.round((product.currentStep?.durationSeconds ?? 0) / 60);
+  const presentation = trainingPresentation(product);
+  const target = product.targetSuccessRate ?? 80;
+  const requiredSessions = product.requiredConsecutiveSessions ?? 3;
   return (
     <AppShell
       title={`${product.dogName}s Plan`}
@@ -35,28 +39,25 @@ export default function PlanPage() {
           <span>Messbares Ziel</span>
           <strong>{product.goalText}</strong>
           <p>
-            Ausgangslage {product.baselineSuccessRate}% · Ziel 80% in drei
-            vergleichbaren Einheiten
+            Ausgangslage {product.baselineSuccessRate}% · Ziel {target}% in{" "}
+            {requiredSessions} vergleichbaren Einheiten
           </p>
         </div>
       </section>
       <section className="plain-section">
         <h2>Aktuelle Stufe</h2>
         <p className="section-lede">
-          {product.currentStep?.difficulty ?? 1} / Orientierung unter wenig
-          Ablenkung
+          {product.currentStep?.difficulty ?? 1} / {presentation.stage}
         </p>
         <small>
           {duration} Minuten · maximal {product.currentStep?.repetitions ?? 0}{" "}
-          Abschnitte
+          {presentation.unit}
         </small>
       </section>
       <section className="plain-section">
         <h2>Warum dieser Block?</h2>
         <p className="plan-copy">
-          Die Ausgangslage stammt aus deinem Bericht. DogOS hält Umgebung und
-          Aufgabe zunächst vergleichbar; erst wiederholte Sitzungsdaten
-          verändern die Schwierigkeit.
+          Die Ausgangslage stammt aus deinem Bericht. {presentation.why}
         </p>
       </section>
       <section className="reason-panel">

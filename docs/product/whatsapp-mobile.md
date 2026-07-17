@@ -39,14 +39,19 @@ it never advances the plan implicitly.
 
 1. User initiates the WhatsApp conversation.
 2. DogOS identifies itself as an AI-assisted service and states its limits.
-3. DogOS asks a small set of non-sensitive routing questions using buttons/lists.
-4. Immediate safety answers can stop the autonomous path and offer escalation.
+3. The owner describes the dog, history, training concern, and goal naturally.
+   A constrained extractor records only explicit supported facts; DogOS asks
+   one focused follow-up for the first missing fact.
+4. Relevant physical or bite facts add a specific advisory. The conversation,
+   history, account, and referral access remain available even when an affected
+   autonomous exercise is held.
 5. DogOS sends a short-lived signed account-link URL.
 6. The web page verifies/requires a Supabase session and explicit account linking.
 7. The user accepts versioned privacy/terms/AI disclosures.
-8. Short questions continue in WhatsApp; sensitive or long anamnesis opens a
-   signed, single-purpose page.
-9. DogOS summarizes structured answers and asks the user to correct them.
+8. Short questions continue in WhatsApp; sensitive account operations use an
+   authenticated, single-purpose page.
+9. DogOS preserves owner wording alongside canonical answers and requests only
+   material missing information.
 10. The engine selects one measurable goal and requests a baseline.
 11. If an approved protocol is eligible, the engine creates a versioned plan;
     otherwise it returns an unsupported/professional route.
@@ -194,7 +199,8 @@ as future/beta only after evidence supports them.
 - A new German user completes intake using buttons plus one sensitive signed page.
 - An expired/replayed link fails safely and offers a fresh link without data loss.
 - A user with an unknown/mixed breed completes the full flow.
-- A high-risk answer stops plan generation before any LLM explanation.
+- A child-involved bite prevents an autonomous exercise plan, explains the
+  boundary without diagnosis, and keeps conversation and referral access open.
 - A user completes three sessions and sees evidence-based progress dimensions.
 - A user with insufficient data sees `not enough data`, not a fabricated score.
 - A Swiss household sees CHF and `de-CH` formatting without different training logic.

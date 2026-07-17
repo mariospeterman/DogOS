@@ -6,7 +6,9 @@ export interface OnboardingFacts {
   ageBand: "adult" | "puppy" | "senior" | "unknown";
   baselineSuccessRate: number;
   behaviorConcernCode: string;
+  behaviorConcernDescription: string | null;
   dogName: string;
+  dogProfileSummary: string | null;
   equipmentCodes: string[];
   goalCode: string;
   goalText: string;
@@ -42,14 +44,18 @@ export interface PersistOnboardingInput {
 
 export interface DogProductContext {
   baselineSuccessRate: number;
+  behaviorConcernDescription?: string;
   dogId: string;
   dogName: string;
+  dogProfileSummary?: string;
   goal: string;
   latestDecision: string;
   planId: string | null;
   planStatus: "active" | "blocked" | "setup_required";
   riskDisposition: RiskAssessment["disposition"];
   sessionCount: number;
+  targetSuccessRate?: number;
+  requiredConsecutiveSessions?: number;
   todaySessionId: string | null;
 }
 
@@ -265,7 +271,23 @@ export class OnboardingRepository {
         d.id::text as dog_id,
         d.name as dog_name,
         g.canonical_goal_type::text as goal,
+        (
+          select dh.training_history->0->>'ownerSummary'
+          from api.dog_history dh
+          where dh.dog_id = d.id
+          order by dh.created_at desc
+          limit 1
+        ) as dog_profile_summary,
+        (
+          select bc.context->>'ownerDescription'
+          from api.behavior_concerns bc
+          where bc.dog_id = d.id
+          order by bc.created_at desc
+          limit 1
+        ) as behavior_concern_description,
         gm.value_numeric::float8 as baseline_success_rate,
+        gv.target_definition,
+        gv.success_criteria,
         p.id::text as plan_id,
         coalesce(p.status, 'draft') as plan_status,
         ra.disposition_code::text as disposition,
@@ -302,10 +324,20 @@ export class OnboardingRepository {
       "disposition.",
       "",
     ) as RiskAssessment["disposition"];
+    const target = row.target_definition as Record<string, unknown>;
+    const successCriteria = row.success_criteria as Record<string, unknown>;
     return {
       baselineSuccessRate: Number(row.baseline_success_rate),
+      ...(typeof row.behavior_concern_description === "string" &&
+      row.behavior_concern_description.length > 0
+        ? { behaviorConcernDescription: row.behavior_concern_description }
+        : {}),
       dogId: String(row.dog_id),
       dogName: String(row.dog_name),
+      ...(typeof row.dog_profile_summary === "string" &&
+      row.dog_profile_summary.length > 0
+        ? { dogProfileSummary: row.dog_profile_summary }
+        : {}),
       goal: String(row.goal),
       latestDecision: "repeat_step",
       planId: row.plan_id === null ? null : String(row.plan_id),
@@ -316,7 +348,11 @@ export class OnboardingRepository {
             ? "setup_required"
             : "blocked",
       riskDisposition: disposition,
+      requiredConsecutiveSessions: Number(
+        successCriteria.consecutiveSessions ?? 3,
+      ),
       sessionCount: Number(row.session_count),
+      targetSuccessRate: Number(target.successRate ?? 80),
       todaySessionId:
         row.today_session_id === null ? null : String(row.today_session_id),
     };
@@ -403,6 +439,15 @@ export class OnboardingRepository {
           ${input.facts.suspectedPain}, ${input.facts.suspectedPain}, 'owner_report')
       `;
         await tx`
+        insert into api.dog_history
+          (dog_id, training_history, source)
+        values (${input.ids.dogId}, ${tx.json(
+          input.facts.dogProfileSummary === null
+            ? []
+            : [{ ownerSummary: input.facts.dogProfileSummary }],
+        )}, 'owner_report')
+      `;
+        await tx`
         insert into api.household_context (household_id, adults_count)
         values (${input.householdId}, ${
           input.facts.householdSize === "single"
@@ -441,9 +486,11 @@ export class OnboardingRepository {
         }
         await tx`
         insert into api.behavior_concerns
-          (id, dog_id, anamnesis_id, concern_code, source)
+          (id, dog_id, anamnesis_id, concern_code, context, source)
         values (${input.ids.behaviorConcernId}, ${input.ids.dogId},
-          ${input.ids.anamnesisId}, ${input.facts.behaviorConcernCode}, 'owner_report')
+          ${input.ids.anamnesisId}, ${input.facts.behaviorConcernCode},
+          ${tx.json({ ownerDescription: input.facts.behaviorConcernDescription })},
+          'owner_report')
       `;
         if (input.ids.safetyEventId !== null) {
           await tx`

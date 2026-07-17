@@ -86,7 +86,10 @@ function canonicalFacts(snapshot: ConversationSnapshot): OnboardingFacts {
       answers.behavior_concern,
       "concern.leash_pulling",
     ),
+    behaviorConcernDescription:
+      snapshot.notes?.concern_description?.trim() || null,
     dogName: textAnswer(answers.dog_identity, "dog_identity"),
+    dogProfileSummary: snapshot.notes?.dog_profile_summary?.trim() || null,
     equipmentCodes:
       answers.training_setup === "training_setup.choice.1"
         ? (developmentProtocols.find(
@@ -94,7 +97,10 @@ function canonicalFacts(snapshot: ConversationSnapshot): OnboardingFacts {
           )?.requiredEquipmentCodes ?? [])
         : [],
     goalCode,
-    goalText: goalLabels[goalCode]?.[snapshot.locale] ?? goalCode,
+    goalText:
+      snapshot.notes?.goal_description?.trim() ||
+      goalLabels[goalCode]?.[snapshot.locale] ||
+      goalCode,
     householdSize:
       answers.household_context === "household_context.choice.1"
         ? "single"

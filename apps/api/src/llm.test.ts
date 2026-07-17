@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { coachGenerationPurpose, loadCoachModelConfig } from "./llm.js";
+import {
+  canonicalOnboardingInterpretation,
+  coachGenerationPurpose,
+  loadCoachModelConfig,
+  parseOnboardingExtraction,
+} from "./llm.js";
 
 describe("coach model configuration", () => {
   it("defaults to deterministic and validates an EU OpenAI setup", () => {
@@ -13,15 +18,58 @@ describe("coach model configuration", () => {
     ).toMatchObject({
       baseUrl: "https://eu.api.openai.com/v1",
       freeModel: "gpt-5.6-luna",
+      onboardingModel: "gpt-5.6-terra",
       paidModel: "gpt-5.6-terra",
       profiles: {
         chat: { maxOutputTokens: 900, timeoutMs: 12_000 },
         evidence: { maxOutputTokens: 2_500, timeoutMs: 30_000 },
+        onboarding: { maxOutputTokens: 700, timeoutMs: 15_000 },
         plan: { maxOutputTokens: 3_000, timeoutMs: 30_000 },
         professional_summary: {
           maxOutputTokens: 4_000,
           timeoutMs: 45_000,
         },
+      },
+    });
+  });
+
+  it("maps structured natural-language facts into canonical onboarding answers", () => {
+    const parsed = parseOnboardingExtraction(
+      JSON.stringify({
+        acknowledgement:
+          "Echo already has a strong foundation; we can make recall measurable.",
+        ageBand: "adult",
+        baseline: "half",
+        concern: "recall",
+        concernDescription: "Recall drops around wildlife.",
+        dogName: "Echo",
+        dogProfileSummary:
+          "2.5-year-old female Belgian Malinois with prior training",
+        goal: "recall",
+        goalDescription: "Return on one cue around moderate distraction.",
+        health: "none",
+        household: "single",
+        locale: "en",
+        safety: "none",
+        setup: null,
+      }),
+    );
+    expect(canonicalOnboardingInterpretation(parsed)).toMatchObject({
+      answers: {
+        baseline_collection: "baseline_collection.choice.2",
+        behavior_concern: "behavior_concern.choice.2",
+        dog_history: "dog_history.choice.2",
+        dog_identity: "dog_identity.text:Echo",
+        goal_selection: "goal_selection.choice.2",
+        health_screen: "health_screen.choice.1",
+        household_context: "household_context.choice.1",
+        safety_screen: "safety_screen.choice.1",
+      },
+      notes: {
+        concern_description: "Recall drops around wildlife.",
+        dog_profile_summary:
+          "2.5-year-old female Belgian Malinois with prior training",
+        goal_description: "Return on one cue around moderate distraction.",
       },
     });
   });

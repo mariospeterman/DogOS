@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { AppShell } from "../../../../components/app-shell";
 import { SessionControls } from "../../../../components/session-controls";
 import { useProductDashboard } from "../../../../lib/product";
+import { trainingPresentation } from "../../../../lib/training-presentation";
 
 export default function SessionPage() {
   const params = useParams<{ id: string }>();
@@ -19,17 +20,14 @@ export default function SessionPage() {
   }
   const duration = Math.round(scheduled.durationSeconds / 60);
   const repetitions = product.currentStep?.repetitions ?? 8;
+  const presentation = trainingPresentation(product);
   return (
     <AppShell title="Mikrotraining" eyebrow={product.dogName}>
       <section className="session-instruction">
-        <strong>Orientierung / lockere Leine</strong>
-        <p>
-          Beginne in einem ruhigen Abschnitt. Markiere {product.dogName}s
-          freiwillige Orientierung und gehe weiter. Wird die Leine straff,
-          bleibst du stehen und setzt erst bei lockerer Leine fort.
-        </p>
+        <strong>{presentation.title}</strong>
+        <p>{presentation.instruction(product.dogName)}</p>
         <span>
-          {duration} Minuten · bis {repetitions} Abschnitte
+          {duration} Minuten · bis {repetitions} {presentation.unit}
         </span>
       </section>
       <SessionControls

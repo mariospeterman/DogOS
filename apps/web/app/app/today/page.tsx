@@ -4,6 +4,7 @@ import { Clock3, MessageCircle, Play, Target } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
 import { useProductDashboard } from "../../../lib/product";
+import { trainingPresentation } from "../../../lib/training-presentation";
 import { whatsappCoachUrl } from "../../../lib/whatsapp";
 
 export default function TodayPage() {
@@ -28,6 +29,7 @@ export default function TodayPage() {
     (product.currentStep?.durationSeconds ?? 240) / 60,
   );
   const repetitions = product.currentStep?.repetitions ?? 8;
+  const presentation = trainingPresentation(product);
   const sessionHref = product.todaySessionId
     ? `/app/session/${product.todaySessionId}`
     : "/app/plan";
@@ -55,19 +57,16 @@ export default function TodayPage() {
             <Clock3 size={16} /> {duration} Minuten
           </span>
         </div>
-        <h2>Orientierung in einem ruhigen Abschnitt</h2>
+        <h2>{presentation.title}</h2>
         <p className="exercise-brief">
-          Beginne mit lockerer Leine. Markiere den Moment, in dem sich{" "}
-          {product.dogName} freiwillig an dir orientiert, und gehe weiter. Wird
-          die Leine straff, bleibst du stehen und setzt erst bei lockerer Leine
-          fort.
+          {presentation.instruction(product.dogName)}
         </p>
         <div className="brief-grid">
           <div>
             <Target />
             <span>
               <strong>Messpunkt</strong>
-              {repetitions} Abschnitte, Erfolg jeweils direkt erfassen
+              {presentation.measurement(repetitions)}
             </span>
           </div>
         </div>

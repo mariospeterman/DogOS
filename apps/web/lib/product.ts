@@ -28,8 +28,10 @@ export interface ProductDashboard {
   planId: string | null;
   planStatus: "active" | "blocked";
   riskDisposition: string;
+  requiredConsecutiveSessions?: number;
   sessionCount: number;
   status: "ready";
+  targetSuccessRate?: number;
   todaySessionId: string | null;
 }
 

@@ -1,15 +1,15 @@
 # Slice 2.6: Authenticated WhatsApp Training Vertical
 
-- Status: in progress, first implementation increment complete
-- Last reviewed: 2026-07-16
+- Status: in progress, natural onboarding increment complete
+- Last reviewed: 2026-07-17
 
 ## Product boundary
 
-WhatsApp and the authenticated web Coach are two clients for one canonical
-conversation. The web app remains a thin control and evidence layer for dog
+WhatsApp is the primary conversational Coach. The web app remains a thin
+control and evidence layer for dog
 profile, plan, schedule, session capture, milestones, account, entitlement,
-billing, and professional referrals. Its Coach view is not a second agent:
-history, context, entitlements, and reply generation remain shared.
+billing, and professional referrals. Web coaching actions hand back to the same
+WhatsApp conversation instead of creating a competing owner chat.
 
 The normal path contains one compact training block, an outcome target, a start
 control, and a WhatsApp handoff. Generic equipment prerequisites and pre-emptive
@@ -31,14 +31,16 @@ development authentication.
 
 ## WhatsApp orchestration
 
-The explicit state machine is persisted in
+The explicit state machine and canonical answers are persisted in
 `private.whatsapp_conversation_sessions`. The orchestrator supports restart,
-automatic language adaptation, bounded deterministic free text, Meta reply
-buttons, duplicate delivery protection, and a daily entitlement counter. There
-is no language-selection step: supported language is inferred from each inbound
-message, while ambiguous text and provider choice IDs preserve the active
-presentation locale. Existing sessions at the retired locale-confirmation state
-advance without losing answers.
+automatic language adaptation, Meta reply buttons, duplicate delivery
+protection, and a daily entitlement counter. A schema-constrained model can
+extract several explicitly stated onboarding facts from one natural message.
+The state machine validates and records those facts, then asks only for the
+first missing item. On model timeout, refusal, or invalid output, the
+state-specific deterministic parser remains available. There is no language
+selector: language follows each inbound message, while ambiguous text and
+provider choice IDs preserve the active presentation locale.
 
 The conversation stays focused on dog training, observations, plan, and
 progress. Obvious prompt-injection and unrelated requests receive one short
@@ -59,23 +61,25 @@ may claim a higher tier directly.
 
 ## LLM boundary
 
-No LLM is authoritative in this increment. Language resolution is an injectable
-adapter; the current reviewed German/English development adapter is
-deterministic. A future multilingual model may replace that adapter only after
-evaluation and receives a compact
-context capsule containing only:
+No LLM is authoritative. The onboarding model performs strict structured fact
+extraction and writes a short, specific acknowledgement. It cannot directly
+write database rows or choose risk, protocol, plan, progression, entitlement,
+or referral outcomes. The state machine and domain services accept only the
+supported canonical values.
+
+The plan writer receives a compact context capsule containing only:
 
 ```text
-intent + active dog facts needed for this turn + current canonical plan step
-+ recent bounded observations + allowed tools + locale + presentation style
+intent + relevant persisted dog/profile facts + owner goal wording
++ current canonical plan step + milestone + bounded measurements + locale
 ```
 
 It does not receive the whole account, the entire conversation, internal rule
-definitions, unrelated personal data, or entitlement secrets. Candidate facts
-are schema validated and confirmed where ambiguity matters. Engines compute
-risk, eligibility, plan, progression, and referral disposition. Detected
-language changes presentation only; it cannot change canonical answers,
-country, currency, timezone, measurements, or engine decisions.
+definitions, unrelated personal data, or entitlement secrets. OpenAI requests
+use `store: false`, regional routing is configurable, and purpose-specific
+timeouts and token budgets prevent a routine chat limit from truncating a full
+plan. Plan output may explain but cannot modify computed steps or milestones.
+Generic professional-referral endings are prohibited for low-risk plans.
 
 ## Acceptance completed
 
@@ -88,14 +92,16 @@ country, currency, timezone, measurements, or engine decisions.
   CHF, Europe/Zurich, answers, and state;
 - prompt-injection and unrelated topic attempts remain out of scope;
 - high-risk handling remains recoverable rather than terminal;
+- one natural message can capture multiple explicit dog and goal facts;
+- onboarding projects the owner wording and dog profile into durable records;
+- generated plans receive dog context, canonical steps, and milestone data;
+- a free user sees one non-blocking Plus comparison after the first plan;
 - the 390 x 844 Today, Plan, and Session views have been browser-reviewed.
 
 ## Still required
 
-- replace the in-memory product service with the completed repository layer in
-  every route;
 - exercise the full onboarding sequence on the real Meta test phone;
-- add real entitlement lookup instead of the default freemium capability;
 - implement professionally reviewed anamnesis content and protocol versions;
-- run the provider model evaluation before selecting a production LLM;
+- run blind model evaluation before enabling model-generated presentation in
+  production;
 - obtain veterinary, trainer, privacy, and legal approval for release wording.

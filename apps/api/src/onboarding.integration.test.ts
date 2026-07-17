@@ -212,12 +212,21 @@ describe("durable WhatsApp onboarding", () => {
       country: "CH",
       currency: "CHF",
       locale: "en",
+      notes: {
+        concern_description: "Recall drops around wildlife.",
+        dog_profile_summary:
+          "2.5-year-old female Belgian Malinois with prior training",
+        goal_description: "Return on one cue around moderate distraction.",
+      },
       state: "plan_ready",
       timezone: "Europe/Zurich",
     });
 
     expect(result).toMatchObject({
+      behaviorConcernDescription: "Recall drops around wildlife.",
       dogName: "Echo",
+      dogProfileSummary:
+        "2.5-year-old female Belgian Malinois with prior training",
       goal: "goal.recall",
       planStatus: "active",
       riskDisposition: "continue_low_risk_training",
@@ -235,6 +244,29 @@ describe("durable WhatsApp onboarding", () => {
       "equipment.harness",
       "equipment.food_reward",
     ]);
+    const [languageFacts] = await sql`
+      select
+        dh.training_history,
+        bc.context as concern_context,
+        g.owner_goal_text
+      from private.onboarding_projections op
+      join api.dog_history dh on dh.dog_id = op.dog_id
+      join api.behavior_concerns bc on bc.id = (
+        select id from api.behavior_concerns where dog_id = op.dog_id limit 1
+      )
+      join api.goals g on g.id = op.goal_id
+      where op.contact_id = ${recallContactId}
+    `;
+    expect(languageFacts).toMatchObject({
+      concern_context: { ownerDescription: "Recall drops around wildlife." },
+      owner_goal_text: "Return on one cue around moderate distraction.",
+      training_history: [
+        {
+          ownerSummary:
+            "2.5-year-old female Belgian Malinois with prior training",
+        },
+      ],
+    });
   });
 
   it("reconciles a low-risk projection after setup becomes complete", async () => {

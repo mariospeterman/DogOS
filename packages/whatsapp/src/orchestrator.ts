@@ -1,4 +1,4 @@
-import type { TierCapabilities } from "@dogos/contracts";
+import type { SubscriptionTier, TierCapabilities } from "@dogos/contracts";
 import {
   composeCoachReply,
   maxCoachReplyCharacters,
@@ -8,6 +8,8 @@ import {
 
 import {
   ConversationMachine,
+  onboardingAnswerStates,
+  type OnboardingAnswerState,
   type ConversationSnapshot,
   type ConversationState,
 } from "./machine.js";
@@ -85,6 +87,7 @@ const meteredStates = new Set<ConversationState>([
 ]);
 
 export interface ConversationLinks {
+  account?: string;
   plan: string;
   progress: string;
   referral: string;
@@ -93,6 +96,9 @@ export interface ConversationLinks {
 
 export interface ConversationProductContext {
   baselineSuccessRate?: number;
+  behaviorConcernDescription?: string;
+  targetSuccessRate?: number;
+  requiredConsecutiveSessions?: number;
   calendar?: Array<{
     durationSeconds: number;
     isRecovery: boolean;
@@ -108,6 +114,7 @@ export interface ConversationProductContext {
   } | null;
   dogId: string;
   dogName: string;
+  dogProfileSummary?: string;
   goal: string;
   goalText?: string;
   latestDecision: string;
@@ -127,9 +134,20 @@ export interface WhatsAppConversationDependencies {
     contact: ProviderContact,
     snapshot: ConversationSnapshot,
   ) => Promise<ConversationProductContext>;
+  interpretOnboarding?: (input: {
+    contact: ProviderContact;
+    message: string;
+    snapshot: ConversationSnapshot;
+  }) => Promise<{
+    acknowledgement: string;
+    answers: Partial<Record<OnboardingAnswerState, string>>;
+    locale: "de-CH" | "en";
+    notes: Record<string, string>;
+  }>;
   rewriteCoachReply?: (input: {
     contact: ProviderContact;
     context: CoachTrainingContext;
+    contextKind: "plan";
     draft: CoachReply;
     message: string;
   }) => Promise<string>;
@@ -142,6 +160,7 @@ export interface WhatsAppConversationDependencies {
     contact: ProviderContact,
     limit: number,
   ) => Promise<boolean>;
+  tierForContact?: (contact: ProviderContact) => Promise<SubscriptionTier>;
 }
 
 export class WhatsAppConversationOrchestrator {
@@ -220,6 +239,62 @@ export class WhatsAppConversationOrchestrator {
           ? "Ich bleibe bei deinem Hund: Training, Beobachtungen, Plan und Fortschritt. Was davon brauchst du?"
           : "I stay focused on your dog: training, observations, plan, and progress. Which do you need?",
       );
+    }
+
+    if (
+      onboardingAnswerStates.includes(current.state as OnboardingAnswerState) &&
+      this.dependencies.interpretOnboarding !== undefined
+    ) {
+      try {
+        const interpretation = await this.dependencies.interpretOnboarding({
+          contact,
+          message: text,
+          snapshot: snapshotOf(current),
+        });
+        if (interpretation.locale !== current.locale) {
+          machine.switchLocale(interpretation.locale);
+        }
+        let next = machine.recordOnboarding(interpretation);
+        if (
+          next.state === "plan_ready" &&
+          this.dependencies.projectOnboarding !== undefined
+        ) {
+          const context = await this.dependencies.projectOnboarding(
+            contact,
+            snapshotOf(next),
+          );
+          if (context.planStatus === "blocked") {
+            machine.escalate();
+            next = machine.view();
+          } else if (context.planStatus === "setup_required") {
+            await this.persist(contact.id, next);
+            return this.presentSetupRequired(contact.externalId, next.locale);
+          }
+        }
+        await this.persist(contact.id, next);
+        if (next.state === "plan_ready") {
+          return this.presentPlan(
+            contact,
+            next.locale === "de-CH"
+              ? "Erkläre mir den neuen Trainingsplan mit Ziel, Etappen und Fortschrittslogik."
+              : "Explain the new training plan, milestones, and progression logic.",
+            next.locale,
+            true,
+          );
+        }
+        const advisory = onboardingAdvisory(
+          interpretation.answers,
+          next.locale,
+        );
+        return this.present(
+          contact.externalId,
+          next,
+          [interpretation.acknowledgement, advisory].filter(Boolean).join(" "),
+        );
+      } catch {
+        // The deterministic state-specific parser remains available on timeout,
+        // refusal, or invalid structured extraction.
+      }
     }
 
     if (current.state === "plan_ready") {
@@ -303,6 +378,7 @@ export class WhatsAppConversationOrchestrator {
     contact: ProviderContact,
     text: string,
     locale: "de-CH" | "en",
+    offerUpgrade = false,
   ): Promise<OutboundMessage> {
     const links = await this.dependencies.links(contact);
     const context = await this.dependencies.productContext?.(contact);
@@ -326,11 +402,27 @@ export class WhatsAppConversationOrchestrator {
       ...(context?.baselineSuccessRate === undefined
         ? {}
         : { baselineSuccessRate: context.baselineSuccessRate }),
+      ...(context?.behaviorConcernDescription === undefined
+        ? {}
+        : {
+            behaviorConcernDescription: context.behaviorConcernDescription,
+          }),
       ...(context?.currentStep === undefined
         ? {}
         : { currentStep: context.currentStep }),
+      ...(context?.requiredConsecutiveSessions === undefined
+        ? {}
+        : {
+            requiredConsecutiveSessions: context.requiredConsecutiveSessions,
+          }),
+      ...(context?.targetSuccessRate === undefined
+        ? {}
+        : { targetSuccessRate: context.targetSuccessRate }),
       dogName:
         context?.dogName ?? (locale === "de-CH" ? "dein Hund" : "your dog"),
+      ...(context?.dogProfileSummary === undefined
+        ? {}
+        : { dogProfileSummary: context.dogProfileSummary }),
       durationMinutes: 4,
       evidenceCount: context?.sessionCount ?? 0,
       goal: context?.goalText ?? context?.goal ?? "current training goal",
@@ -354,6 +446,7 @@ export class WhatsAppConversationOrchestrator {
         const generated = await this.dependencies.rewriteCoachReply({
           contact,
           context: trainingContext,
+          contextKind: "plan",
           draft: reply,
           message: text,
         });
@@ -367,9 +460,18 @@ export class WhatsAppConversationOrchestrator {
         // Keep the deterministic coaching reply when the optional model fails.
       }
     }
+    const tier = offerUpgrade
+      ? await this.dependencies.tierForContact?.(contact)
+      : undefined;
+    const upgrade =
+      tier === "freemium" && links.account !== undefined
+        ? locale === "de-CH"
+          ? `\n\nDu startest kostenlos. Wenn du später mehr Coach-Nachrichten und häufigere Plananpassungen brauchst, kannst du Plus in Ruhe vergleichen: ${links.account}`
+          : `\n\nYou are starting free. If you later need more Coach messages and more frequent plan adjustments, you can compare Plus here: ${links.account}`
+        : "";
     return this.dependencies.provider.sendInteractive(
       contact.externalId,
-      `${reply.text} ${reply.actions[0]?.href ?? links.today}`,
+      `${reply.text} ${reply.actions[0]?.href ?? links.today}${upgrade}`,
       options.plan_ready[locale],
     );
   }
@@ -416,15 +518,15 @@ export class WhatsAppConversationOrchestrator {
   private present(
     contactId: string,
     view: ReturnType<ConversationMachine["view"]>,
+    acknowledgement?: string,
   ): Promise<OutboundMessage> {
     const choices = options[view.state][view.locale];
+    const message = acknowledgement?.trim()
+      ? `${acknowledgement.trim()}\n\n${view.prompt}`
+      : view.prompt;
     return choices.length === 0
-      ? this.dependencies.provider.sendText(contactId, view.prompt)
-      : this.dependencies.provider.sendInteractive(
-          contactId,
-          view.prompt,
-          choices,
-        );
+      ? this.dependencies.provider.sendText(contactId, message)
+      : this.dependencies.provider.sendInteractive(contactId, message, choices);
   }
 
   private persist(
@@ -437,6 +539,7 @@ export class WhatsAppConversationOrchestrator {
       country: view.country,
       currency: view.currency,
       locale: view.locale,
+      notes: view.notes ?? {},
       state: view.state,
       timezone: view.timezone,
     };
@@ -453,9 +556,27 @@ function snapshotOf(
     country: view.country,
     currency: view.currency,
     locale: view.locale,
+    notes: view.notes ?? {},
     state: view.state,
     timezone: view.timezone,
   };
+}
+
+function onboardingAdvisory(
+  answers: Partial<Record<OnboardingAnswerState, string>>,
+  locale: "de-CH" | "en",
+): string {
+  if (answers.health_screen === "health_screen.choice.2") {
+    return locale === "de-CH"
+      ? "Eine akute körperliche Veränderung kann DogOS nicht beurteilen; bei anhaltenden oder deutlichen Beschwerden ist eine tierärztliche Abklärung sinnvoll. Das ist keine Diagnose, und wir erfassen den Trainingskontext weiter."
+      : "DogOS cannot assess an acute physical change; veterinary assessment is appropriate if it persists or is pronounced. This is not a diagnosis, and we will continue recording the training context.";
+  }
+  if (answers.safety_screen === "safety_screen.choice.3") {
+    return locale === "de-CH"
+      ? "Bei einem Biss mit Kind ist die Unterstützung durch eine qualifizierte Fachperson sinnvoll. Ich erfasse den Fall weiter und zeige danach passende nächste Schritte."
+      : "After a bite involving a child, support from a qualified professional is appropriate. I will keep recording the case and then show suitable next steps.";
+  }
+  return "";
 }
 
 function isUsableName(text: string): boolean {

@@ -27,7 +27,11 @@ import {
 import { buildApp } from "./app.js";
 import { createRequestAuthenticator } from "./auth.js";
 import { loadStripeBillingConfig, StripeBillingService } from "./billing.js";
-import { loadCoachModelConfig, OpenAICoachReplyGenerator } from "./llm.js";
+import {
+  loadCoachModelConfig,
+  OpenAICoachReplyGenerator,
+  OpenAIOnboardingInterpreter,
+} from "./llm.js";
 import { OnboardingService } from "./onboarding-service.js";
 import { SignedActionService } from "./signed-actions.js";
 
@@ -64,6 +68,10 @@ const modelRuns =
 const coachGenerator =
   coachModelConfig && modelRuns
     ? new OpenAICoachReplyGenerator(coachModelConfig, modelRuns)
+    : undefined;
+const onboardingInterpreter =
+  coachModelConfig && modelRuns
+    ? new OpenAIOnboardingInterpreter(coachModelConfig, modelRuns)
     : undefined;
 const onboarding =
   onboardingRepository === undefined
@@ -109,6 +117,11 @@ const signedActions = new SignedActionService(
 );
 const webBase = process.env.WEB_ORIGIN ?? "http://127.0.0.1:3000";
 const conversation = new WhatsAppConversationOrchestrator({
+  ...(onboardingInterpreter === undefined
+    ? {}
+    : {
+        interpretOnboarding: (input) => onboardingInterpreter.interpret(input),
+      }),
   links: async (contact) => {
     const actorId = contact.userId!;
     const householdId = contact.householdId!;
@@ -135,7 +148,13 @@ const conversation = new WhatsAppConversationOrchestrator({
       issue("open_progress", "/app/progress"),
       issue("open_trainers", "/app/trainers"),
     ]);
-    return { plan, progress, referral, today };
+    return {
+      account: `${webBase}/app/account`,
+      plan,
+      progress,
+      referral,
+      today,
+    };
   },
   ...(onboarding === undefined
     ? {}
@@ -157,12 +176,19 @@ const conversation = new WhatsAppConversationOrchestrator({
   ...(coachGenerator === undefined || accounts === undefined
     ? {}
     : {
-        rewriteCoachReply: async ({ contact, context, draft, message }) => {
+        rewriteCoachReply: async ({
+          contact,
+          context,
+          contextKind,
+          draft,
+          message,
+        }) => {
           if (contact.userId === null) return draft.text;
           const account = await accounts.resolveByAppUser(contact.userId);
           if (account === null) return draft.text;
           return coachGenerator.generate({
             context,
+            contextKind,
             draft,
             message,
             tier: account.tier,
@@ -183,6 +209,16 @@ const conversation = new WhatsAppConversationOrchestrator({
           return {
             coachingMessagesPerDay: account.capabilities.coachingMessagesPerDay,
           };
+        },
+      }),
+  ...(accounts === undefined
+    ? {}
+    : {
+        tierForContact: async (contact) => {
+          if (contact.userId === null) return "freemium" as const;
+          const account = await accounts.resolveByAppUser(contact.userId);
+          if (account === null) throw new Error("ACCOUNT_NOT_FOUND");
+          return account.tier;
         },
       }),
   ...(accounts === undefined || capabilityUsage === undefined

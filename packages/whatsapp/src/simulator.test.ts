@@ -72,7 +72,7 @@ describe("conversation machine", () => {
       currency: "CHF",
       timezone: "Europe/Zurich",
     });
-    expect(after.prompt).toMatch(/Who lives/);
+    expect(after.prompt).toMatch(/Tell me about your dog/);
   });
 
   it("resumes saved state and fails closed into professional escalation", () => {
@@ -131,7 +131,8 @@ describe("WhatsApp conversation orchestration", () => {
   it("infers English without a selector and preserves Swiss context", async () => {
     const { contact, orchestrator, store } = await setup();
     const disclosure = await orchestrator.handle(contact, "Proceed");
-    expect(disclosure.text).toMatch(/rule-based/);
+    expect(disclosure.text).toMatch(/AI-assisted/);
+    expect(disclosure.text).toMatch(/computed from the recorded facts/);
     expect(disclosure.options).toEqual(["Understood"]);
     expect(disclosure.options).not.toContain("Deutsch");
     expect(disclosure.options).not.toContain("English");
@@ -144,10 +145,10 @@ describe("WhatsApp conversation orchestration", () => {
       timezone: "Europe/Zurich",
     });
 
-    const household = await orchestrator.handle(contact, "choice.1");
-    expect(household.text).toMatch(/Who lives/);
+    const profile = await orchestrator.handle(contact, "choice.1");
+    expect(profile.text).toMatch(/Tell me about your dog/);
     expect((await store.loadConversation(contact.id))?.state).toBe(
-      "household_context",
+      "dog_identity",
     );
   });
 
@@ -195,8 +196,8 @@ describe("WhatsApp conversation orchestration", () => {
       "Bitte antworte auf Deutsch",
     );
     const after = await store.loadConversation(contact.id);
-    expect(german.text).toMatch(/Wer lebt/);
-    expect(after?.state).toBe("household_context");
+    expect(german.text).toMatch(/Erzaehl mir kurz von deinem Hund/);
+    expect(after?.state).toBe("dog_identity");
     expect(after?.answers).toEqual(before?.answers);
     expect(after).toMatchObject({
       country: "CH",
@@ -214,11 +215,11 @@ describe("WhatsApp conversation orchestration", () => {
       state: "locale_confirmation",
     });
 
-    const household = await orchestrator.handle(contact, "choice.2");
-    expect(household.text).toMatch(/Who lives/);
+    const profile = await orchestrator.handle(contact, "choice.2");
+    expect(profile.text).toMatch(/Tell me about your dog/);
     expect(await store.loadConversation(contact.id)).toMatchObject({
       locale: "en",
-      state: "household_context",
+      state: "dog_identity",
     });
   });
 
@@ -230,7 +231,7 @@ describe("WhatsApp conversation orchestration", () => {
     );
     expect(refused.text).toMatch(/Ich bleibe bei deinem Hund/);
     const machine = new ConversationMachine("de-CH");
-    for (let index = 0; index < 5; index += 1) machine.answer("answer.test");
+    for (let index = 0; index < 8; index += 1) machine.answer("answer.test");
     expect(machine.view().state).toBe("health_screen");
     await store.saveConversation(contact.id, machine.view());
     const response = await orchestrator.handle(contact, "Er lahmt plötzlich");
@@ -249,7 +250,7 @@ describe("WhatsApp conversation orchestration", () => {
     for (let index = 0; index < 10; index += 1) {
       machine.answer(`answer.${index}`);
     }
-    expect(machine.view().state).toBe("baseline_collection");
+    expect(machine.view().state).toBe("training_setup");
     await store.saveConversation(contact.id, machine.view());
     const orchestrator = new WhatsAppConversationOrchestrator({
       links: async () => ({
@@ -274,6 +275,151 @@ describe("WhatsApp conversation orchestration", () => {
 
     const response = await orchestrator.handle(contact, "choice.2");
     expect(response.text).toMatch(/not a safety stop/);
+    expect((await store.loadConversation(contact.id))?.state).toBe(
+      "plan_ready",
+    );
+  });
+
+  it("captures several owner facts from one natural onboarding message", async () => {
+    const { contact, store } = await setup();
+    const provider = new LocalWhatsAppSimulator("test-secret");
+    const machine = new ConversationMachine("en");
+    machine.answer("welcome.choice.1");
+    machine.answer("ai_disclosure.choice.1");
+    await store.saveConversation(contact.id, machine.view());
+    const orchestrator = new WhatsAppConversationOrchestrator({
+      interpretOnboarding: async () => ({
+        acknowledgement:
+          "Echo sounds like a capable young Malinois with a solid foundation; recall around distraction is the first gap to make measurable.",
+        answers: {
+          baseline_collection: "baseline_collection.choice.2",
+          behavior_concern: "behavior_concern.choice.2",
+          dog_history: "dog_history.choice.2",
+          dog_identity: "dog_identity.text:Echo",
+          goal_selection: "goal_selection.choice.2",
+          health_screen: "health_screen.choice.1",
+          household_context: "household_context.choice.1",
+          safety_screen: "safety_screen.choice.1",
+        },
+        locale: "en",
+        notes: {
+          dog_profile_summary:
+            "2.5-year-old female Belgian Malinois with prior training",
+          goal_description: "Reliable recall around moderate distraction",
+        },
+      }),
+      links: async () => ({
+        plan: "https://dogos.test/plan",
+        progress: "https://dogos.test/progress",
+        referral: "https://dogos.test/trainers",
+        today: "https://dogos.test/today",
+      }),
+      provider,
+      store,
+    });
+
+    const response = await orchestrator.handle(
+      contact,
+      "Echo is a 2.5 year old female Malinois. Recall works about half the time. No pain or bite history; I train her myself.",
+    );
+    const saved = await store.loadConversation(contact.id);
+    expect(response.text).toMatch(/capable young Malinois/);
+    expect(response.text).toMatch(/listed equipment/);
+    expect(saved).toMatchObject({
+      answers: {
+        baseline_collection: "baseline_collection.choice.2",
+        dog_identity: "dog_identity.text:Echo",
+        goal_selection: "goal_selection.choice.2",
+      },
+      notes: {
+        dog_profile_summary:
+          "2.5-year-old female Belgian Malinois with prior training",
+      },
+      state: "training_setup",
+    });
+  });
+
+  it("delivers a personalised full plan and one honest free-tier comparison", async () => {
+    const { contact, store } = await setup();
+    const provider = new LocalWhatsAppSimulator("test-secret");
+    const machine = new ConversationMachine("en");
+    machine.answer("welcome.choice.1");
+    machine.answer("ai_disclosure.choice.1");
+    await store.saveConversation(contact.id, machine.view());
+    let generatedContextKind: string | undefined;
+    const context = {
+      baselineSuccessRate: 50,
+      behaviorConcernDescription: "Recall drops around wildlife.",
+      currentStep: {
+        difficulty: 1,
+        durationSeconds: 240,
+        repetitions: 6,
+        stepCode: "step.recall_short_distance",
+      },
+      dogId: "dog-1",
+      dogName: "Echo",
+      dogProfileSummary:
+        "2.5-year-old female Belgian Malinois with prior training",
+      goal: "goal.recall",
+      goalText: "Return on one cue around moderate distraction.",
+      latestDecision: "repeat_step",
+      planId: "plan-1",
+      planStatus: "active" as const,
+      requiredConsecutiveSessions: 3,
+      sessionCount: 0,
+      targetSuccessRate: 80,
+      todaySessionId: "session-1",
+    };
+    const orchestrator = new WhatsAppConversationOrchestrator({
+      interpretOnboarding: async () => ({
+        acknowledgement: "Echo has a strong foundation.",
+        answers: {
+          baseline_collection: "baseline_collection.choice.2",
+          behavior_concern: "behavior_concern.choice.2",
+          dog_history: "dog_history.choice.2",
+          dog_identity: "dog_identity.text:Echo",
+          goal_selection: "goal_selection.choice.2",
+          health_screen: "health_screen.choice.1",
+          household_context: "household_context.choice.1",
+          safety_screen: "safety_screen.choice.1",
+          training_setup: "training_setup.choice.1",
+        },
+        locale: "en",
+        notes: {},
+      }),
+      links: async () => ({
+        account: "https://dogos.test/account",
+        plan: "https://dogos.test/plan",
+        progress: "https://dogos.test/progress",
+        referral: "https://dogos.test/trainers",
+        today: "https://dogos.test/today",
+      }),
+      productContext: async () => context,
+      projectOnboarding: async () => context,
+      provider,
+      rewriteCoachReply: async ({ context: generatedContext, contextKind }) => {
+        generatedContextKind = contextKind;
+        expect(generatedContext).toMatchObject({
+          behaviorConcernDescription: "Recall drops around wildlife.",
+          dogProfileSummary:
+            "2.5-year-old female Belgian Malinois with prior training",
+          targetSuccessRate: 80,
+        });
+        return "Echo's recall plan starts with six short, measurable repetitions and progresses after three sessions at 80%.";
+      },
+      store,
+      tierForContact: async () => "freemium",
+    });
+
+    const response = await orchestrator.handle(
+      contact,
+      "Echo is ready; I have the training setup.",
+    );
+
+    expect(generatedContextKind).toBe("plan");
+    expect(response.text).toMatch(/six short, measurable repetitions/);
+    expect(response.text).toMatch(/compare Plus/);
+    expect(response.text).toMatch(/dogos\.test\/account/);
     expect((await store.loadConversation(contact.id))?.state).toBe(
       "plan_ready",
     );

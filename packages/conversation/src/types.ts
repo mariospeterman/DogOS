@@ -29,6 +29,9 @@ export interface CoachConversation {
 
 export interface CoachTrainingContext {
   baselineSuccessRate?: number;
+  behaviorConcernDescription?: string;
+  targetSuccessRate?: number;
+  requiredConsecutiveSessions?: number;
   currentStep?: {
     difficulty: number;
     durationSeconds: number;
@@ -36,6 +39,7 @@ export interface CoachTrainingContext {
     stepCode: string;
   } | null;
   dogName: string;
+  dogProfileSummary?: string;
   goal: string;
   stage: string;
   durationMinutes: number;

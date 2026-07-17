@@ -120,9 +120,16 @@ export function composeCoachReply(input: {
       kind: "primary" as const,
     });
   } else if (planPattern.test(input.message) || input.contextKind === "plan") {
+    const milestone =
+      input.context.targetSuccessRate === undefined ||
+      input.context.requiredConsecutiveSessions === undefined
+        ? ""
+        : de
+          ? ` Ausgangspunkt sind etwa ${input.context.baselineSuccessRate ?? "noch nicht ausreichend gemessene"} Prozent; die nächste Etappe ist ${input.context.targetSuccessRate} Prozent in ${input.context.requiredConsecutiveSessions} vergleichbaren Einheiten.`
+          : ` The baseline is about ${input.context.baselineSuccessRate ?? "not yet sufficiently measured"} percent; the next milestone is ${input.context.targetSuccessRate} percent across ${input.context.requiredConsecutiveSessions} comparable sessions.`;
     text = de
-      ? `Der Plan für ${input.context.dogName} ${training.plan}. Die Einheiten bleiben mit ${input.context.durationMinutes} Minuten kurz, damit Ausführung und Messung sauber bleiben. Danach entscheidet die dokumentierte Leistung über den nächsten Schritt.`
-      : `${input.context.dogName}'s plan ${training.plan}. Sessions stay short at ${input.context.durationMinutes} minutes so execution and measurement remain clean. Documented performance then determines the next step.`;
+      ? `Der Plan für ${input.context.dogName} ${training.plan}. Die Einheiten bleiben mit ${input.context.durationMinutes} Minuten kurz, damit Ausführung und Messung sauber bleiben.${milestone} Danach entscheidet die dokumentierte Leistung über den nächsten Schritt.`
+      : `${input.context.dogName}'s plan ${training.plan}. Sessions stay short at ${input.context.durationMinutes} minutes so execution and measurement remain clean.${milestone} Documented performance then determines the next step.`;
     actions.push({
       href: input.links.plan,
       label: de ? "Plan öffnen" : "Open plan",

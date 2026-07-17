@@ -64,6 +64,24 @@ describe("omnichannel Coach conversation", () => {
     expect(reply.text).not.toMatch(/lockerer Leine/);
   });
 
+  it("explains deterministic plan milestones without inventing a score", () => {
+    const reply = composeCoachReply({
+      context: {
+        ...context,
+        baselineSuccessRate: 50,
+        requiredConsecutiveSessions: 3,
+        targetSuccessRate: 80,
+      },
+      contextKind: "plan",
+      currentLocale: "de-CH",
+      links,
+      message: "Erkläre den Plan",
+    });
+    expect(reply.text).toMatch(/50 Prozent/);
+    expect(reply.text).toMatch(/80 Prozent/);
+    expect(reply.text).toMatch(/3 vergleichbaren Einheiten/);
+  });
+
   it("records web and WhatsApp in one ordered timeline", async () => {
     const service = new CoachConversationService(
       new InMemoryCoachConversationStore(),
