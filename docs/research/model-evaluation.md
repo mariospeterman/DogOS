@@ -43,6 +43,31 @@ Prompt/context caching, a rolling structured summary, and retrieval of only the
 active plan step control cost. Tier changes limits and optional capabilities,
 not the correctness or safety standard.
 
+## Implemented benchmark router
+
+The production code defaults to `DOGOS_LLM_MODE=deterministic`. Enabling
+`openai` adds a bounded presentation rewrite after deterministic intent,
+safety wording, actions, and training context are computed:
+
+```text
+Freemium candidate -> gpt-5.6-luna
+Plus/Pro/Ultra candidate -> gpt-5.6-terra
+provider timeout -> deterministic reply
+invalid or oversized output -> deterministic reply
+```
+
+Both model IDs are environment-switchable. Requests use `store: false`, no
+provider conversation state, at most 320 output tokens by default, and no raw
+database or general-purpose tools. The prompt is intentionally shorter than the
+1,024-token automatic prompt-cache threshold; padding it to obtain a cache hit
+would cost more and add noise. Model runs store operational usage and latency,
+not duplicated conversation content.
+
+Luna is an economical candidate, not a presumed quality winner: OpenAI describes
+it as roughly the earlier nano tier. Terra is roughly the earlier mini tier. A
+blind de-CH/English evaluation must establish instruction accuracy, naturalness,
+scope resistance, latency, and normalized cost before production activation.
+
 ## Memory benchmark
 
 Run the same coaching cases with no external memory, a PostgreSQL full-text or

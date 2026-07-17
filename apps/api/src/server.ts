@@ -18,6 +18,8 @@ import {
 import {
   AccountRepository,
   BillingRepository,
+  CapabilityUsageRepository,
+  ModelRunRepository,
   OnboardingRepository,
   PostgresRepository,
 } from "@dogos/database";
@@ -25,6 +27,7 @@ import {
 import { buildApp } from "./app.js";
 import { createRequestAuthenticator } from "./auth.js";
 import { loadStripeBillingConfig, StripeBillingService } from "./billing.js";
+import { loadCoachModelConfig, OpenAICoachReplyGenerator } from "./llm.js";
 import { OnboardingService } from "./onboarding-service.js";
 import { SignedActionService } from "./signed-actions.js";
 
@@ -38,6 +41,9 @@ const onboardingRepository = environment.DATABASE_URL
 const commands = environment.DATABASE_URL
   ? new PostgresRepository(environment.DATABASE_URL)
   : undefined;
+const capabilityUsage = environment.DATABASE_URL
+  ? new CapabilityUsageRepository(environment.DATABASE_URL)
+  : undefined;
 const stripeConfig = loadStripeBillingConfig(process.env);
 const billingRepository =
   environment.DATABASE_URL && stripeConfig
@@ -46,6 +52,18 @@ const billingRepository =
 const billing =
   stripeConfig && billingRepository
     ? new StripeBillingService(stripeConfig, billingRepository)
+    : undefined;
+const coachModelConfig = loadCoachModelConfig(process.env);
+if (coachModelConfig !== null && environment.DATABASE_URL === undefined) {
+  throw new Error("LLM_MODEL_RUN_DATABASE_REQUIRED");
+}
+const modelRuns =
+  coachModelConfig && environment.DATABASE_URL
+    ? new ModelRunRepository(environment.DATABASE_URL)
+    : undefined;
+const coachGenerator =
+  coachModelConfig && modelRuns
+    ? new OpenAICoachReplyGenerator(coachModelConfig, modelRuns)
     : undefined;
 const onboarding =
   onboardingRepository === undefined
@@ -80,7 +98,7 @@ const whatsappProvider =
 const coachStore = environment.DATABASE_URL
   ? new PostgresCoachConversationStore(environment.DATABASE_URL)
   : new InMemoryCoachConversationStore();
-const coach = new CoachConversationService(coachStore);
+const coach = new CoachConversationService(coachStore, coachGenerator);
 const signedActions = new SignedActionService(
   {
     pilot1:
@@ -127,6 +145,22 @@ const conversation = new WhatsAppConversationOrchestrator({
           onboarding.project(contact, snapshot),
       }),
   provider: whatsappProvider,
+  ...(coachGenerator === undefined || accounts === undefined
+    ? {}
+    : {
+        rewriteCoachReply: async ({ contact, context, draft, message }) => {
+          if (contact.userId === null) return draft.text;
+          const account = await accounts.resolveByAppUser(contact.userId);
+          if (account === null) return draft.text;
+          return coachGenerator.generate({
+            context,
+            draft,
+            message,
+            tier: account.tier,
+            traceId: `whatsapp:${contact.id}`,
+          });
+        },
+      }),
   store: whatsappStore,
   ...(accounts === undefined
     ? {}
@@ -140,6 +174,23 @@ const conversation = new WhatsAppConversationOrchestrator({
           return {
             coachingMessagesPerDay: account.capabilities.coachingMessagesPerDay,
           };
+        },
+      }),
+  ...(accounts === undefined || capabilityUsage === undefined
+    ? {}
+    : {
+        consumeCoachingMessage: async (contact, limit) => {
+          if (contact.userId === null || contact.householdId === null) {
+            return whatsappStore.consumeDailyMessage(contact.id, limit);
+          }
+          const account = await accounts.resolveByAppUser(contact.userId);
+          if (account === null) throw new Error("ACCOUNT_NOT_FOUND");
+          return capabilityUsage.consumeCoachingMessage({
+            actorUserId: contact.userId,
+            householdId: contact.householdId,
+            limit,
+            timezone: account.timezone,
+          });
         },
       }),
 });
@@ -175,6 +226,7 @@ const app = buildApp({
   ...(billing === undefined ? {} : { billing }),
   coach,
   ...(commands === undefined ? {} : { commands }),
+  ...(capabilityUsage === undefined ? {} : { usage: capabilityUsage }),
   ...(onboardingRepository === undefined
     ? {}
     : { products: onboardingRepository }),

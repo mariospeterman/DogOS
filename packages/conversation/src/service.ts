@@ -9,6 +9,19 @@ import type {
 import { composeCoachReply } from "./reply.js";
 import type { CoachConversationStore } from "./store.js";
 
+export type CoachServiceTier = "freemium" | "plus" | "pro" | "ultra";
+
+export interface CoachReplyGenerator {
+  generate(input: {
+    context: CoachTrainingContext;
+    contextKind?: CoachContextKind;
+    draft: CoachReply;
+    message: string;
+    tier: CoachServiceTier;
+    traceId: string;
+  }): Promise<string>;
+}
+
 export interface CoachScope {
   actorUserId: string;
   dogId: string;
@@ -17,7 +30,10 @@ export interface CoachScope {
 }
 
 export class CoachConversationService {
-  constructor(private readonly store: CoachConversationStore) {}
+  constructor(
+    private readonly store: CoachConversationStore,
+    private readonly generator?: CoachReplyGenerator,
+  ) {}
 
   ensure(scope: CoachScope, channel: CoachChannel = "web") {
     return this.store.ensure({ ...scope, channel });
@@ -32,6 +48,7 @@ export class CoachConversationService {
     links: CoachLinks;
     message: string;
     scope: CoachScope;
+    tier?: CoachServiceTier;
     traceId: string;
   }): Promise<{ conversation: CoachConversation; reply: CoachReply }> {
     const conversation = await this.store.ensure({
@@ -59,7 +76,7 @@ export class CoachConversationService {
         traceId: input.traceId,
       });
     }
-    const reply = composeCoachReply({
+    const deterministicReply = composeCoachReply({
       context: input.context,
       ...(input.contextKind === undefined
         ? {}
@@ -68,6 +85,26 @@ export class CoachConversationService {
       links: input.links,
       message: input.message,
     });
+    let reply = deterministicReply;
+    if (this.generator !== undefined) {
+      try {
+        const generated = await this.generator.generate({
+          context: input.context,
+          ...(input.contextKind === undefined
+            ? {}
+            : { contextKind: input.contextKind }),
+          draft: deterministicReply,
+          message: input.message,
+          tier: input.tier ?? "freemium",
+          traceId: input.traceId,
+        });
+        if (generated.trim().length > 0 && generated.length <= 1_500) {
+          reply = { ...deterministicReply, text: generated.trim() };
+        }
+      } catch {
+        // The deterministic reply remains available when a model is unavailable.
+      }
+    }
     await this.store.setLocale(conversation.id, reply.locale);
     await this.store.append({
       actorUserId: null,

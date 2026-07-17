@@ -19,10 +19,11 @@ import type { WhatsAppWebhookService } from "@dogos/whatsapp";
 import {
   IdempotencyConflictError,
   type AccountRepository,
+  type CapabilityUsageRepository,
   type OnboardingRepository,
   type PostgresRepository,
 } from "@dogos/database";
-import { ProductService } from "./product-service.js";
+import { LocalProductFixture } from "./local-product-fixture.js";
 import {
   SignedActionError,
   SignedActionService,
@@ -51,6 +52,7 @@ const errorCodes = [
   "SIGNED_ACTION_EXPIRED",
   "SIGNED_ACTION_REPLAYED",
   "BILLING_UNAVAILABLE",
+  "RATE_LIMITED",
 ] as const;
 type ErrorCode = (typeof errorCodes)[number];
 
@@ -88,6 +90,7 @@ const commonResponses = {
   403: errorSchema,
   404: errorSchema,
   409: errorSchema,
+  429: errorSchema,
 };
 const mutationHeaders = {
   type: "object",
@@ -154,7 +157,8 @@ export interface BuildAppOptions {
     "dashboardByDog" | "findPrimaryByHousehold"
   >;
   commands?: Pick<PostgresRepository, "completeSession" | "startSession">;
-  product?: ProductService;
+  usage?: Pick<CapabilityUsageRepository, "consumeCoachingMessage">;
+  product?: LocalProductFixture;
   signedActions?: SignedActionService;
   twilio?: {
     inboundWebhookUrl: string;
@@ -170,7 +174,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     logger: process.env.NODE_ENV !== "test",
     requestIdHeader: "x-request-id",
   });
-  const product = options.product ?? new ProductService();
+  const product = options.product ?? new LocalProductFixture();
   const coach =
     options.coach ??
     new CoachConversationService(new InMemoryCoachConversationStore());
@@ -667,8 +671,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         key(request);
         if (actor.householdId === null || options.billing === undefined) {
           throw new ApiError(
-            409,
-            "BILLING_UNAVAILABLE",
+            429,
+            "RATE_LIMITED",
             "Billing is not configured for this environment",
           );
         }
@@ -751,6 +755,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           dogId,
           actor.householdId,
         );
+        const account = await options.accounts?.resolveByAppUser(actor.actorId);
         const snapshot = product.snapshot();
         if (options.products !== undefined && dashboard === null) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
@@ -767,7 +772,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           actorUserId: actor.actorId,
           dogId,
           householdId: actor.householdId,
-          locale: snapshot.locale,
+          locale: account?.locale === "en" ? "en" : "de-CH",
         });
       },
     );
@@ -815,6 +820,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           body.dogId,
           actor.householdId,
         );
+        const account = await options.accounts?.resolveByAppUser(actor.actorId);
         const snapshot = product.snapshot();
         if (options.products !== undefined && dashboard === null) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
@@ -826,6 +832,23 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             actor.identity === "unrelated")
         ) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (
+          account !== null &&
+          account !== undefined &&
+          options.usage !== undefined &&
+          !(await options.usage.consumeCoachingMessage({
+            actorUserId: actor.actorId,
+            householdId: actor.householdId,
+            limit: account.capabilities.coachingMessagesPerDay,
+            timezone: account.timezone,
+          }))
+        ) {
+          throw new ApiError(
+            409,
+            "BILLING_UNAVAILABLE",
+            "The daily coaching limit has been reached",
+          );
         }
         return coach.send({
           channel: "web",
@@ -839,10 +862,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             goal: dashboard?.goalText ?? snapshot.goal,
             latestDecision:
               dashboard?.latestDecision ?? snapshot.latestDecision,
-            stage:
-              snapshot.locale === "de-CH"
-                ? "Orientierung unter wenig Ablenkung"
-                : "orientation under low distraction",
+            stage: dashboard?.currentStep?.stepCode ?? "orientation foundation",
           },
           ...(body.contextKind === undefined
             ? {}
@@ -853,7 +873,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           links: {
             plan: "/app/plan",
             progress: "/app/progress",
-            session: "/app/session/session-1",
+            session: dashboard?.todaySessionId
+              ? `/app/session/${dashboard.todaySessionId}`
+              : "/app/today",
             today: "/app/today",
           },
           message: body.message,
@@ -861,8 +883,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             actorUserId: actor.actorId,
             dogId: body.dogId,
             householdId: actor.householdId,
-            locale: snapshot.locale,
+            locale: account?.locale === "en" ? "en" : "de-CH",
           },
+          tier: account?.tier ?? "freemium",
           traceId: request.id,
         });
       },

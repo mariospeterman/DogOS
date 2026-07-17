@@ -1,5 +1,9 @@
 import type { TierCapabilities } from "@dogos/contracts";
-import { composeCoachReply } from "@dogos/conversation";
+import {
+  composeCoachReply,
+  type CoachReply,
+  type CoachTrainingContext,
+} from "@dogos/conversation";
 
 import {
   ConversationMachine,
@@ -99,11 +103,21 @@ export interface WhatsAppConversationDependencies {
     contact: ProviderContact,
     snapshot: ConversationSnapshot,
   ) => Promise<ConversationProductContext>;
+  rewriteCoachReply?: (input: {
+    contact: ProviderContact;
+    context: CoachTrainingContext;
+    draft: CoachReply;
+    message: string;
+  }) => Promise<string>;
   provider: WhatsAppProvider;
   store: WhatsAppStateStore;
   capabilitiesForContact?: (
     contact: ProviderContact,
   ) => Promise<Pick<TierCapabilities, "coachingMessagesPerDay">>;
+  consumeCoachingMessage?: (
+    contact: ProviderContact,
+    limit: number,
+  ) => Promise<boolean>;
 }
 
 export class WhatsAppConversationOrchestrator {
@@ -147,10 +161,16 @@ export class WhatsAppConversationOrchestrator {
     const localeChanged = locale !== beforeResolution.locale;
     const capabilities =
       await this.dependencies.capabilitiesForContact?.(contact);
-    const allowed = await this.dependencies.store.consumeDailyMessage(
-      contact.id,
-      capabilities?.coachingMessagesPerDay ?? 12,
-    );
+    const messageLimit = capabilities?.coachingMessagesPerDay ?? 12;
+    const allowed =
+      (await this.dependencies.consumeCoachingMessage?.(
+        contact,
+        messageLimit,
+      )) ??
+      (await this.dependencies.store.consumeDailyMessage(
+        contact.id,
+        messageLimit,
+      ));
     if (!allowed) {
       if (localeChanged) await this.persist(contact.id, current);
       return this.dependencies.provider.sendText(
@@ -255,23 +275,39 @@ export class WhatsAppConversationOrchestrator {
         links.progress,
       );
     }
+    const trainingContext = {
+      dogName:
+        context?.dogName ?? (locale === "de-CH" ? "dein Hund" : "your dog"),
+      durationMinutes: 4,
+      evidenceCount: context?.sessionCount ?? 0,
+      goal: context?.goal ?? "goal.pending",
+      latestDecision: context?.latestDecision ?? "repeat_step",
+      stage:
+        locale === "de-CH"
+          ? "Orientierung unter wenig Ablenkung"
+          : "orientation under low distraction",
+    };
     const reply = composeCoachReply({
-      context: {
-        dogName:
-          context?.dogName ?? (locale === "de-CH" ? "dein Hund" : "your dog"),
-        durationMinutes: 4,
-        evidenceCount: context?.sessionCount ?? 0,
-        goal: context?.goal ?? "goal.pending",
-        latestDecision: context?.latestDecision ?? "repeat_step",
-        stage:
-          locale === "de-CH"
-            ? "Orientierung unter wenig Ablenkung"
-            : "orientation under low distraction",
-      },
+      context: trainingContext,
       currentLocale: locale,
       links: { ...links, session: links.today },
       message: text,
     });
+    if (this.dependencies.rewriteCoachReply !== undefined) {
+      try {
+        const generated = await this.dependencies.rewriteCoachReply({
+          contact,
+          context: trainingContext,
+          draft: reply,
+          message: text,
+        });
+        if (generated.trim().length > 0 && generated.length <= 1_500) {
+          reply.text = generated.trim();
+        }
+      } catch {
+        // Keep the deterministic coaching reply when the optional model fails.
+      }
+    }
     return this.dependencies.provider.sendInteractive(
       contact.externalId,
       `${reply.text} ${reply.actions[0]?.href ?? links.today}`,

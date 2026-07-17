@@ -87,4 +87,42 @@ describe("omnichannel Coach conversation", () => {
     const replay = await service.send(input);
     expect(replay.conversation.messages).toHaveLength(2);
   });
+
+  it("allows bounded presentation rewriting and falls back deterministically", async () => {
+    const generated = new CoachConversationService(
+      new InMemoryCoachConversationStore(),
+      { generate: async () => "Kurzer, natürlicher Coach-Text." },
+    );
+    const result = await generated.send({
+      channel: "web",
+      clientMessageId: "generated",
+      context,
+      links,
+      message: "Warum dieser Block?",
+      scope,
+      tier: "plus",
+      traceId: "trace-generated",
+    });
+    expect(result.reply.text).toBe("Kurzer, natürlicher Coach-Text.");
+    expect(result.reply.actions[0]?.href).toBe("/app/plan");
+
+    const fallback = new CoachConversationService(
+      new InMemoryCoachConversationStore(),
+      {
+        generate: async () => {
+          throw new Error("provider unavailable");
+        },
+      },
+    );
+    const fallbackResult = await fallback.send({
+      channel: "web",
+      clientMessageId: "fallback",
+      context,
+      links,
+      message: "Warum dieser Block?",
+      scope,
+      traceId: "trace-fallback",
+    });
+    expect(fallbackResult.reply.text).toMatch(/arbeitet gerade/);
+  });
 });

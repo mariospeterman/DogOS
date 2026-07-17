@@ -6,7 +6,7 @@ import {
   runCanonicalCase,
 } from "@dogos/testing";
 
-export interface ProductSnapshot {
+export interface LocalProductSnapshot {
   locale: "de-CH" | "en";
   country: "CH";
   currency: "CHF";
@@ -29,13 +29,13 @@ export interface ProductSnapshot {
   audit: Array<{ action: string; traceId: string }>;
 }
 
-export class ProductService {
-  #state: ProductSnapshot;
+export class LocalProductFixture {
+  #state: LocalProductSnapshot;
   readonly #idempotency = new Map<string, { hash: string; result: unknown }>();
   constructor() {
     this.#state = this.initialState("de-CH");
   }
-  initialState(locale: "de-CH" | "en"): ProductSnapshot {
+  initialState(locale: "de-CH" | "en"): LocalProductSnapshot {
     const output = runCanonicalCase(
       canonicalizeLocalizedCase(
         locale === "de-CH" ? germanOwnerCase : englishOwnerCase,
@@ -48,11 +48,12 @@ export class ProductService {
       timezone: "Europe/Zurich",
       household: {
         id: "20000000-0000-0000-0000-000000000001",
-        name: locale === "de-CH" ? "Familie Keller" : "Keller household",
+        name:
+          locale === "de-CH" ? "Lokaler Testhaushalt" : "Local test household",
       },
       dog: {
         id: "30000000-0000-0000-0000-000000000001",
-        name: "Milo",
+        name: "Rex",
         breed: "Mischling / mixed",
       },
       workflowState: "plan_ready",
@@ -66,15 +67,15 @@ export class ProductService {
       audit: [],
     };
   }
-  reset(locale: "de-CH" | "en" = "de-CH"): ProductSnapshot {
+  reset(locale: "de-CH" | "en" = "de-CH"): LocalProductSnapshot {
     this.#state = this.initialState(locale);
     this.#idempotency.clear();
     return this.snapshot();
   }
-  snapshot(): ProductSnapshot {
+  snapshot(): LocalProductSnapshot {
     return structuredClone(this.#state);
   }
-  switchLocale(locale: "de-CH" | "en", traceId: string): ProductSnapshot {
+  switchLocale(locale: "de-CH" | "en", traceId: string): LocalProductSnapshot {
     this.#state.locale = locale;
     this.#state.audit.push({ action: "locale.switched", traceId });
     return this.snapshot();
@@ -101,7 +102,7 @@ export class ProductService {
   completeSession(
     input: { success: number; foodAccepted: boolean; avoidance?: boolean },
     traceId: string,
-  ): ProductSnapshot {
+  ): LocalProductSnapshot {
     const id = randomUUID();
     this.#state.sessions.push({
       id,
@@ -126,7 +127,7 @@ export class ProductService {
   setSafety(
     kind: "low" | "pain" | "child_bite",
     traceId: string,
-  ): ProductSnapshot {
+  ): LocalProductSnapshot {
     this.#state.safety =
       kind === "low"
         ? "continue_low_risk_training"
@@ -151,7 +152,7 @@ export class ProductService {
       throw new Error("PLAN_GENERATION_BLOCKED");
   }
 
-  activateAdjustment(traceId: string): ProductSnapshot {
+  activateAdjustment(traceId: string): LocalProductSnapshot {
     this.#state.planVersion += 1;
     this.#state.audit.push({ action: "plan.adjusted", traceId });
     return this.snapshot();

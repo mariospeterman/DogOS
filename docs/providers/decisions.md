@@ -1,7 +1,7 @@
 # Provider Decisions and Research Register
 
 - Status: proposed
-- Research date: 2026-07-14
+- Research date: 2026-07-17
 
 This document records architecture decisions, current limitations, and official
 sources. Provider behavior and pricing are volatile; Phase 2 must re-check each
@@ -9,19 +9,19 @@ source before pinning SDK/API/model versions.
 
 ## 1. Decision summary
 
-| Capability            | Phase 2 choice                         | Alternative                 | Decision                                                                                                                                                 |
-| --------------------- | -------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| WhatsApp              | Meta Cloud API directly                | Twilio/WATI/ManyChat        | Meta remains the production candidate. A Twilio Sandbox adapter is available only for a restricted development pilot behind the same canonical contract. |
-| Database/Auth/Storage | Supabase managed EU project            | Separate Postgres/Auth/S3   | Faster coherent RLS/auth/storage foundation; use explicit schemas/grants and local CLI.                                                                  |
-| Background jobs       | Trigger.dev                            | Temporal Cloud, BullMQ      | Durable retries/queues/idempotency with low operating burden. Revisit Temporal only for workflow complexity Trigger cannot express safely.               |
-| Text models           | AI SDK Core plus DogOS contracts       | Direct SDKs only            | Normalize common text capabilities while keeping policy/routing and canonical outputs under DogOS control.                                               |
-| Initial text provider | Gemini stable fast model, configurable | OpenAI/Anthropic            | Product assumption; benchmark extraction, German quality, latency, cost, and privacy before production.                                                  |
-| Async video later     | Gemini stable video model              | OpenAI frame/event packages | Native video semantics, but 1 FPS processing means it cannot measure timing. Deferred.                                                                   |
-| Realtime later        | LiveKit + local CV                     | Daily/direct WebRTC         | Strong media/agent ecosystem and region controls; deferred due safety and current Gemini 3.1 compatibility limits.                                       |
-| Billing               | Stripe Billing                         | Paddle                      | Mature subscription/webhook lifecycle. Merchant/tax structure requires business/legal confirmation.                                                      |
-| Booking               | Cal.com API v2                         | Calendly/SavvyCal handoff   | API-first booking and webhooks; referral accounting remains in DogOS.                                                                                    |
-| Observability         | OpenTelemetry + Sentry                 | Datadog                     | Portable traces plus errors; scrub sensitive training and household data.                                                                                |
-| Analytics/flags       | PostHog EU                             | Plausible + Unleash         | One consent-gated product analytics/flags surface; no decision-bearing training events sent by default.                                                  |
+| Capability            | Phase 2 choice                 | Alternative                 | Decision                                                                                                                                                 |
+| --------------------- | ------------------------------ | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WhatsApp              | Meta Cloud API directly        | Twilio/WATI/ManyChat        | Meta remains the production candidate. A Twilio Sandbox adapter is available only for a restricted development pilot behind the same canonical contract. |
+| Database/Auth/Storage | Supabase managed EU project    | Separate Postgres/Auth/S3   | Faster coherent RLS/auth/storage foundation; use explicit schemas/grants and local CLI.                                                                  |
+| Background jobs       | Trigger.dev                    | Temporal Cloud, BullMQ      | Durable retries/queues/idempotency with low operating burden. Revisit Temporal only for workflow complexity Trigger cannot express safely.               |
+| Text models           | DogOS reply-generator port     | General agent framework     | The current task is one bounded rewrite, not an autonomous agent loop. DogOS owns routing, limits, context, fallback, and canonical outputs.             |
+| Initial text provider | OpenAI Responses, configurable | Gemini/DeepSeek/Kimi        | Freemium defaults to Luna and paid tiers to Terra as benchmark candidates. No production winner is selected before blind evaluation and DPA review.      |
+| Async video later     | Gemini stable video model      | OpenAI frame/event packages | Native video semantics, but 1 FPS processing means it cannot measure timing. Deferred.                                                                   |
+| Realtime later        | LiveKit + local CV             | Daily/direct WebRTC         | Strong media/agent ecosystem and region controls; deferred due safety and current Gemini 3.1 compatibility limits.                                       |
+| Billing               | Stripe Billing                 | Paddle                      | Mature subscription/webhook lifecycle. Merchant/tax structure requires business/legal confirmation.                                                      |
+| Booking               | Cal.com API v2                 | Calendly/SavvyCal handoff   | API-first booking and webhooks; referral accounting remains in DogOS.                                                                                    |
+| Observability         | OpenTelemetry + Sentry         | Datadog                     | Portable traces plus errors; scrub sensitive training and household data.                                                                                |
+| Analytics/flags       | PostHog EU                     | Plausible + Unleash         | One consent-gated product analytics/flags surface; no decision-bearing training events sent by default.                                                  |
 
 ## 2. Important verified limitations
 
@@ -53,6 +53,29 @@ not a committed first-release provider path.
 Current Cal.com v2 booking documentation requires a dated `cal-api-version`
 header. The adapter must pin it centrally and contract-test webhook/event mapping.
 Cal.com is a booking provider, not DogOS's referral ledger or commission authority.
+The current create-booking endpoint requires `cal-api-version: 2026-02-25`,
+while list endpoints may carry a newer dated version. A future adapter therefore
+pins versions per endpoint rather than using one assumed global version. DogOS
+owns trainer eligibility, ranking, referral consent, appointment state, and the
+commission ledger. Cal.com is optional for availability, create, reschedule,
+cancel, and conferencing. It must never be used for the training calendar.
+
+### OpenAI coaching boundary
+
+The official catalog describes GPT-5.6 Luna as a cost-sensitive, high-volume
+model roughly corresponding to an earlier nano tier. Terra balances intelligence
+and cost and roughly corresponds to an earlier mini tier. Luna is therefore not
+accepted as the best coaching model based on price or context size alone. DogOS
+routes the two as evaluation candidates and records model, latency, and token use.
+
+The Responses request uses `store: false`, a short timeout, a bounded output, and
+only the active structured context plus the deterministic draft. The model may
+rewrite presentation but cannot create a plan, alter safety or progression, call
+database tools, or grant entitlements. OpenAI states API data is not used for
+training by default unless the customer opts in; default abuse monitoring may
+retain content for up to 30 days. EU data residency additionally requires an
+approved project and data-retention controls, so setting the EU hostname alone is
+not a compliance claim.
 
 ### Supabase exposure defaults
 
@@ -111,10 +134,14 @@ All sources retrieved 2026-07-14.
 | Trigger.dev    | [Tasks](https://trigger.dev/docs/tasks/overview)                                                         | Retries and queues.                                          |
 | Trigger.dev    | [Idempotency](https://trigger.dev/docs/idempotency)                                                      | Scope behavior and deduplication.                            |
 | Stripe         | [Subscription webhooks](https://docs.stripe.com/billing/subscriptions/webhooks)                          | Async subscription/entitlement lifecycle.                    |
-| Cal.com        | [Bookings API](https://cal.com/docs/api-reference/v2/bookings/get-all-bookings)                          | API version header and canonical booking mapping.            |
+| Cal.com        | [Create booking](https://cal.com/docs/api-reference/v2/bookings/create-a-booking)                        | Endpoint-specific API version and booking contract.          |
 | Cal.com        | [Webhooks API](https://cal.com/docs/api-reference/v2/orgs-webhooks/get-a-webhook)                        | Secret and event configuration.                              |
 | AI SDK         | [Providers and models](https://ai-sdk.dev/docs/foundations/providers-and-models)                         | Multi-provider text abstraction.                             |
 | AI SDK         | [Structured output](https://ai-sdk.dev/docs/reference/ai-sdk-core/output)                                | Schema-validated text output.                                |
+| OpenAI         | [GPT-5.6 Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna)                               | Model tier, price, features, and rate limits.                |
+| OpenAI         | [GPT-5.6 Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra)                             | Model tier, price, modalities, and context.                  |
+| OpenAI         | [Data controls](https://platform.openai.com/docs/models/default-usage-policies-by-endpoint)              | Training, retention, ZDR, and regional requirements.         |
+| OpenAI         | [Prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching)                           | Exact-prefix threshold and cache economics.                  |
 | Gemini         | [Video understanding](https://ai.google.dev/gemini-api/docs/video-understanding)                         | FPS, token use, upload methods, limitations.                 |
 | Gemini         | [Model lifecycle](https://ai.google.dev/gemini-api/docs/models)                                          | Stable/preview/latest model policy.                          |
 | Gemini         | [Structured output](https://ai.google.dev/gemini-api/docs/structured-output)                             | JSON Schema subset and semantic validation warning.          |
