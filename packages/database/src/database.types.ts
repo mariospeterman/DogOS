@@ -2751,6 +2751,7 @@ export type Database = {
           country: string;
           created_at: string;
           currency: string;
+          display_name: string | null;
           fallback_locale: string;
           id: string;
           legal_jurisdiction: string;
@@ -2765,6 +2766,7 @@ export type Database = {
           country?: string;
           created_at?: string;
           currency?: string;
+          display_name?: string | null;
           fallback_locale?: string;
           id?: string;
           legal_jurisdiction?: string;
@@ -2779,6 +2781,7 @@ export type Database = {
           country?: string;
           created_at?: string;
           currency?: string;
+          display_name?: string | null;
           fallback_locale?: string;
           id?: string;
           legal_jurisdiction?: string;
