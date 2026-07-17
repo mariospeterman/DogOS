@@ -75,6 +75,14 @@ const options: Record<ConversationState, Record<"de-CH" | "en", string[]>> = {
 const offTopicPattern =
   /ignore (all|previous)|system prompt|developer message|jailbreak|write (code|an essay)|politics|investment|homework/i;
 const acutePattern = /schmerz|pain|lahm|limp|plötzlich|sudden|akut|acute/i;
+const meteredStates = new Set<ConversationState>([
+  "plan_ready",
+  "daily_session",
+  "checkin",
+  "progress_review",
+  "adjustment",
+  "professional_escalation",
+]);
 
 export interface ConversationLinks {
   plan: string;
@@ -104,7 +112,7 @@ export interface ConversationProductContext {
   goalText?: string;
   latestDecision: string;
   planId: string | null;
-  planStatus: "active" | "blocked";
+  planStatus: "active" | "blocked" | "setup_required";
   sessionCount: number;
   todaySessionId: string | null;
 }
@@ -175,26 +183,28 @@ export class WhatsAppConversationOrchestrator {
     const current = machine.view();
     const locale = current.locale;
     const localeChanged = locale !== beforeResolution.locale;
-    const capabilities =
-      await this.dependencies.capabilitiesForContact?.(contact);
-    const messageLimit = capabilities?.coachingMessagesPerDay ?? 12;
-    const allowed =
-      (await this.dependencies.consumeCoachingMessage?.(
-        contact,
-        messageLimit,
-      )) ??
-      (await this.dependencies.store.consumeDailyMessage(
-        contact.id,
-        messageLimit,
-      ));
-    if (!allowed) {
-      if (localeChanged) await this.persist(contact.id, current);
-      return this.dependencies.provider.sendText(
-        contact.externalId,
-        locale === "de-CH"
-          ? "Dein heutiges Nachrichtenkontingent ist aufgebraucht. Plan, Verlauf und heutige Einheit bleiben in DogOS verfügbar. Unter Konto kannst du einen Tarif mit mehr Coaching-Nachrichten wählen."
-          : "Today's message allowance is used. Your plan, history, and today's session remain available in DogOS. You can choose a tier with more coaching messages under Account.",
-      );
+    if (meteredStates.has(current.state)) {
+      const capabilities =
+        await this.dependencies.capabilitiesForContact?.(contact);
+      const messageLimit = capabilities?.coachingMessagesPerDay ?? 12;
+      const allowed =
+        (await this.dependencies.consumeCoachingMessage?.(
+          contact,
+          messageLimit,
+        )) ??
+        (await this.dependencies.store.consumeDailyMessage(
+          contact.id,
+          messageLimit,
+        ));
+      if (!allowed) {
+        if (localeChanged) await this.persist(contact.id, current);
+        return this.dependencies.provider.sendText(
+          contact.externalId,
+          locale === "de-CH"
+            ? "Dein heutiges Nachrichtenkontingent ist aufgebraucht. Plan, Verlauf und heutige Einheit bleiben in DogOS verfügbar. Unter Konto kannst du einen Tarif mit mehr Coaching-Nachrichten wählen."
+            : "Today's message allowance is used. Your plan, history, and today's session remain available in DogOS. You can choose a tier with more coaching messages under Account.",
+        );
+      }
     }
 
     if (resolution.source === "explicit_request") {
@@ -217,6 +227,21 @@ export class WhatsAppConversationOrchestrator {
     }
 
     if (current.state === "professional_escalation") {
+      const context = await this.dependencies.productContext?.(contact);
+      if (
+        context?.planStatus === "setup_required" &&
+        this.dependencies.projectOnboarding !== undefined
+      ) {
+        const repaired = await this.dependencies.projectOnboarding(
+          contact,
+          snapshotOf(current),
+        );
+        if (repaired.planStatus === "active") {
+          const recovered = machine.recoverPlanReady();
+          await this.persist(contact.id, recovered);
+          return this.presentPlan(contact, text, recovered.locale);
+        }
+      }
       return this.presentEscalation(contact, text, current.locale);
     }
 
@@ -265,6 +290,9 @@ export class WhatsAppConversationOrchestrator {
       if (context.planStatus === "blocked") {
         machine.escalate();
         next = machine.view();
+      } else if (context.planStatus === "setup_required") {
+        await this.persist(contact.id, next);
+        return this.presentSetupRequired(contact.externalId, next.locale);
       }
     }
     await this.persist(contact.id, next);
@@ -278,6 +306,9 @@ export class WhatsAppConversationOrchestrator {
   ): Promise<OutboundMessage> {
     const links = await this.dependencies.links(contact);
     const context = await this.dependencies.productContext?.(contact);
+    if (context?.planStatus === "setup_required") {
+      return this.presentSetupRequired(contact.externalId, locale);
+    }
     const normalized = text.trim().toLowerCase();
     if (["choice.2", "plan"].includes(normalized)) {
       return this.dependencies.provider.sendText(
@@ -367,6 +398,18 @@ export class WhatsAppConversationOrchestrator {
       locale === "de-CH"
         ? "Beschreibe kurz nur die neue Beobachtung. DogOS speichert sie als Bericht; eine Diagnose oder Freigabe erfolgt daraus nicht automatisch."
         : "Briefly describe only the new observation. DogOS records it as a report; it does not automatically create a diagnosis or clearance.",
+    );
+  }
+
+  private presentSetupRequired(
+    contactId: string,
+    locale: "de-CH" | "en",
+  ): Promise<OutboundMessage> {
+    return this.dependencies.provider.sendText(
+      contactId,
+      locale === "de-CH"
+        ? "Dein Fall ist gespeichert. Fuer den gewaehlten Trainingsschritt fehlt noch die bestaetigte Ausruestung. Das ist kein Sicherheitsstopp und keine Empfehlung fuer eine Fachperson."
+        : "Your case is saved. The selected training step still needs confirmed equipment. This is not a safety stop or a professional-referral recommendation.",
     );
   }
 

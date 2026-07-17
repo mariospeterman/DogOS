@@ -15,6 +15,57 @@ const progressPattern =
   /\b(fortschritt|entwicklung|progress|better|verbess)\w*/i;
 const planPattern = /\b(plan|woche|schedule|kalender|calendar)\b/i;
 
+function trainingCopy(context: CoachTrainingContext, de: boolean) {
+  switch (context.currentStep?.stepCode) {
+    case "step.recall_short_distance":
+      return de
+        ? {
+            plan: "baut den Rückruf zuerst auf kurzer Distanz und bei niedriger Ablenkung auf",
+            today:
+              "Sichere die Schleppleine am Geschirr, gib das Rückrufsignal einmal und bestätige die unmittelbare Wendung zu dir. Löse nach sechs sauberen Wiederholungen auf.",
+          }
+        : {
+            plan: "builds recall first at short distance and under low distraction",
+            today:
+              "Attach the long line to the harness, give the recall cue once, and mark the immediate turn toward you. Finish after six clean repetitions.",
+          };
+    case "step.loose_leash_low_distraction":
+      return de
+        ? {
+            plan: "baut lockere Leinenführung zuerst auf einem übersichtlichen Abschnitt auf",
+            today:
+              "Beginne auf einem übersichtlichen Abschnitt, gehe bei lockerer Leine weiter und bestätige freiwillige Orientierung.",
+          }
+        : {
+            plan: "builds loose-leash handling first on a clear stretch",
+            today:
+              "Start on a clear stretch, continue while the leash stays loose, and mark voluntary check-ins.",
+          };
+    case "step.calm_engagement_low_distraction":
+      return de
+        ? {
+            plan: "baut ruhige Orientierung zuerst unter niedriger Ablenkung auf",
+            today:
+              "Wähle genügend Abstand, warte auf freiwillige Orientierung und bestätige ruhiges, ansprechbares Verhalten.",
+          }
+        : {
+            plan: "builds calm engagement first under low distraction",
+            today:
+              "Choose enough distance, wait for voluntary orientation, and mark calm, responsive behaviour.",
+          };
+    default:
+      return de
+        ? {
+            plan: `arbeitet zuerst an ${context.stage}`,
+            today: `Trainiere den aktuellen Schritt ${context.currentStep?.repetitions ?? "in wenigen"} Mal unter niedriger Ablenkung und bestätige jede saubere Ausführung.`,
+          }
+        : {
+            plan: `starts with ${context.stage}`,
+            today: `Train the current step for ${context.currentStep?.repetitions ?? "a few"} repetitions under low distraction and mark each clean response.`,
+          };
+  }
+}
+
 export function inferCoachLocale(
   text: string,
   current: "de-CH" | "en",
@@ -34,6 +85,7 @@ export function composeCoachReply(input: {
 }): CoachReply {
   const locale = inferCoachLocale(input.message, input.currentLocale);
   const de = locale === "de-CH";
+  const training = trainingCopy(input.context, de);
   const actions = [];
   let text: string;
 
@@ -69,8 +121,8 @@ export function composeCoachReply(input: {
     });
   } else if (planPattern.test(input.message) || input.contextKind === "plan") {
     text = de
-      ? `Der Plan für ${input.context.dogName} baut Orientierung zuerst unter niedriger Ablenkung auf. Die Einheiten bleiben mit ${input.context.durationMinutes} Minuten kurz, damit Ausführung und Messung sauber bleiben. Danach entscheidet die dokumentierte Leistung über den nächsten Schritt.`
-      : `${input.context.dogName}'s plan builds orientation under low distraction first. Sessions stay short at ${input.context.durationMinutes} minutes so execution and measurement remain clean. Documented performance then determines the next step.`;
+      ? `Der Plan für ${input.context.dogName} ${training.plan}. Die Einheiten bleiben mit ${input.context.durationMinutes} Minuten kurz, damit Ausführung und Messung sauber bleiben. Danach entscheidet die dokumentierte Leistung über den nächsten Schritt.`
+      : `${input.context.dogName}'s plan ${training.plan}. Sessions stay short at ${input.context.durationMinutes} minutes so execution and measurement remain clean. Documented performance then determines the next step.`;
     actions.push({
       href: input.links.plan,
       label: de ? "Plan öffnen" : "Open plan",
@@ -78,8 +130,8 @@ export function composeCoachReply(input: {
     });
   } else {
     text = de
-      ? `Heute: ${input.context.durationMinutes} Minuten ruhige Orientierung mit ${input.context.dogName}. Beginne auf einem übersichtlichen Abschnitt, gehe bei lockerer Leine weiter und bestätige freiwillige Orientierung. Schreib mir danach kurz, was leicht oder schwer war.`
-      : `Today: ${input.context.durationMinutes} minutes of calm orientation with ${input.context.dogName}. Start on a clear stretch, continue with a loose leash, and mark voluntary check-ins. Then tell me briefly what felt easy or difficult.`;
+      ? `Heute: ${input.context.durationMinutes} Minuten mit ${input.context.dogName}. ${training.today} Schreib mir danach kurz, was leicht oder schwer war.`
+      : `Today: ${input.context.durationMinutes} minutes with ${input.context.dogName}. ${training.today} Then tell me briefly what felt easy or difficult.`;
     actions.push({
       href: input.links.today,
       label: de ? "Heutigen Block öffnen" : "Open today's block",

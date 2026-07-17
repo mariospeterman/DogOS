@@ -176,4 +176,134 @@ describe("durable WhatsApp onboarding", () => {
       sessions: 1,
     });
   }, 15_000);
+
+  it("uses the selected protocol equipment for a completed recall setup", async () => {
+    const recallContactId = randomUUID();
+    await sql`
+      insert into private.whatsapp_provider_contacts
+        (id, provider, external_contact_id, external_contact_hash, status,
+         user_id, household_id, locale, allowlisted, linked_at)
+      values (${recallContactId}, 'meta_cloud', ${`integration:${recallContactId}`},
+        ${`hash:${recallContactId}`}, 'linked',
+        '10000000-0000-0000-0000-000000000001',
+        '20000000-0000-0000-0000-000000000001', 'en', true, now())
+    `;
+    const contact = {
+      externalId: `integration:${recallContactId}`,
+      householdId: "20000000-0000-0000-0000-000000000001",
+      id: recallContactId,
+      linked: true,
+      locale: "en" as const,
+      userId: "10000000-0000-0000-0000-000000000001",
+    };
+    const result = await service.project(contact, {
+      answers: {
+        baseline_collection: "baseline_collection.choice.2",
+        behavior_concern: "behavior_concern.choice.2",
+        dog_history: "dog_history.choice.2",
+        dog_identity: "dog_identity.text:Echo",
+        goal_selection: "goal_selection.choice.2",
+        health_screen: "health_screen.choice.1",
+        household_context: "household_context.choice.1",
+        safety_screen: "safety_screen.choice.1",
+        training_setup: "training_setup.choice.1",
+      },
+      audit: [],
+      country: "CH",
+      currency: "CHF",
+      locale: "en",
+      state: "plan_ready",
+      timezone: "Europe/Zurich",
+    });
+
+    expect(result).toMatchObject({
+      dogName: "Echo",
+      goal: "goal.recall",
+      planStatus: "active",
+      riskDisposition: "continue_low_risk_training",
+    });
+    const [answer] = await sql`
+      select aa.answer_value
+      from private.onboarding_projections op
+      join api.anamnesis_answers aa on aa.anamnesis_id = op.anamnesis_id
+      join api.question_definitions qd on qd.id = aa.question_definition_id
+      where op.contact_id = ${recallContactId}
+        and qd.question_code = 'question.training_setup'
+    `;
+    expect(answer?.answer_value).toEqual([
+      "equipment.long_line",
+      "equipment.harness",
+      "equipment.food_reward",
+    ]);
+  });
+
+  it("reconciles a low-risk projection after setup becomes complete", async () => {
+    const repairContactId = randomUUID();
+    await sql`
+      insert into private.whatsapp_provider_contacts
+        (id, provider, external_contact_id, external_contact_hash, status,
+         user_id, household_id, locale, allowlisted, linked_at)
+      values (${repairContactId}, 'meta_cloud', ${`integration:${repairContactId}`},
+        ${`hash:${repairContactId}`}, 'linked',
+        '10000000-0000-0000-0000-000000000001',
+        '20000000-0000-0000-0000-000000000001', 'en', true, now())
+    `;
+    const contact = {
+      externalId: `integration:${repairContactId}`,
+      householdId: "20000000-0000-0000-0000-000000000001",
+      id: repairContactId,
+      linked: true,
+      locale: "en" as const,
+      userId: "10000000-0000-0000-0000-000000000001",
+    };
+    const snapshot = {
+      answers: {
+        baseline_collection: "baseline_collection.choice.2",
+        behavior_concern: "behavior_concern.choice.2",
+        dog_history: "dog_history.choice.2",
+        dog_identity: "dog_identity.text:Echo",
+        goal_selection: "goal_selection.choice.2",
+        health_screen: "health_screen.choice.1",
+        household_context: "household_context.choice.1",
+        safety_screen: "safety_screen.choice.1",
+        training_setup: "training_setup.choice.2",
+      },
+      audit: [],
+      country: "CH" as const,
+      currency: "CHF" as const,
+      locale: "en" as const,
+      state: "plan_ready" as const,
+      timezone: "Europe/Zurich" as const,
+    };
+    const pending = await service.project(contact, snapshot);
+    const repaired = await service.project(contact, {
+      ...snapshot,
+      answers: {
+        ...snapshot.answers,
+        training_setup: "training_setup.choice.1",
+      },
+    });
+
+    expect(pending).toMatchObject({
+      dogName: "Echo",
+      planId: null,
+      planStatus: "setup_required",
+    });
+    expect(repaired).toMatchObject({
+      dogId: pending.dogId,
+      planId: expect.any(String),
+      planStatus: "active",
+    });
+    const [counts] = await sql`
+      select
+        (select count(*)::integer from api.plans p
+          join private.onboarding_projections op on op.plan_id = p.id
+          where op.contact_id = ${repairContactId}) as plans,
+        (select count(*)::integer from private.audit_events a
+          join private.onboarding_projections op on op.dog_id = a.target_id
+          where op.contact_id = ${repairContactId}
+            and a.action = 'onboarding.plan_reconciled') as audits
+    `;
+    expect(counts).toMatchObject({ audits: 1, plans: 1 });
+  });
 });

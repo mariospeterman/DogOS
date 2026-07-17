@@ -89,7 +89,9 @@ function canonicalFacts(snapshot: ConversationSnapshot): OnboardingFacts {
     dogName: textAnswer(answers.dog_identity, "dog_identity"),
     equipmentCodes:
       answers.training_setup === "training_setup.choice.1"
-        ? ["equipment.leash", "equipment.harness", "equipment.food_reward"]
+        ? (developmentProtocols.find(
+            (protocol) => protocol.goalFamily === goalCode,
+          )?.requiredEquipmentCodes ?? [])
         : [],
     goalCode,
     goalText: goalLabels[goalCode]?.[snapshot.locale] ?? goalCode,
@@ -140,7 +142,9 @@ export class OnboardingService {
       throw new Error("LINKED_CONTACT_REQUIRED");
     }
     const existing = await this.repository.findByContact(contact.id);
-    if (existing !== null) return existing;
+    if (existing !== null && existing.planStatus !== "setup_required") {
+      return existing;
+    }
     const facts = canonicalFacts(snapshot);
     const entityIds = ids();
     const safetyEvent: SafetyEvent | null =

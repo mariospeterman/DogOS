@@ -4,12 +4,12 @@
   "generatedAt": "2026-07-17T14:22:00.000Z",
   "suites": {
     "unit": {
-      "tests": 178,
-      "passed": 178
+      "tests": 181,
+      "passed": 181
     },
     "integration": {
-      "tests": 5,
-      "passed": 5
+      "tests": 7,
+      "passed": 7
     },
     "e2e": {
       "tests": 32,

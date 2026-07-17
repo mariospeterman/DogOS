@@ -43,6 +43,27 @@ describe("omnichannel Coach conversation", () => {
     expect(reply.actions).toHaveLength(1);
   });
 
+  it("renders recall instructions from the canonical plan step", () => {
+    const reply = composeCoachReply({
+      context: {
+        ...context,
+        currentStep: {
+          difficulty: 1,
+          durationSeconds: 240,
+          repetitions: 6,
+          stepCode: "step.recall_short_distance",
+        },
+        goal: "Zuverlässiger Rückruf bei wenig Ablenkung",
+      },
+      currentLocale: "de-CH",
+      links,
+      message: "Was jetzt?",
+    });
+    expect(reply.text).toMatch(/Rückrufsignal/);
+    expect(reply.text).toMatch(/Schleppleine/);
+    expect(reply.text).not.toMatch(/lockerer Leine/);
+  });
+
   it("records web and WhatsApp in one ordered timeline", async () => {
     const service = new CoachConversationService(
       new InMemoryCoachConversationStore(),

@@ -47,7 +47,7 @@ export interface DogProductContext {
   goal: string;
   latestDecision: string;
   planId: string | null;
-  planStatus: "active" | "blocked";
+  planStatus: "active" | "blocked" | "setup_required";
   riskDisposition: RiskAssessment["disposition"];
   sessionCount: number;
   todaySessionId: string | null;
@@ -80,6 +80,55 @@ interface TransactionQuery {
     ...parameters: unknown[]
   ): Promise<Array<Record<string, unknown>>>;
   json(value: unknown): unknown;
+}
+
+async function persistPlan(
+  tx: TransactionQuery,
+  plan: Plan,
+  planId: string,
+  dogId: string,
+  goalVersionId: string,
+): Promise<void> {
+  const version = plan.activeVersion;
+  await tx`
+    insert into api.plans (id, dog_id, goal_version_id, status)
+    values (${planId}, ${dogId}, ${goalVersionId}, 'draft')
+  `;
+  const [planVersion] = await tx`
+    insert into api.plan_versions
+      (plan_id, version, protocol_version_id, rule_set_id,
+       generation_reason_codes, generation_mode, status)
+    values (${planId}, ${version.version}, ${version.protocolVersionId},
+      ${version.ruleSetId}, ${version.generationReasonCodes},
+      ${version.generationMode}, 'prepared')
+    returning id
+  `;
+  const planVersionId = String(planVersion!.id);
+  const stepIds = new Map<string, string>();
+  for (const step of version.steps) {
+    const [storedStep] = await tx`
+      insert into api.plan_steps
+        (plan_version_id, protocol_step_code, sequence_number,
+         difficulty_parameters, repetitions, duration_seconds,
+         stop_condition_codes)
+      values (${planVersionId}, ${step.stepCode}, ${step.sequence},
+        ${tx.json({ level: step.difficulty })}, ${step.repetitions},
+        ${step.durationSeconds}, ${step.stopConditionCodes})
+      returning id
+    `;
+    stepIds.set(step.stepCode, String(storedStep!.id));
+  }
+  for (const session of version.scheduledSessions) {
+    await tx`
+      insert into api.scheduled_sessions
+        (plan_step_id, planned_start, duration_seconds, purpose_code,
+         is_recovery, is_review, status)
+      values (${stepIds.get(session.stepCode)!}, ${session.plannedStart},
+        ${session.durationSeconds}, ${session.purposeCode},
+        ${session.recoveryDay}, ${session.observationOnly}, 'planned')
+    `;
+  }
+  await tx`select private.activate_plan_version(${planId}, ${planVersionId}, null)`;
 }
 
 const questionCodes = [
@@ -260,7 +309,12 @@ export class OnboardingRepository {
       goal: String(row.goal),
       latestDecision: "repeat_step",
       planId: row.plan_id === null ? null : String(row.plan_id),
-      planStatus: row.plan_id === null ? "blocked" : "active",
+      planStatus:
+        row.plan_id !== null
+          ? "active"
+          : disposition === "continue_low_risk_training"
+            ? "setup_required"
+            : "blocked",
       riskDisposition: disposition,
       sessionCount: Number(row.session_count),
       todaySessionId:
@@ -269,16 +323,60 @@ export class OnboardingRepository {
   }
 
   async persist(input: PersistOnboardingInput): Promise<DogProductContext> {
+    let projectedDogId = input.ids.dogId;
     await this.#sql.begin(
       "isolation level serializable",
       async (transaction) => {
         const tx = transaction as unknown as TransactionQuery;
         const existing = await tx`
-        select dog_id from private.onboarding_projections
+        select dog_id, anamnesis_id, goal_id, plan_id
+        from private.onboarding_projections
         where contact_id = ${input.contactId}::uuid
         for update
       `;
-        if (existing.length > 0) return;
+        const projection = existing[0];
+        if (projection !== undefined) {
+          projectedDogId = String(projection.dog_id);
+          if (projection.plan_id !== null || input.plan === null) return;
+          const [goalVersion] = await tx`
+            select id::text
+            from api.goal_versions
+            where goal_id = ${projection.goal_id}::uuid and version = 1
+          `;
+          if (goalVersion === undefined) {
+            throw new Error("ONBOARDING_GOAL_VERSION_MISSING");
+          }
+          await persistPlan(
+            tx,
+            input.plan,
+            input.ids.planId,
+            projectedDogId,
+            String(goalVersion.id),
+          );
+          await tx`
+            update api.anamnesis_answers aa
+            set answer_value = ${tx.json(input.facts.equipmentCodes)}
+            from api.question_definitions qd
+            where aa.question_definition_id = qd.id
+              and aa.anamnesis_id = ${projection.anamnesis_id}::uuid
+              and qd.question_code = 'question.training_setup'
+          `;
+          await tx`
+            update private.onboarding_projections
+            set plan_id = ${input.ids.planId}, snapshot_hash = ${input.snapshotHash},
+                updated_at = now()
+            where contact_id = ${input.contactId}::uuid
+          `;
+          await tx`
+            insert into private.audit_events
+              (actor_user_id, actor_type, action, target_type, target_id,
+               trace_id, metadata)
+            values (${input.actorUserId}, 'user', 'onboarding.plan_reconciled',
+              'dog', ${projectedDogId}, ${input.snapshotHash},
+              ${tx.json({ channel: "whatsapp", reason: "setup_reconciled" })})
+          `;
+          return;
+        }
         const questions = await tx`
         select id::text, question_code::text
         from api.question_definitions
@@ -406,46 +504,13 @@ export class OnboardingRepository {
       `;
 
         if (input.plan !== null) {
-          const version = input.plan.activeVersion;
-          await tx`
-          insert into api.plans (id, dog_id, goal_version_id, status)
-          values (${input.ids.planId}, ${input.ids.dogId}, ${input.ids.goalVersionId}, 'draft')
-        `;
-          const [planVersion] = await tx`
-          insert into api.plan_versions
-            (plan_id, version, protocol_version_id, rule_set_id,
-             generation_reason_codes, generation_mode, status)
-          values (${input.ids.planId}, ${version.version}, ${version.protocolVersionId},
-            ${version.ruleSetId}, ${version.generationReasonCodes},
-            ${version.generationMode}, 'prepared')
-          returning id
-        `;
-          const planVersionId = String(planVersion!.id);
-          const stepIds = new Map<string, string>();
-          for (const step of version.steps) {
-            const [storedStep] = await tx`
-            insert into api.plan_steps
-              (plan_version_id, protocol_step_code, sequence_number,
-               difficulty_parameters, repetitions, duration_seconds,
-               stop_condition_codes)
-            values (${planVersionId}, ${step.stepCode}, ${step.sequence},
-              ${tx.json({ level: step.difficulty })}, ${step.repetitions},
-              ${step.durationSeconds}, ${step.stopConditionCodes})
-            returning id
-          `;
-            stepIds.set(step.stepCode, String(storedStep!.id));
-          }
-          for (const session of version.scheduledSessions) {
-            await tx`
-            insert into api.scheduled_sessions
-              (plan_step_id, planned_start, duration_seconds, purpose_code,
-               is_recovery, is_review, status)
-            values (${stepIds.get(session.stepCode)!}, ${session.plannedStart},
-              ${session.durationSeconds}, ${session.purposeCode},
-              ${session.recoveryDay}, ${session.observationOnly}, 'planned')
-          `;
-          }
-          await tx`select private.activate_plan_version(${input.ids.planId}, ${planVersionId}, null)`;
+          await persistPlan(
+            tx,
+            input.plan,
+            input.ids.planId,
+            input.ids.dogId,
+            input.ids.goalVersionId,
+          );
         }
 
         await tx`
@@ -465,7 +530,7 @@ export class OnboardingRepository {
       `;
       },
     );
-    const context = await this.findByDog(input.ids.dogId);
+    const context = await this.findByDog(projectedDogId);
     if (context === null) throw new Error("ONBOARDING_PROJECTION_FAILED");
     return context;
   }

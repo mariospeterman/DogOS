@@ -84,6 +84,10 @@ describe("conversation machine", () => {
 
     expect(resumed.view().answers).toEqual(saved.answers);
     expect(resumed.escalate().state).toBe("professional_escalation");
+    expect(resumed.recoverPlanReady()).toMatchObject({
+      answers: saved.answers,
+      state: "plan_ready",
+    });
   });
 });
 
@@ -147,6 +151,39 @@ describe("WhatsApp conversation orchestration", () => {
     );
   });
 
+  it("does not charge required onboarding against the coaching quota", async () => {
+    const { contact, store } = await setup();
+    const provider = new LocalWhatsAppSimulator("test-secret");
+    let consumed = 0;
+    const orchestrator = new WhatsAppConversationOrchestrator({
+      capabilitiesForContact: async () => ({ coachingMessagesPerDay: 12 }),
+      consumeCoachingMessage: async () => {
+        consumed += 1;
+        return true;
+      },
+      links: async () => ({
+        plan: "https://dogos.test/plan",
+        progress: "https://dogos.test/progress",
+        referral: "https://dogos.test/trainers",
+        today: "https://dogos.test/today",
+      }),
+      provider,
+      store,
+    });
+
+    await orchestrator.handle(contact, "Proceed");
+    expect(consumed).toBe(0);
+
+    const machine = new ConversationMachine("en");
+    for (let index = 0; index < 11; index += 1) {
+      machine.answer(`answer.${index}`);
+    }
+    expect(machine.view().state).toBe("plan_ready");
+    await store.saveConversation(contact.id, machine.view());
+    await orchestrator.handle(contact, "What now?");
+    expect(consumed).toBe(1);
+  });
+
   it("switches naturally without consuming an answer", async () => {
     const { contact, orchestrator, store } = await setup();
     await orchestrator.handle(contact, "Proceed");
@@ -202,6 +239,43 @@ describe("WhatsApp conversation orchestration", () => {
     expect(response.options).toEqual(["Nein", "Schnappen", "Biss / Kind"]);
     expect((await store.loadConversation(contact.id))?.state).toBe(
       "safety_screen",
+    );
+  });
+
+  it("does not turn an incomplete setup into professional escalation", async () => {
+    const { contact, store } = await setup();
+    const provider = new LocalWhatsAppSimulator("test-secret");
+    const machine = new ConversationMachine("en");
+    for (let index = 0; index < 10; index += 1) {
+      machine.answer(`answer.${index}`);
+    }
+    expect(machine.view().state).toBe("baseline_collection");
+    await store.saveConversation(contact.id, machine.view());
+    const orchestrator = new WhatsAppConversationOrchestrator({
+      links: async () => ({
+        plan: "https://dogos.test/plan",
+        progress: "https://dogos.test/progress",
+        referral: "https://dogos.test/trainers",
+        today: "https://dogos.test/today",
+      }),
+      projectOnboarding: async () => ({
+        dogId: "dog-1",
+        dogName: "Echo",
+        goal: "goal.recall",
+        latestDecision: "repeat_step",
+        planId: null,
+        planStatus: "setup_required",
+        sessionCount: 0,
+        todaySessionId: null,
+      }),
+      provider,
+      store,
+    });
+
+    const response = await orchestrator.handle(contact, "choice.2");
+    expect(response.text).toMatch(/not a safety stop/);
+    expect((await store.loadConversation(contact.id))?.state).toBe(
+      "plan_ready",
     );
   });
 });

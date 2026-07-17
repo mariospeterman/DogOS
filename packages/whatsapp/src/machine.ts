@@ -156,6 +156,17 @@ export class ConversationMachine {
     return this.view();
   }
 
+  recoverPlanReady(): ReturnType<ConversationMachine["view"]> {
+    if (this.#snapshot.state === "professional_escalation") {
+      this.#snapshot.state = "plan_ready";
+      this.#snapshot.audit.push({
+        event: "plan.reconciled",
+        state: this.#snapshot.state,
+      });
+    }
+    return this.view();
+  }
+
   resume(snapshot: ConversationSnapshot): void {
     this.#snapshot = structuredClone(snapshot);
   }
