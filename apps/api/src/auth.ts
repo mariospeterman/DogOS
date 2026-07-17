@@ -3,7 +3,7 @@ import postgres, { type Sql } from "postgres";
 
 import type { AgentActorContext, LocalAgentIdentity } from "@dogos/agent-auth";
 
-import { localIdentities } from "./product-service.js";
+import { localIdentities } from "./local-identities.js";
 
 export interface RequestAuthenticator {
   authenticate(

@@ -12,7 +12,8 @@ import {
   InMemoryCoachConversationStore,
 } from "@dogos/conversation";
 import type { WhatsAppWebhookService } from "@dogos/whatsapp";
-import { ProductService, localIdentities } from "./product-service.js";
+import { localIdentities } from "./local-identities.js";
+import { ProductService } from "./product-service.js";
 import {
   SignedActionError,
   SignedActionService,

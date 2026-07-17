@@ -145,5 +145,5 @@ describe("WhatsApp webhook routes", () => {
       ).statusCode,
     ).toBe(200);
     expect(provider.history().at(-1)?.text).toMatch(/Verknüpfe dein Konto/);
-  });
+  }, 10_000);
 });

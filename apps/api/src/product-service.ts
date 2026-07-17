@@ -6,39 +6,6 @@ import {
   runCanonicalCase,
 } from "@dogos/testing";
 
-export type LocalIdentity =
-  "owner" | "caregiver" | "viewer" | "trainer" | "unrelated";
-export const localIdentities: Record<
-  LocalIdentity,
-  { id: string; role: string; householdId: string | null }
-> = {
-  owner: {
-    id: "10000000-0000-0000-0000-000000000001",
-    role: "owner",
-    householdId: "20000000-0000-0000-0000-000000000001",
-  },
-  caregiver: {
-    id: "10000000-0000-0000-0000-000000000002",
-    role: "caregiver",
-    householdId: "20000000-0000-0000-0000-000000000001",
-  },
-  viewer: {
-    id: "10000000-0000-0000-0000-000000000003",
-    role: "viewer",
-    householdId: "20000000-0000-0000-0000-000000000001",
-  },
-  trainer: {
-    id: "10000000-0000-0000-0000-000000000006",
-    role: "trainer",
-    householdId: "20000000-0000-0000-0000-000000000001",
-  },
-  unrelated: {
-    id: "10000000-0000-0000-0000-000000000005",
-    role: "owner",
-    householdId: "20000000-0000-0000-0000-000000000002",
-  },
-};
-
 export interface ProductSnapshot {
   locale: "de-CH" | "en";
   country: "CH";
