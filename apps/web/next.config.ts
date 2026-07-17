@@ -25,6 +25,19 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   poweredByHeader: false,
   reactStrictMode: true,
+  async rewrites() {
+    const apiOrigin =
+      process.env.DOGOS_INTERNAL_API_URL ?? "http://127.0.0.1:4000";
+    return [
+      { source: "/v1/:path*", destination: `${apiOrigin}/v1/:path*` },
+      {
+        source: "/webhooks/:path*",
+        destination: `${apiOrigin}/webhooks/:path*`,
+      },
+      { source: "/health/:path*", destination: `${apiOrigin}/health/:path*` },
+      { source: "/openapi.json", destination: `${apiOrigin}/openapi.json` },
+    ];
+  },
   turbopack: {
     root: repositoryRoot,
   },

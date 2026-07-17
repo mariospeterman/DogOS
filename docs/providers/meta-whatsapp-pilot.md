@@ -16,9 +16,12 @@ The adapter verifies `X-Hub-Signature-256` against the exact raw body using the 
 4. Generate a development/system-user token with only the WhatsApp permissions shown by the Meta setup screen. Store it as `WHATSAPP_ACCESS_TOKEN` in an uncommitted secret environment.
 5. Record the Phone Number ID, App Secret, and currently supported Graph API version from the app dashboard.
 6. Generate a separate random webhook verify token. Do not reuse the app secret or access token.
-7. Expose `https://<pilot-host>/webhooks/whatsapp` through an owner-controlled HTTPS host. Configure that callback and verify token, then subscribe the WhatsApp Business Account `messages` field.
-8. Set `WHATSAPP_MODE=meta_test`, the five credential variables, `WHATSAPP_PUBLIC_WEBHOOK_URL`, `WHATSAPP_ACCOUNT_LINK_URL`, and `DATABASE_URL`.
-9. Run `pnpm whatsapp:verify-config`, then `pnpm whatsapp:run-pilot`.
+7. Expose the web app through one HTTPS origin. Next.js forwards `/webhooks/*`, `/v1/*`, `/health/*`, and `/openapi.json` to the internal API configured by `DOGOS_INTERNAL_API_URL`. This keeps phone links, browser API calls, and the Meta callback on one hostname.
+8. Configure `https://<pilot-host>/webhooks/whatsapp` as the Meta callback, enter the existing `WHATSAPP_VERIFY_TOKEN`, verify it, and subscribe the WhatsApp Business Account `messages` field.
+9. Set `WEB_ORIGIN`, `NEXT_PUBLIC_API_URL`, `WHATSAPP_PUBLIC_WEBHOOK_URL`, and `WHATSAPP_ACCOUNT_LINK_URL` to that same HTTPS origin. Set `WHATSAPP_MODE=meta_test`, the five credential variables, and `DATABASE_URL`.
+10. Run `pnpm whatsapp:verify-config`, then `pnpm whatsapp:run-pilot`.
+
+For a temporary ngrok pilot, run `ngrok http 3000`, not port 4000. A new free ngrok domain requires updating all four public-origin variables and the Meta callback before restarting DogOS. A reserved domain avoids that repeated configuration.
 
 Meta's developer documentation currently requires login in some regions. Payloads and direct-send contracts were cross-checked against Meta's official [WhatsApp Cloud API Postman collection](https://www.postman.com/meta/whatsapp-business-platform/overview) and [Meta-hosted interactive-message SDK reference](https://whatsapp.github.io/WhatsApp-Nodejs-SDK/api-reference/messages/interactive/).
 
