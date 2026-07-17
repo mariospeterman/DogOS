@@ -29,7 +29,7 @@ export default defineConfig({
     },
     {
       command:
-        "API_PORT=4200 DOGOS_AUTH_MODE=local DOGOS_ENV=test USE_MOCK_PROVIDERS=true WEB_ORIGIN=http://127.0.0.1:3200 WHATSAPP_MODE=simulator pnpm --filter @dogos/api exec tsx src/server.ts",
+        "NODE_OPTIONS=--conditions=development API_PORT=4200 DOGOS_AUTH_MODE=local DOGOS_ENV=test USE_MOCK_PROVIDERS=true WEB_ORIGIN=http://127.0.0.1:3200 WHATSAPP_MODE=simulator pnpm --filter @dogos/api exec tsx src/server.ts",
       url: "http://127.0.0.1:4200/health/ready",
       reuseExistingServer: false,
       timeout: 120_000,

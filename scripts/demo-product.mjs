@@ -80,6 +80,7 @@ start(["--filter", "@dogos/api", "exec", "tsx", "src/server.ts"], {
   DOGOS_AUTH_MODE: "local",
   DOGOS_ENV: "local",
   DOGOS_LLM_MODE: "deterministic",
+  NODE_OPTIONS: "--conditions=development",
   USE_MOCK_PROVIDERS: "true",
   WEB_ORIGIN: webOrigin,
   WHATSAPP_MODE: "simulator",
