@@ -9,6 +9,9 @@ describe("training presentation", () => {
     expect(presentStage("step.low_distraction_baseline", "en")).toBe(
       "orientation under low distraction",
     );
+    expect(presentStage("step.recall_short_distance", "de-CH")).toBe(
+      "Rückruf auf kurzer Distanz bei niedriger Ablenkung",
+    );
   });
 
   it("uses safe owner-facing fallbacks for unknown codes", () => {

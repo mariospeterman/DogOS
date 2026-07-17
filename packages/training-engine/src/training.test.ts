@@ -7,7 +7,7 @@ import { developmentSafetyRuleSet } from "@dogos/safety-engine";
 import type { EligibilityContext } from "./eligibility.js";
 import { evaluateProtocolEligibility } from "./eligibility.js";
 import type { PlanGenerationInput } from "./plan.js";
-import { generatePlan } from "./plan.js";
+import { compareSemanticVersions, generatePlan } from "./plan.js";
 
 const dogId = "10000000-0000-4000-8000-000000000001";
 const baselineEvidenceId = "90000000-0000-4000-8000-000000000010";
@@ -210,6 +210,46 @@ describe("protocol eligibility", () => {
 });
 
 describe("plan generation", () => {
+  it("orders protocol versions by SemVer precedence", () => {
+    expect(compareSemanticVersions("1.10.0", "1.9.0")).toBeGreaterThan(0);
+    expect(compareSemanticVersions("1.10.0", "1.10.0-beta.2")).toBeGreaterThan(
+      0,
+    );
+    expect(
+      compareSemanticVersions("1.10.0-beta.11", "1.10.0-beta.2"),
+    ).toBeGreaterThan(0);
+
+    const input = planInput();
+    const current = input.protocols.find(
+      (protocol) =>
+        protocol.goalFamily ===
+        input.prioritisedGoals[0]!.goal.canonicalGoalType,
+    )!;
+    input.protocols = [
+      {
+        ...current,
+        id: "71000000-0000-4000-8000-000000000009",
+        semanticVersion: "1.9.0",
+      },
+      {
+        ...current,
+        id: "71000000-0000-4000-8000-000000000010",
+        semanticVersion: "1.10.0-beta.2",
+      },
+      {
+        ...current,
+        id: "71000000-0000-4000-8000-000000000011",
+        semanticVersion: "1.10.0",
+      },
+    ];
+
+    const result = generatePlan(input);
+    expect(result.status).toBe("generated");
+    if (result.status === "generated") {
+      expect(result.plan.activeVersion.protocolSemanticVersion).toBe("1.10.0");
+    }
+  });
+
   it("generates the same capped, version-pinned schedule for the same input", () => {
     const input = planInput();
 

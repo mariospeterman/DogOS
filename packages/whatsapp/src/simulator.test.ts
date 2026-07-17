@@ -352,7 +352,7 @@ describe("WhatsApp conversation orchestration", () => {
       behaviorConcernDescription: "Recall drops around wildlife.",
       currentStep: {
         difficulty: 1,
-        durationSeconds: 240,
+        durationSeconds: 180,
         repetitions: 6,
         stepCode: "step.recall_short_distance",
       },
@@ -367,6 +367,7 @@ describe("WhatsApp conversation orchestration", () => {
       planStatus: "active" as const,
       requiredConsecutiveSessions: 3,
       sessionCount: 0,
+      stage: "short-distance recall under low distraction",
       targetSuccessRate: 80,
       todaySessionId: "session-1",
     };
@@ -403,6 +404,8 @@ describe("WhatsApp conversation orchestration", () => {
           behaviorConcernDescription: "Recall drops around wildlife.",
           dogProfileSummary:
             "2.5-year-old female Belgian Malinois with prior training",
+          durationMinutes: 3,
+          stage: "short-distance recall under low distraction",
           targetSuccessRate: 80,
         });
         return "Echo's recall plan starts with six short, measurable repetitions and progresses after three sessions at 80%.";

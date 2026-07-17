@@ -34,6 +34,7 @@ import {
 } from "./llm.js";
 import { OnboardingService } from "./onboarding-service.js";
 import { SignedActionService } from "./signed-actions.js";
+import { presentStage } from "./training-presentation.js";
 
 const environment = loadApiEnv(process.env);
 const accounts = environment.DATABASE_URL
@@ -162,12 +163,24 @@ const conversation = new WhatsAppConversationOrchestrator({
         productContext: async (contact) => {
           const context = await onboarding.findByContact(contact.id);
           if (context === null || contact.householdId === null) return context;
-          return (
+          const dashboard =
             (await onboardingRepository?.dashboardByDog(
               context.dogId,
               contact.householdId,
-            )) ?? context
-          );
+            )) ?? context;
+          const currentStep =
+            "currentStep" in dashboard ? dashboard.currentStep : null;
+          const stepCode =
+            currentStep !== null &&
+            typeof currentStep === "object" &&
+            "stepCode" in currentStep &&
+            typeof currentStep.stepCode === "string"
+              ? currentStep.stepCode
+              : undefined;
+          return {
+            ...dashboard,
+            stage: presentStage(stepCode, contact.locale),
+          };
         },
         projectOnboarding: (contact, snapshot) =>
           onboarding.project(contact, snapshot),

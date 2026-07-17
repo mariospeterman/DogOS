@@ -47,7 +47,7 @@ export class LocalRequestAuthenticator implements RequestAuthenticator {
     headers: IncomingHttpHeaders,
     traceId: string,
   ): Promise<AgentActorContext> {
-    if (this.environment === "production") {
+    if (this.environment === "production" || this.environment === "preview") {
       return Promise.reject(new AuthenticationError("AUTH_REQUIRED"));
     }
     const value = headers["x-dogos-user"];
@@ -154,6 +154,12 @@ export function createRequestAuthenticator(input: {
   publishableKey: string | undefined;
   supabaseUrl: string | undefined;
 }): RequestAuthenticator {
+  if (
+    input.authMode === "hybrid" &&
+    (input.environment === "preview" || input.environment === "production")
+  ) {
+    throw new Error("HYBRID_AUTH_FORBIDDEN");
+  }
   if (input.authMode === "local") {
     if (input.environment === "preview" || input.environment === "production") {
       throw new Error("DEVELOPMENT_AUTH_FORBIDDEN");

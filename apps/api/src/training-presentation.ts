@@ -14,9 +14,21 @@ const goalLabels: Record<string, Record<"de-CH" | "en", string>> = {
 };
 
 const stageLabels: Record<string, Record<"de-CH" | "en", string>> = {
+  "step.calm_engagement_low_distraction": {
+    "de-CH": "ruhige Orientierung mit gut kontrollierbarem Abstand",
+    en: "calm engagement at a manageable distance",
+  },
+  "step.loose_leash_low_distraction": {
+    "de-CH": "lockere Leine unter niedriger Ablenkung",
+    en: "loose-leash handling under low distraction",
+  },
   "step.low_distraction_baseline": {
     "de-CH": "Orientierung unter niedriger Ablenkung",
     en: "orientation under low distraction",
+  },
+  "step.recall_short_distance": {
+    "de-CH": "Rückruf auf kurzer Distanz bei niedriger Ablenkung",
+    en: "short-distance recall under low distraction",
   },
 };
 

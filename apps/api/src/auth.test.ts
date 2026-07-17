@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AuthenticationError,
   CompositeRequestAuthenticator,
+  createRequestAuthenticator,
   LocalRequestAuthenticator,
 } from "./auth.js";
 
@@ -21,6 +22,12 @@ describe("request authentication", () => {
       new LocalRequestAuthenticator("production").authenticate(
         { "x-dogos-user": "owner" },
         "trace-2",
+      ),
+    ).rejects.toEqual(new AuthenticationError("AUTH_REQUIRED"));
+    await expect(
+      new LocalRequestAuthenticator("preview").authenticate(
+        { "x-dogos-user": "owner" },
+        "trace-3",
       ),
     ).rejects.toEqual(new AuthenticationError("AUTH_REQUIRED"));
   });
@@ -54,4 +61,19 @@ describe("request authentication", () => {
     ).resolves.toMatchObject({ authMode: "supabase" });
     expect(calls).toEqual(["supabase"]);
   });
+
+  it.each(["preview", "production"] as const)(
+    "refuses hybrid development identities at %s boot",
+    (environment) => {
+      expect(() =>
+        createRequestAuthenticator({
+          authMode: "hybrid",
+          databaseUrl: undefined,
+          environment,
+          publishableKey: undefined,
+          supabaseUrl: undefined,
+        }),
+      ).toThrow("HYBRID_AUTH_FORBIDDEN");
+    },
+  );
 });

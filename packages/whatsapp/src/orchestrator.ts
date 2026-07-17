@@ -121,6 +121,7 @@ export interface ConversationProductContext {
   planId: string | null;
   planStatus: "active" | "blocked" | "setup_required";
   sessionCount: number;
+  stage?: string;
   todaySessionId: string | null;
 }
 
@@ -423,14 +424,18 @@ export class WhatsAppConversationOrchestrator {
       ...(context?.dogProfileSummary === undefined
         ? {}
         : { dogProfileSummary: context.dogProfileSummary }),
-      durationMinutes: 4,
+      durationMinutes: Math.max(
+        1,
+        Math.ceil((context?.currentStep?.durationSeconds ?? 240) / 60),
+      ),
       evidenceCount: context?.sessionCount ?? 0,
       goal: context?.goalText ?? context?.goal ?? "current training goal",
       latestDecision: context?.latestDecision ?? "repeat_step",
       stage:
-        locale === "de-CH"
-          ? "Orientierung unter wenig Ablenkung"
-          : "orientation under low distraction",
+        context?.stage ??
+        (locale === "de-CH"
+          ? "dem aktuellen Trainingsschritt"
+          : "the current training step"),
       ...(context?.calendar === undefined
         ? {}
         : { schedule: context.calendar }),
