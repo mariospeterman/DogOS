@@ -10,6 +10,7 @@ import { composeCoachReply } from "./reply.js";
 import type { CoachConversationStore } from "./store.js";
 
 export type CoachServiceTier = "freemium" | "plus" | "pro" | "ultra";
+export const maxCoachReplyCharacters = 3_600;
 
 export interface CoachReplyGenerator {
   generate(input: {
@@ -98,7 +99,10 @@ export class CoachConversationService {
           tier: input.tier ?? "freemium",
           traceId: input.traceId,
         });
-        if (generated.trim().length > 0 && generated.length <= 1_500) {
+        if (
+          generated.trim().length > 0 &&
+          generated.length <= maxCoachReplyCharacters
+        ) {
           reply = { ...deterministicReply, text: generated.trim() };
         }
       } catch {

@@ -28,12 +28,26 @@ export interface CoachConversation {
 }
 
 export interface CoachTrainingContext {
+  baselineSuccessRate?: number;
+  currentStep?: {
+    difficulty: number;
+    durationSeconds: number;
+    repetitions: number;
+    stepCode: string;
+  } | null;
   dogName: string;
   goal: string;
   stage: string;
   durationMinutes: number;
   evidenceCount: number;
   latestDecision: string;
+  schedule?: Array<{
+    durationSeconds: number;
+    isRecovery: boolean;
+    plannedStart: string;
+    purposeCode: string;
+    status: string;
+  }>;
 }
 
 export interface CoachLinks {

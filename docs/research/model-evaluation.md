@@ -57,11 +57,13 @@ invalid or oversized output -> deterministic reply
 ```
 
 Both model IDs are environment-switchable. Requests use `store: false`, no
-provider conversation state, at most 320 output tokens by default, and no raw
-database or general-purpose tools. The prompt is intentionally shorter than the
-1,024-token automatic prompt-cache threshold; padding it to obtain a cache hit
-would cost more and add noise. Model runs store operational usage and latency,
-not duplicated conversation content.
+provider conversation state, and no raw database or general-purpose tools.
+Normal chat, complete plan presentation, and professional summaries have
+independent output/time budgets. Provider status must be `completed`; otherwise
+DogOS uses its deterministic draft instead of sending partial prose. The prompt
+is intentionally shorter than the automatic prompt-cache threshold; padding it
+to obtain a cache hit would cost more and add noise. Model runs store operational
+usage and latency, not duplicated conversation content.
 
 Luna is an economical candidate, not a presumed quality winner: OpenAI describes
 it as roughly the earlier nano tier. Terra is roughly the earlier mini tier. A

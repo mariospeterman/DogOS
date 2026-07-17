@@ -18,7 +18,7 @@ PostgreSQL facts and measurements (authoritative)
   -> typed draft with citations and proposed actions
   -> validation
   -> canonical Coach message
-  -> web or WhatsApp presentation
+  -> WhatsApp presentation or authenticated app record
 
 Confirmed user fact or command
   -> canonical API tool
@@ -31,11 +31,10 @@ state. This keeps the prompt short while protecting the few boundaries that
 matter: identity, household access, measured facts, evidence provenance, and
 durable writes.
 
-The canonical conversation belongs to DogOS, not a provider. Web and WhatsApp
-append to one ordered timeline. Channel bindings contain routing metadata only;
-they cannot fork memory, plan state, entitlements, or assistant behavior. A web
-reply is not automatically delivered through WhatsApp, preventing duplicate
-notifications and unnecessary provider/model calls.
+The canonical conversation belongs to DogOS, not a provider. WhatsApp messages
+append to one ordered server-side timeline. Channel bindings contain routing
+metadata only; they cannot fork memory, plan state, entitlements, or assistant
+behavior. The owner web product does not render a second chat.
 
 ## Context capsule
 

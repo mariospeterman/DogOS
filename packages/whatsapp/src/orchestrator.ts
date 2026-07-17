@@ -1,6 +1,7 @@
 import type { TierCapabilities } from "@dogos/contracts";
 import {
   composeCoachReply,
+  maxCoachReplyCharacters,
   type CoachReply,
   type CoachTrainingContext,
 } from "@dogos/conversation";
@@ -83,9 +84,24 @@ export interface ConversationLinks {
 }
 
 export interface ConversationProductContext {
+  baselineSuccessRate?: number;
+  calendar?: Array<{
+    durationSeconds: number;
+    isRecovery: boolean;
+    plannedStart: string;
+    purposeCode: string;
+    status: string;
+  }>;
+  currentStep?: {
+    difficulty: number;
+    durationSeconds: number;
+    repetitions: number;
+    stepCode: string;
+  } | null;
   dogId: string;
   dogName: string;
   goal: string;
+  goalText?: string;
   latestDecision: string;
   planId: string | null;
   planStatus: "active" | "blocked";
@@ -176,8 +192,8 @@ export class WhatsAppConversationOrchestrator {
       return this.dependencies.provider.sendText(
         contact.externalId,
         locale === "de-CH"
-          ? "Für heute ist das Nachrichtenlimit erreicht. Dein Plan und die heutige Einheit bleiben in DogOS verfügbar."
-          : "Today's message limit is reached. Your plan and today's session remain available in DogOS.",
+          ? "Dein heutiges Nachrichtenkontingent ist aufgebraucht. Plan, Verlauf und heutige Einheit bleiben in DogOS verfügbar. Unter Konto kannst du einen Tarif mit mehr Coaching-Nachrichten wählen."
+          : "Today's message allowance is used. Your plan, history, and today's session remain available in DogOS. You can choose a tier with more coaching messages under Account.",
       );
     }
 
@@ -276,16 +292,25 @@ export class WhatsAppConversationOrchestrator {
       );
     }
     const trainingContext = {
+      ...(context?.baselineSuccessRate === undefined
+        ? {}
+        : { baselineSuccessRate: context.baselineSuccessRate }),
+      ...(context?.currentStep === undefined
+        ? {}
+        : { currentStep: context.currentStep }),
       dogName:
         context?.dogName ?? (locale === "de-CH" ? "dein Hund" : "your dog"),
       durationMinutes: 4,
       evidenceCount: context?.sessionCount ?? 0,
-      goal: context?.goal ?? "goal.pending",
+      goal: context?.goalText ?? context?.goal ?? "current training goal",
       latestDecision: context?.latestDecision ?? "repeat_step",
       stage:
         locale === "de-CH"
           ? "Orientierung unter wenig Ablenkung"
           : "orientation under low distraction",
+      ...(context?.calendar === undefined
+        ? {}
+        : { schedule: context.calendar }),
     };
     const reply = composeCoachReply({
       context: trainingContext,
@@ -301,7 +326,10 @@ export class WhatsAppConversationOrchestrator {
           draft: reply,
           message: text,
         });
-        if (generated.trim().length > 0 && generated.length <= 1_500) {
+        if (
+          generated.trim().length > 0 &&
+          generated.length <= maxCoachReplyCharacters
+        ) {
           reply.text = generated.trim();
         }
       } catch {

@@ -68,9 +68,12 @@ and cost and roughly corresponds to an earlier mini tier. Luna is therefore not
 accepted as the best coaching model based on price or context size alone. DogOS
 routes the two as evaluation candidates and records model, latency, and token use.
 
-The Responses request uses `store: false`, a short timeout, a bounded output, and
-only the active structured context plus the deterministic draft. The model may
-rewrite presentation but cannot create a plan, alter safety or progression, call
+The Responses request uses `store: false`, purpose-specific time/output budgets,
+and only the active structured context plus the deterministic draft. Chat, full
+plan presentation, and professional handover are separate profiles. A response
+is accepted only when the provider reports `completed`; incomplete output falls
+back to the deterministic draft. The model may present the complete computed
+plan but cannot create canonical steps, alter safety or progression, call
 database tools, or grant entitlements. OpenAI states API data is not used for
 training by default unless the customer opts in; default abuse monitoring may
 retain content for up to 30 days. EU data residency additionally requires an

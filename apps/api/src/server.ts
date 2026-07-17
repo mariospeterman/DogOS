@@ -140,7 +140,16 @@ const conversation = new WhatsAppConversationOrchestrator({
   ...(onboarding === undefined
     ? {}
     : {
-        productContext: (contact) => onboarding.findByContact(contact.id),
+        productContext: async (contact) => {
+          const context = await onboarding.findByContact(contact.id);
+          if (context === null || contact.householdId === null) return context;
+          return (
+            (await onboardingRepository?.dashboardByDog(
+              context.dogId,
+              contact.householdId,
+            )) ?? context
+          );
+        },
         projectOnboarding: (contact, snapshot) =>
           onboarding.project(contact, snapshot),
       }),
