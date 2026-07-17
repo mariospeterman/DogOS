@@ -111,16 +111,16 @@ describe("WhatsApp conversation orchestration", () => {
       "10000000-0000-0000-0000-000000000001",
       "20000000-0000-0000-0000-000000000001",
     );
-    const orchestrator = new WhatsAppConversationOrchestrator(
-      provider,
-      store,
-      async () => ({
+    const orchestrator = new WhatsAppConversationOrchestrator({
+      links: async () => ({
         plan: "https://dogos.test/plan",
         progress: "https://dogos.test/progress",
         referral: "https://dogos.test/trainers",
         today: "https://dogos.test/today",
       }),
-    );
+      provider,
+      store,
+    });
     return { contact, orchestrator, store };
   }
 
@@ -185,7 +185,7 @@ describe("WhatsApp conversation orchestration", () => {
     });
   });
 
-  it("rejects prompt injection and stops only after an acute fact is reported", async () => {
+  it("rejects prompt injection and records an acute fact without trapping the flow", async () => {
     const { contact, orchestrator, store } = await setup();
     const refused = await orchestrator.handle(
       contact,
@@ -196,15 +196,12 @@ describe("WhatsApp conversation orchestration", () => {
     for (let index = 0; index < 5; index += 1) machine.answer("answer.test");
     expect(machine.view().state).toBe("health_screen");
     await store.saveConversation(contact.id, machine.view());
-    const stopped = await orchestrator.handle(contact, "Er lahmt plötzlich");
-    expect(stopped.text).toMatch(/tierärztlich abklären/);
-    expect(stopped.options).toEqual([
-      "Fachperson finden",
-      "Verlauf öffnen",
-      "Update melden",
-    ]);
+    const response = await orchestrator.handle(contact, "Er lahmt plötzlich");
+    expect(response.text).toMatch(/tierärztliche Abklärung/);
+    expect(response.text).toMatch(/Gab es Schnappen/);
+    expect(response.options).toEqual(["Nein", "Schnappen", "Biss / Kind"]);
     expect((await store.loadConversation(contact.id))?.state).toBe(
-      "professional_escalation",
+      "safety_screen",
     );
   });
 });

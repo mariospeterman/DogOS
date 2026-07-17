@@ -42,8 +42,12 @@ const options: Record<ConversationState, Record<"de-CH" | "en", string[]>> = {
     en: ["Loose leash", "Recall", "Encounters"],
   },
   goal_selection: {
-    "de-CH": ["Ruhig starten", "Distanz halten", "Signal halten"],
-    en: ["Calm start", "Hold distance", "Hold cue"],
+    "de-CH": ["Lockere Leine", "Rückruf", "Ruhige Begegnung"],
+    en: ["Loose leash", "Recall", "Calm encounters"],
+  },
+  training_setup: {
+    "de-CH": ["Ja, vollständig", "Noch nicht"],
+    en: ["Yes, complete", "Not yet"],
   },
   baseline_collection: {
     "de-CH": ["Selten", "Etwa zur Hälfte", "Meistens"],
@@ -74,26 +78,50 @@ export interface ConversationLinks {
   today: string;
 }
 
+export interface ConversationProductContext {
+  dogId: string;
+  dogName: string;
+  goal: string;
+  latestDecision: string;
+  planId: string | null;
+  planStatus: "active" | "blocked";
+  sessionCount: number;
+  todaySessionId: string | null;
+}
+
+export interface WhatsAppConversationDependencies {
+  languageResolver?: ConversationLanguageResolver;
+  links: (contact: ProviderContact) => Promise<ConversationLinks>;
+  productContext?: (
+    contact: ProviderContact,
+  ) => Promise<ConversationProductContext | null>;
+  projectOnboarding?: (
+    contact: ProviderContact,
+    snapshot: ConversationSnapshot,
+  ) => Promise<ConversationProductContext>;
+  provider: WhatsAppProvider;
+  store: WhatsAppStateStore;
+  tierForContact?: (contact: ProviderContact) => Promise<SubscriptionTier>;
+}
+
 export class WhatsAppConversationOrchestrator {
-  constructor(
-    private readonly provider: WhatsAppProvider,
-    private readonly store: WhatsAppStateStore,
-    private readonly links: (
-      contact: ProviderContact,
-    ) => Promise<ConversationLinks>,
-    private readonly tier: SubscriptionTier = "freemium",
-    private readonly languageResolver: ConversationLanguageResolver = new DeterministicConversationLanguageResolver(),
-  ) {}
+  readonly #languageResolver: ConversationLanguageResolver;
+
+  constructor(private readonly dependencies: WhatsAppConversationDependencies) {
+    this.#languageResolver =
+      dependencies.languageResolver ??
+      new DeterministicConversationLanguageResolver();
+  }
 
   async handle(
     contact: ProviderContact,
     text: string,
   ): Promise<OutboundMessage> {
-    const saved = await this.store.loadConversation(contact.id);
+    const saved = await this.dependencies.store.loadConversation(contact.id);
     const machine = new ConversationMachine(saved?.locale ?? contact.locale);
     if (saved !== null) machine.resume(saved);
     const beforeResolution = machine.view();
-    const resolution = await this.languageResolver.resolve({
+    const resolution = await this.#languageResolver.resolve({
       currentLocale: beforeResolution.locale,
       text,
     });
@@ -115,13 +143,15 @@ export class WhatsAppConversationOrchestrator {
     const current = machine.view();
     const locale = current.locale;
     const localeChanged = locale !== beforeResolution.locale;
-    const allowed = await this.store.consumeDailyMessage(
+    const tier =
+      (await this.dependencies.tierForContact?.(contact)) ?? "freemium";
+    const allowed = await this.dependencies.store.consumeDailyMessage(
       contact.id,
-      capabilitiesForTier(this.tier).coachingMessagesPerDay,
+      capabilitiesForTier(tier).coachingMessagesPerDay,
     );
     if (!allowed) {
       if (localeChanged) await this.persist(contact.id, current);
-      return this.provider.sendText(
+      return this.dependencies.provider.sendText(
         contact.externalId,
         locale === "de-CH"
           ? "Für heute ist das Nachrichtenlimit erreicht. Dein Plan und die heutige Einheit bleiben in DogOS verfügbar."
@@ -136,7 +166,7 @@ export class WhatsAppConversationOrchestrator {
 
     if (offTopicPattern.test(text)) {
       if (localeChanged) await this.persist(contact.id, current);
-      return this.provider.sendText(
+      return this.dependencies.provider.sendText(
         contact.externalId,
         locale === "de-CH"
           ? "Ich bleibe bei deinem Hund: Training, Beobachtungen, Plan und Fortschritt. Was davon brauchst du?"
@@ -157,26 +187,25 @@ export class WhatsAppConversationOrchestrator {
         (acutePattern.test(text) || text === "choice.2")) ||
       (current.state === "safety_screen" && text === "choice.3")
     ) {
-      machine.escalate();
-      await this.persist(contact.id, machine.view());
       const injury = current.state === "health_screen";
-      return this.provider.sendInteractive(
+      machine.answer(normalizeAnswer(current.state, text));
+      const next = machine.view();
+      await this.persist(contact.id, next);
+      return this.dependencies.provider.sendInteractive(
         contact.externalId,
         current.locale === "de-CH"
           ? injury
-            ? "Diese akute Veränderung kann DogOS nicht beurteilen. Setze die heutige Übung vorsichtshalber aus und lass Milo tierärztlich abklären. Das ist keine Diagnose; Plan, Verlauf und Chat bleiben verfügbar."
-            : "Bei einem Biss mit Kind empfiehlt DogOS keine neue autonome Übung. Lass den Fall durch eine qualifizierte Fachperson beurteilen. Das ist keine Diagnose; Chat, Verlauf und Terminzugang bleiben verfügbar."
+            ? `Diese akute Veränderung kann DogOS nicht beurteilen. Eine tierärztliche Abklärung ist sinnvoll; das ist keine Diagnose. Ich erfasse den restlichen Kontext weiter.\n\n${next.prompt}`
+            : `Bei einem Biss mit Kind empfiehlt DogOS eine qualifizierte Fachperson. Das ist keine Diagnose; ich erfasse den Fall weiter und zeige danach die passenden nächsten Schritte.\n\n${next.prompt}`
           : injury
-            ? "DogOS cannot assess this acute change. Skip today's exercise as a precaution and seek veterinary assessment. This is not a diagnosis; your plan, history, and chat remain available."
-            : "After a bite involving a child, DogOS will not suggest a new autonomous exercise. Have the case assessed by a qualified professional. This is not a diagnosis; chat, history, and booking access remain available.",
-        current.locale === "de-CH"
-          ? ["Fachperson finden", "Verlauf öffnen", "Update melden"]
-          : ["Find professional", "Open history", "Report update"],
+            ? `DogOS cannot assess this acute change. Veterinary assessment is appropriate; this is not a diagnosis. I will continue collecting the remaining context.\n\n${next.prompt}`
+            : `After a bite involving a child, DogOS recommends a qualified professional. This is not a diagnosis; I will finish recording the case and then show appropriate next steps.\n\n${next.prompt}`,
+        options[next.state][next.locale],
       );
     }
 
     if (current.state === "dog_identity" && !isUsableName(text)) {
-      return this.provider.sendText(
+      return this.dependencies.provider.sendText(
         contact.externalId,
         current.locale === "de-CH"
           ? "Wie heisst dein Hund? Antworte nur mit dem Rufnamen."
@@ -186,8 +215,22 @@ export class WhatsAppConversationOrchestrator {
 
     const canonicalAnswer = normalizeAnswer(current.state, text);
     machine.answer(canonicalAnswer);
-    await this.persist(contact.id, machine.view());
-    return this.present(contact.externalId, machine.view());
+    let next = machine.view();
+    if (
+      next.state === "plan_ready" &&
+      this.dependencies.projectOnboarding !== undefined
+    ) {
+      const context = await this.dependencies.projectOnboarding(
+        contact,
+        snapshotOf(next),
+      );
+      if (context.planStatus === "blocked") {
+        machine.escalate();
+        next = machine.view();
+      }
+    }
+    await this.persist(contact.id, next);
+    return this.present(contact.externalId, next);
   }
 
   private async presentPlan(
@@ -195,24 +238,29 @@ export class WhatsAppConversationOrchestrator {
     text: string,
     locale: "de-CH" | "en",
   ): Promise<OutboundMessage> {
-    const links = await this.links(contact);
+    const links = await this.dependencies.links(contact);
+    const context = await this.dependencies.productContext?.(contact);
     const normalized = text.trim().toLowerCase();
     if (["choice.2", "plan"].includes(normalized)) {
-      return this.provider.sendText(contact.externalId, links.plan);
+      return this.dependencies.provider.sendText(
+        contact.externalId,
+        links.plan,
+      );
     }
     if (["choice.3", "fortschritt", "progress"].includes(normalized)) {
-      return this.provider.sendText(contact.externalId, links.progress);
+      return this.dependencies.provider.sendText(
+        contact.externalId,
+        links.progress,
+      );
     }
     const reply = composeCoachReply({
       context: {
-        dogName: "Milo",
+        dogName:
+          context?.dogName ?? (locale === "de-CH" ? "dein Hund" : "your dog"),
         durationMinutes: 4,
-        evidenceCount: 2,
-        goal:
-          locale === "de-CH"
-            ? "lockerer Leine im Alltag"
-            : "a loose leash on daily walks",
-        latestDecision: "repeat_step",
+        evidenceCount: context?.sessionCount ?? 0,
+        goal: context?.goal ?? "goal.pending",
+        latestDecision: context?.latestDecision ?? "repeat_step",
         stage:
           locale === "de-CH"
             ? "Orientierung unter wenig Ablenkung"
@@ -222,7 +270,7 @@ export class WhatsAppConversationOrchestrator {
       links: { ...links, session: links.today },
       message: text,
     });
-    return this.provider.sendInteractive(
+    return this.dependencies.provider.sendInteractive(
       contact.externalId,
       `${reply.text} ${reply.actions[0]?.href ?? links.today}`,
       options.plan_ready[locale],
@@ -234,15 +282,21 @@ export class WhatsAppConversationOrchestrator {
     text: string,
     locale: "de-CH" | "en",
   ): Promise<OutboundMessage> {
-    const links = await this.links(contact);
+    const links = await this.dependencies.links(contact);
     const normalized = text.trim().toLowerCase();
     if (normalized === "choice.1") {
-      return this.provider.sendText(contact.externalId, links.referral);
+      return this.dependencies.provider.sendText(
+        contact.externalId,
+        links.referral,
+      );
     }
     if (normalized === "choice.2") {
-      return this.provider.sendText(contact.externalId, links.progress);
+      return this.dependencies.provider.sendText(
+        contact.externalId,
+        links.progress,
+      );
     }
-    return this.provider.sendText(
+    return this.dependencies.provider.sendText(
       contact.externalId,
       locale === "de-CH"
         ? "Beschreibe kurz nur die neue Beobachtung. DogOS speichert sie als Bericht; eine Diagnose oder Freigabe erfolgt daraus nicht automatisch."
@@ -256,8 +310,12 @@ export class WhatsAppConversationOrchestrator {
   ): Promise<OutboundMessage> {
     const choices = options[view.state][view.locale];
     return choices.length === 0
-      ? this.provider.sendText(contactId, view.prompt)
-      : this.provider.sendInteractive(contactId, view.prompt, choices);
+      ? this.dependencies.provider.sendText(contactId, view.prompt)
+      : this.dependencies.provider.sendInteractive(
+          contactId,
+          view.prompt,
+          choices,
+        );
   }
 
   private persist(
@@ -273,8 +331,22 @@ export class WhatsAppConversationOrchestrator {
       state: view.state,
       timezone: view.timezone,
     };
-    return this.store.saveConversation(contactId, snapshot);
+    return this.dependencies.store.saveConversation(contactId, snapshot);
   }
+}
+
+function snapshotOf(
+  view: ReturnType<ConversationMachine["view"]>,
+): ConversationSnapshot {
+  return {
+    answers: view.answers,
+    audit: view.audit,
+    country: view.country,
+    currency: view.currency,
+    locale: view.locale,
+    state: view.state,
+    timezone: view.timezone,
+  };
 }
 
 function isUsableName(text: string): boolean {

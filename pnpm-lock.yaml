@@ -71,6 +71,9 @@ importers:
       '@dogos/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@dogos/knowledge':
+        specifier: workspace:*
+        version: link:../../packages/knowledge
       '@dogos/progress-engine':
         specifier: workspace:*
         version: link:../../packages/progress-engine
@@ -83,6 +86,9 @@ importers:
       '@dogos/testing':
         specifier: workspace:*
         version: link:../../packages/testing
+      '@dogos/training-engine':
+        specifier: workspace:*
+        version: link:../../packages/training-engine
       '@dogos/whatsapp':
         specifier: workspace:*
         version: link:../../packages/whatsapp

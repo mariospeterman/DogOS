@@ -9,6 +9,7 @@ export const conversationStates = [
   "safety_screen",
   "behavior_concern",
   "goal_selection",
+  "training_setup",
   "baseline_collection",
   "plan_ready",
   "daily_session",
@@ -44,14 +45,16 @@ const prompts: Record<ConversationLocale, Record<ConversationState, string>> = {
     safety_screen: "Gab es Schnappen, Beissen oder starke Angst?",
     behavior_concern: "Was ist im Alltag gerade schwierig?",
     goal_selection: "Welches messbare Ziel moechtest du zuerst angehen?",
-    baseline_collection: "Wie oft klappt lockeres Gehen heute?",
-    plan_ready: "Milos Entwicklungsplan ist bereit.",
+    training_setup:
+      "Hast du die genannte Ausruestung und kannst du den richtigen Moment mit einem bekannten Signal markieren?",
+    baseline_collection: "Wie oft klappt dieses Ziel heute?",
+    plan_ready: "Der Entwicklungsplan fuer {{dogName}} ist bereit.",
     daily_session: "Bereit fuer eine kurze Einheit?",
     checkin: "Wie ist die Einheit gelaufen?",
     progress_review: "Hier ist euer Fortschritt nach Messdimensionen.",
     adjustment: "Die Schwierigkeit wurde anhand der Daten angepasst.",
     professional_escalation:
-      "Bitte pausiere das Training und hole professionelle Hilfe.",
+      "Der Fall ist gespeichert. DogOS empfiehlt eine qualifizierte Fachperson, bevor eine neue autonome Uebung beginnt.",
   },
   en: {
     welcome: "Hi, I will guide you and your dog through short training steps.",
@@ -65,13 +68,16 @@ const prompts: Record<ConversationLocale, Record<ConversationState, string>> = {
     safety_screen: "Any snapping, biting, or severe fear?",
     behavior_concern: "What is difficult in daily life?",
     goal_selection: "Which measurable goal should we address first?",
-    baseline_collection: "How often is the leash loose today?",
-    plan_ready: "Milo's development plan is ready.",
+    training_setup:
+      "Do you have the listed equipment and can you mark the correct moment with a familiar cue?",
+    baseline_collection: "How often does this goal work today?",
+    plan_ready: "The development plan for {{dogName}} is ready.",
     daily_session: "Ready for a short session?",
     checkin: "How did the session go?",
     progress_review: "Here is progress by measurement dimension.",
     adjustment: "Difficulty was adjusted from the recorded evidence.",
-    professional_escalation: "Pause training and seek professional help.",
+    professional_escalation:
+      "The case is saved. DogOS recommends a qualified professional before a new autonomous exercise begins.",
   },
 };
 
@@ -91,9 +97,17 @@ export class ConversationMachine {
   }
 
   view(): ConversationSnapshot & { prompt: string } {
+    const dogName = this.#snapshot.answers.dog_identity?.replace(
+      "dog_identity.text:",
+      "",
+    );
     return {
       ...structuredClone(this.#snapshot),
-      prompt: prompts[this.#snapshot.locale][this.#snapshot.state],
+      prompt: prompts[this.#snapshot.locale][this.#snapshot.state].replace(
+        "{{dogName}}",
+        dogName ??
+          (this.#snapshot.locale === "de-CH" ? "deinen Hund" : "your dog"),
+      ),
     };
   }
 

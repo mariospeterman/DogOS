@@ -15,10 +15,11 @@ import {
   InMemoryCoachConversationStore,
   PostgresCoachConversationStore,
 } from "@dogos/conversation";
-import { AccountRepository } from "@dogos/database";
+import { AccountRepository, OnboardingRepository } from "@dogos/database";
 
 import { buildApp } from "./app.js";
 import { createRequestAuthenticator } from "./auth.js";
+import { OnboardingService } from "./onboarding-service.js";
 import { ProductService } from "./product-service.js";
 import { SignedActionService } from "./signed-actions.js";
 
@@ -26,6 +27,13 @@ const environment = loadApiEnv(process.env);
 const accounts = environment.DATABASE_URL
   ? new AccountRepository(environment.DATABASE_URL)
   : undefined;
+const onboardingRepository = environment.DATABASE_URL
+  ? new OnboardingRepository(environment.DATABASE_URL)
+  : undefined;
+const onboarding =
+  onboardingRepository === undefined
+    ? undefined
+    : new OnboardingService(onboardingRepository);
 const authenticator = createRequestAuthenticator({
   ...(accounts === undefined ? {} : { accountRepository: accounts }),
   authMode: environment.DOGOS_AUTH_MODE,
@@ -66,13 +74,14 @@ const signedActions = new SignedActionService(
   "pilot1",
 );
 const webBase = process.env.WEB_ORIGIN ?? "http://127.0.0.1:3000";
-const dogId = "30000000-0000-0000-0000-000000000001";
-const conversation = new WhatsAppConversationOrchestrator(
-  whatsappProvider,
-  whatsappStore,
-  async (contact) => {
+const conversation = new WhatsAppConversationOrchestrator({
+  links: async (contact) => {
     const actorId = contact.userId!;
     const householdId = contact.householdId!;
+    const context = await onboarding?.findByContact(contact.id);
+    if (context === null || context === undefined) {
+      throw new Error("ONBOARDING_PRODUCT_CONTEXT_REQUIRED");
+    }
     const issue = async (
       purpose: "open_plan" | "open_progress" | "open_today" | "open_trainers",
       path: string,
@@ -81,7 +90,7 @@ const conversation = new WhatsAppConversationOrchestrator(
         actorId,
         householdId,
         purpose,
-        subjectId: dogId,
+        subjectId: context.dogId,
         ttlSeconds: 900,
       });
       return `${webBase}${path}?action=${encodeURIComponent(token)}`;
@@ -94,7 +103,26 @@ const conversation = new WhatsAppConversationOrchestrator(
     ]);
     return { plan, progress, referral, today };
   },
-);
+  ...(onboarding === undefined
+    ? {}
+    : {
+        productContext: (contact) => onboarding.findByContact(contact.id),
+        projectOnboarding: (contact, snapshot) =>
+          onboarding.project(contact, snapshot),
+      }),
+  provider: whatsappProvider,
+  store: whatsappStore,
+  ...(accounts === undefined
+    ? {}
+    : {
+        tierForContact: async (contact) => {
+          if (contact.userId === null) return "freemium" as const;
+          const account = await accounts.resolveByAppUser(contact.userId);
+          if (account === null) throw new Error("ACCOUNT_NOT_FOUND");
+          return account.tier;
+        },
+      }),
+});
 const whatsapp = new WhatsAppWebhookService(
   whatsappProvider,
   whatsappStore,
@@ -103,6 +131,8 @@ const whatsapp = new WhatsAppWebhookService(
   async ({ contact, id, text }, traceId) => {
     const outbound = await conversation.handle(contact, text);
     await whatsappStore.saveOutbound(outbound, traceId);
+    const context = await onboarding?.findByContact(contact.id);
+    if (context === null || context === undefined) return;
     await coach.recordWhatsAppExchange({
       contactId: contact.id,
       inboundId: id,
@@ -111,7 +141,7 @@ const whatsapp = new WhatsAppWebhookService(
       outboundText: outbound.text,
       scope: {
         actorUserId: contact.userId!,
-        dogId,
+        dogId: context.dogId,
         householdId: contact.householdId!,
         locale: contact.locale,
       },

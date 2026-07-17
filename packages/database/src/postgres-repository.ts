@@ -118,6 +118,7 @@ export class PostgresRepository {
       union select id from api.observations where id = any(${evidenceIds}::uuid[])
       union select id from api.sessions where id = any(${evidenceIds}::uuid[])
       union select id from api.safety_events where id = any(${evidenceIds}::uuid[])
+      union select id from api.dog_health_context where id = any(${evidenceIds}::uuid[])
     `;
     if (
       new Set(rows.map((row) => String(row.id))).size !==

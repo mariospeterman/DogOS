@@ -1,0 +1,90 @@
+import { randomUUID } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import postgres from "postgres";
+import { OnboardingRepository } from "@dogos/database";
+import { OnboardingService } from "./onboarding-service.js";
+
+const connection = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const sql = postgres(connection, { prepare: false });
+const repository = new OnboardingRepository(connection);
+const service = new OnboardingService(repository);
+const contactId = randomUUID();
+
+beforeAll(async () => {
+  await sql`
+    insert into private.whatsapp_provider_contacts
+      (id, provider, external_contact_id, external_contact_hash, status,
+       user_id, household_id, locale, allowlisted, linked_at)
+    values (${contactId}, 'meta_cloud', ${`integration:${contactId}`},
+      ${`hash:${contactId}`}, 'linked',
+      '10000000-0000-0000-0000-000000000001',
+      '20000000-0000-0000-0000-000000000001', 'en', true, now())
+  `;
+});
+
+afterAll(async () => {
+  await repository.close();
+  await sql.end();
+});
+
+describe("durable WhatsApp onboarding", () => {
+  it("projects one real dog, assessment, goal, plan, and schedule", async () => {
+    const contact = {
+      externalId: `integration:${contactId}`,
+      householdId: "20000000-0000-0000-0000-000000000001",
+      id: contactId,
+      linked: true,
+      locale: "en" as const,
+      userId: "10000000-0000-0000-0000-000000000001",
+    };
+    const snapshot = {
+      answers: {
+        ai_disclosure: "ai_disclosure.choice.1",
+        baseline_collection: "baseline_collection.choice.2",
+        behavior_concern: "behavior_concern.choice.1",
+        dog_history: "dog_history.choice.2",
+        dog_identity: "dog_identity.text:Rex",
+        goal_selection: "goal_selection.choice.1",
+        health_screen: "health_screen.choice.1",
+        household_context: "household_context.choice.1",
+        safety_screen: "safety_screen.choice.1",
+        training_setup: "training_setup.choice.1",
+        welcome: "welcome.choice.1",
+      },
+      audit: [],
+      country: "CH" as const,
+      currency: "CHF" as const,
+      locale: "en" as const,
+      state: "plan_ready" as const,
+      timezone: "Europe/Zurich" as const,
+    };
+
+    const first = await service.project(contact, snapshot);
+    const replay = await service.project(contact, snapshot);
+    expect(first).toMatchObject({
+      baselineSuccessRate: 50,
+      dogName: "Rex",
+      goal: "goal.loose_leash_walking",
+      planStatus: "active",
+      riskDisposition: "continue_low_risk_training",
+    });
+    expect(replay).toEqual(first);
+
+    const [counts] = await sql`
+      select
+        (select count(*)::integer from private.onboarding_projections where contact_id = ${contactId}) as projections,
+        (select count(*)::integer from api.dogs where id = ${first.dogId}) as dogs,
+        (select count(*)::integer from api.plans where id = ${first.planId}) as plans,
+        (select count(*)::integer from api.scheduled_sessions ss
+          join api.plan_steps ps on ps.id = ss.plan_step_id
+          join api.plan_versions pv on pv.id = ps.plan_version_id
+          where pv.plan_id = ${first.planId}) as scheduled_sessions
+    `;
+    expect(counts).toMatchObject({
+      dogs: 1,
+      plans: 1,
+      projections: 1,
+      scheduled_sessions: 4,
+    });
+  });
+});

@@ -107,20 +107,20 @@ insert into api.breed_aliases (id, breed_taxonomy_id, locale, alias) values
   ('42100000-0000-0000-0000-000000000004', '42000000-0000-0000-0000-000000000002', 'en', 'Border Collie');
 
 insert into api.training_protocols (id, protocol_code, goal_family, status) values (
-  '50000000-0000-0000-0000-000000000001',
+  '50000000-0000-4000-8000-000000000004',
   'protocol.loose_leash_foundation', 'goal.loose_leash_walking', 'development'
-);
+) on conflict (id) do nothing;
 
 insert into private.protocol_versions (
   id, training_protocol_id, semantic_version, canonical_definition,
   evidence_level, validity_state, development_only, created_by
 ) values (
-  '51000000-0000-0000-0000-000000000001',
-  '50000000-0000-0000-0000-000000000001', '0.1.0-dev',
+  '51000000-0000-4000-8000-000000000004',
+  '50000000-0000-4000-8000-000000000004', '0.1.0-development',
   '{"steps":[{"code":"step.low_distraction_baseline"}],"localeIndependent":true}',
   'pending_professional_review', 'draft', true,
   '10000000-0000-0000-0000-000000000001'
-);
+) on conflict (id) do nothing;
 
 insert into private.rule_sets (
   id, rule_set_code, version, canonical_definition, validity_state
@@ -130,8 +130,8 @@ insert into private.rule_sets (
 );
 
 insert into api.protocol_localizations (id, protocol_version_id, localized_content_id) values
-  ('53000000-0000-0000-0000-000000000001', '51000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000009'),
-  ('53000000-0000-0000-0000-000000000002', '51000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-00000000000a');
+  ('53000000-0000-0000-0000-000000000001', '51000000-0000-4000-8000-000000000004', '40000000-0000-0000-0000-000000000009'),
+  ('53000000-0000-0000-0000-000000000002', '51000000-0000-4000-8000-000000000004', '40000000-0000-0000-0000-00000000000a');
 
 insert into api.message_catalog_entries (
   id, message_key, message_version, localized_content_id, channel
@@ -213,8 +213,8 @@ insert into api.plan_versions (
   id, plan_id, version, protocol_version_id, rule_set_id,
   generation_reason_codes, generation_mode, status, effective_from
 ) values
-  ('74000000-0000-0000-0000-000000000001', '73000000-0000-0000-0000-000000000001', 1, '51000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000001', array['PLAN_GENERATED_DEVELOPMENT_ONLY']::api.reason_code[], 'development', 'active', now()),
-  ('74000000-0000-0000-0000-000000000002', '73000000-0000-0000-0000-000000000002', 1, '51000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000001', array['PLAN_GENERATED_DEVELOPMENT_ONLY']::api.reason_code[], 'development', 'active', now());
+  ('74000000-0000-0000-0000-000000000001', '73000000-0000-0000-0000-000000000001', 1, '51000000-0000-4000-8000-000000000004', '52000000-0000-0000-0000-000000000001', array['PLAN_GENERATED_DEVELOPMENT_ONLY']::api.reason_code[], 'development', 'active', now()),
+  ('74000000-0000-0000-0000-000000000002', '73000000-0000-0000-0000-000000000002', 1, '51000000-0000-4000-8000-000000000004', '52000000-0000-0000-0000-000000000001', array['PLAN_GENERATED_DEVELOPMENT_ONLY']::api.reason_code[], 'development', 'active', now());
 
 update api.plans set active_plan_version_id = '74000000-0000-0000-0000-000000000001' where id = '73000000-0000-0000-0000-000000000001';
 update api.plans set active_plan_version_id = '74000000-0000-0000-0000-000000000002' where id = '73000000-0000-0000-0000-000000000002';
