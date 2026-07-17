@@ -1,7 +1,7 @@
 {
   "slice": "2.5",
   "status": "pass",
-  "generatedAt": "2026-07-17T13:36:51.000Z",
+  "generatedAt": "2026-07-17T14:22:00.000Z",
   "suites": {
     "unit": {
       "tests": 178,
@@ -20,8 +20,8 @@
       ]
     },
     "pgTap": {
-      "tests": 127,
-      "passed": 127
+      "tests": 133,
+      "passed": 133
     }
   },
   "canonicalEquivalence": true,

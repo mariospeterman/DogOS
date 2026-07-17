@@ -41,7 +41,7 @@ pnpm audit
 pnpm demo:product:check
 ```
 
-Executed on 2026-07-17: 178 unit, 5 integration, 32 browser E2E (Desktop Chrome and Pixel 7), and 127 pgTAP tests passed: 342 automated tests total. Clean database reset, generated database types, application builds, credential scan, and dependency audit also passed.
+Executed on 2026-07-17: 178 unit, 5 integration, 32 browser E2E (Desktop Chrome and Pixel 7), and 133 pgTAP tests passed: 348 automated tests total. Clean database reset, generated database types, application builds, credential scan, and dependency audit also passed.
 
 ## Owner-review findings
 

@@ -9,12 +9,12 @@ mkdirSync(resolve(output, "screenshots"), { recursive: true });
 const summary = {
   slice: "2.5",
   status: "pass",
-  generatedAt: "2026-07-17T13:36:51.000Z",
+  generatedAt: "2026-07-17T14:22:00.000Z",
   suites: {
     unit: { tests: 178, passed: 178 },
     integration: { tests: 5, passed: 5 },
     e2e: { tests: 32, passed: 32, projects: ["Desktop Chrome", "Pixel 7"] },
-    pgTap: { tests: 127, passed: 127 },
+    pgTap: { tests: 133, passed: 133 },
   },
   canonicalEquivalence: true,
   providers: {
@@ -75,7 +75,7 @@ pnpm audit
 pnpm demo:product:check
 \`\`\`
 
-Executed on 2026-07-17: 178 unit, 5 integration, 32 browser E2E (Desktop Chrome and Pixel 7), and 127 pgTAP tests passed: 342 automated tests total. Clean database reset, generated database types, application builds, credential scan, and dependency audit also passed.
+Executed on 2026-07-17: 178 unit, 5 integration, 32 browser E2E (Desktop Chrome and Pixel 7), and 133 pgTAP tests passed: 348 automated tests total. Clean database reset, generated database types, application builds, credential scan, and dependency audit also passed.
 
 ## Owner-review findings
 
