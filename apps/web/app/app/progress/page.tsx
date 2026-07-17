@@ -1,77 +1,77 @@
+"use client";
+
 import {
   AlertCircle,
-  ArrowRight,
   Database,
   Info,
   MessageCircle,
   TrendingUp,
 } from "lucide-react";
-import { AppShell } from "../../../components/app-shell";
 import Link from "next/link";
-
-const metrics = [
-  ["Lockere Abschnitte", "6 / 8", 75],
-  ["Konstante Ausführung", "2 Einheiten", 50],
-  ["Datenabdeckung", "mittel", 62],
-] as const;
+import { AppShell } from "../../../components/app-shell";
+import { useProductDashboard } from "../../../lib/product";
 
 export default function ProgressPage() {
+  const { loading, product } = useProductDashboard();
+  if (loading || product === null) {
+    return (
+      <AppShell
+        title="Fortschritt"
+        eyebrow={loading ? "Wird geladen" : "Noch keine Daten"}
+      />
+    );
+  }
+  const evidence = product.sessionCount;
   return (
-    <AppShell title="Milos Entwicklung" eyebrow="Letzte 14 Tage">
+    <AppShell
+      title={`${product.dogName}s Entwicklung`}
+      eyebrow="Aktiver Zyklus"
+    >
       <section className="decision-banner">
         <TrendingUp />
         <div>
           <span>Aktuelle Entscheidung</span>
-          <strong>Block 01 halten</strong>
+          <strong>Stufe halten</strong>
           <p>
-            Noch eine vergleichbare Einheit fehlt. Danach prüft DogOS den
-            nächsten Ablenkungsgrad.
+            {evidence < 3
+              ? `${3 - evidence} vergleichbare Einheiten fehlen für die nächste Prüfung.`
+              : "Die nächste Anpassung wird aus den erfassten Messwerten berechnet."}
           </p>
         </div>
       </section>
       <section className="metrics">
         <div className="metrics-head">
-          <h2>Kernsignale</h2>
+          <h2>Evidenz</h2>
           <span>
-            <Database size={15} /> 2 Einheiten
+            <Database size={15} /> {evidence} Einheiten
           </span>
         </div>
-        {metrics.map(([label, value, width]) => (
-          <div className="metric" key={label}>
-            <div>
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </div>
-            <div className="metric-track">
-              <span style={{ width: `${width}%` }} />
-            </div>
+        <div className="metric">
+          <div>
+            <span>Berichtete Ausgangslage</span>
+            <strong>{product.baselineSuccessRate}%</strong>
           </div>
-        ))}
-      </section>
-      <section className="missing-data compact-evidence">
-        <AlertCircle />
-        <div>
-          <strong>Offene Evidenz</strong>
-          <p>
-            Reaktionszeit und Distanz wurden nicht erfasst. Sie bleiben offen,
-            statt geschätzt zu werden.
-          </p>
+          <div className="metric-track">
+            <span style={{ width: `${product.baselineSuccessRate}%` }} />
+          </div>
         </div>
       </section>
-      <section className="plain-section">
-        <h2>Beobachtung</h2>
-        <p>In ruhiger Umgebung war die Erfolgsrate in 2 Einheiten höher.</p>
-        <p className="caveat">
-          <Info size={15} /> Zwei Einheiten zeigen eine Tendenz, noch keinen
-          belastbaren Zusammenhang.
-        </p>
-      </section>
-      <a className="text-link" href="/app/plan">
-        Begründung im Plan ansehen <ArrowRight size={16} />
-      </a>
+      {evidence === 0 ? (
+        <section className="missing-data compact-evidence">
+          <AlertCircle />
+          <div>
+            <strong>Noch keine Sitzungsmessung</strong>
+            <p>Werte bleiben offen, bis du den ersten Block abschliesst.</p>
+          </div>
+        </section>
+      ) : null}
+      <p className="caveat">
+        <Info size={15} /> Beobachtete Zusammenhänge sind beschreibend und keine
+        Ursache-Wirkungs-Aussage.
+      </p>
       <Link
         className="button secondary wide"
-        href="/app/coach?context=progress&prompt=Wie%20bewertest%20du%20Milos%20Fortschritt%3F"
+        href="/app/coach?context=progress"
       >
         <MessageCircle size={18} /> Fortschritt besprechen
       </Link>

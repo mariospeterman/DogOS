@@ -1,80 +1,79 @@
-import { ChevronRight, Crosshair, Info, MessageCircle } from "lucide-react";
+"use client";
+
+import { Info, MessageCircle, Target } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
 import { PlanTabs } from "../../../components/plan-tabs";
+import { useProductDashboard } from "../../../lib/product";
 
 export default function PlanPage() {
+  const { loading, product } = useProductDashboard();
+  if (loading || product === null) {
+    return (
+      <AppShell
+        title="Plan"
+        eyebrow={loading ? "Wird geladen" : "Noch nicht bereit"}
+      >
+        {!loading ? (
+          <p className="helper">
+            Schliesse zuerst die Aufnahme in WhatsApp ab.
+          </p>
+        ) : null}
+      </AppShell>
+    );
+  }
+  const duration = Math.round((product.currentStep?.durationSeconds ?? 0) / 60);
   return (
-    <AppShell title="Milos Plan" eyebrow="Aktiver Trainingszyklus">
+    <AppShell
+      title={`${product.dogName}s Plan`}
+      eyebrow="Aktiver Trainingszyklus"
+    >
       <PlanTabs active="plan" />
       <section className="plan-objective">
-        <Crosshair />
+        <Target />
         <div>
-          <span>Auftrag</span>
-          <strong>Lockere Leine auf ruhigen Alltagswegen</strong>
-          <p>Von 6 auf 8 kontrollierte Abschnitte pro Einheit.</p>
+          <span>Messbares Ziel</span>
+          <strong>{product.goalText}</strong>
+          <p>
+            Ausgangslage {product.baselineSuccessRate}% · Ziel 80% in drei
+            vergleichbaren Einheiten
+          </p>
         </div>
       </section>
       <section className="plain-section">
         <h2>Aktuelle Stufe</h2>
-        <p className="section-lede">01 / Orientierung unter wenig Ablenkung</p>
-        <div className="stage-track">
-          <span className="done" />
-          <span className="active" />
-          <span />
-          <span />
-        </div>
-        <small>Nächste Prüfung nach drei vergleichbaren Einheiten</small>
+        <p className="section-lede">
+          {product.currentStep?.difficulty ?? 1} / Orientierung unter wenig
+          Ablenkung
+        </p>
+        <small>
+          {duration} Minuten · maximal {product.currentStep?.repetitions ?? 0}{" "}
+          Abschnitte
+        </small>
       </section>
       <section className="plain-section">
         <h2>Warum dieser Block?</h2>
         <p className="plan-copy">
-          Milo arbeitet aktuell in ruhiger Umgebung stabiler als unter hoher
-          Ablenkung. Dieser Block festigt zuerst Orientierung und
-          Leinenkontrolle; Tempo und Ablenkung werden erst nach wiederholbarer
-          Ausführung erhöht.
+          Die Ausgangslage stammt aus deinem Bericht. DogOS hält Umgebung und
+          Aufgabe zunächst vergleichbar; erst wiederholte Sitzungsdaten
+          verändern die Schwierigkeit.
         </p>
-        <div className="dog-factors">
-          <span>Mischling</span>
-          <span>Erwachsen</span>
-          <span>Stadtumgebung</span>
-        </div>
       </section>
       <section className="reason-panel">
         <Info />
         <div>
           <strong>Entscheidung: Schwierigkeit halten</strong>
           <p>
-            Eine vergleichbare Einheit liegt vor. Einzelne gute Ergebnisse
-            ändern den Block noch nicht; Milos gemessene Ausführung entscheidet.
+            {product.sessionCount === 0
+              ? "Noch keine abgeschlossene Einheit liegt vor."
+              : `${product.sessionCount} Einheiten liegen als Evidenz vor.`}
           </p>
-          <span>1 von 3 Einheiten als Evidenz</span>
-        </div>
-      </section>
-      <section className="plain-section">
-        <h2>Wochenrhythmus</h2>
-        <div className="schedule-row">
-          <span>Mo</span>
-          <strong>Training</strong>
-          <small>4 Min.</small>
-          <ChevronRight />
-        </div>
-        <div className="schedule-row">
-          <span>Di</span>
-          <strong>Ruhetag</strong>
-          <small>Beobachten</small>
-          <ChevronRight />
-        </div>
-        <div className="schedule-row">
-          <span>Mi</span>
-          <strong>Training</strong>
-          <small>4 Min.</small>
-          <ChevronRight />
+          <span>Entwicklungsprotokoll · professionelle Prüfung ausstehend</span>
         </div>
       </section>
       <Link
         className="button secondary wide"
-        href="/app/coach?context=plan&prompt=Erkläre%20mir%20warum%20dieser%20Block%20jetzt%20passt."
+        href={`/app/coach?context=plan&prompt=${encodeURIComponent("Warum passt dieser Block jetzt?")}`}
       >
         <MessageCircle size={18} /> Plan mit Coach besprechen
       </Link>

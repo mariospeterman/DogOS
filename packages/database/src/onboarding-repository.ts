@@ -53,6 +53,27 @@ export interface DogProductContext {
   todaySessionId: string | null;
 }
 
+export interface ProductScheduleEntry {
+  durationSeconds: number;
+  id: string;
+  isRecovery: boolean;
+  plannedStart: string;
+  purposeCode: string;
+  status: string;
+}
+
+export interface ProductDashboard extends DogProductContext {
+  calendar: ProductScheduleEntry[];
+  currentStep: {
+    difficulty: number;
+    durationSeconds: number;
+    repetitions: number;
+    stepCode: string;
+    stopConditionCodes: string[];
+  } | null;
+  goalText: string;
+}
+
 interface TransactionQuery {
   (
     template: TemplateStringsArray,
@@ -94,7 +115,102 @@ export class OnboardingRepository {
     return typeof dogId === "string" ? this.findByDog(dogId) : null;
   }
 
-  async findByDog(dogId: string): Promise<DogProductContext | null> {
+  async findPrimaryByHousehold(
+    householdId: string,
+  ): Promise<ProductDashboard | null> {
+    const [projection] = await this.#sql`
+      select op.dog_id::text
+      from private.onboarding_projections op
+      join private.whatsapp_provider_contacts contact on contact.id = op.contact_id
+      where contact.household_id = ${householdId}::uuid
+      order by op.updated_at desc
+      limit 1
+    `;
+    return typeof projection?.dog_id === "string"
+      ? this.dashboardByDog(String(projection.dog_id), householdId)
+      : null;
+  }
+
+  async dashboardByDog(
+    dogId: string,
+    householdId: string,
+  ): Promise<ProductDashboard | null> {
+    const context = await this.findByDog(dogId, householdId);
+    if (context === null) return null;
+    const [goal] = await this.#sql`
+      select g.owner_goal_text
+      from private.onboarding_projections op
+      join api.goals g on g.id = op.goal_id
+      where op.dog_id = ${dogId}::uuid
+    `;
+    const steps = await this.#sql`
+      select
+        ps.protocol_step_code::text,
+        ps.duration_seconds,
+        ps.repetitions,
+        ps.difficulty_parameters,
+        ps.stop_condition_codes::text[]
+      from api.plans p
+      join api.plan_versions pv on pv.id = p.active_plan_version_id
+      join api.plan_steps ps on ps.plan_version_id = pv.id
+      where p.dog_id = ${dogId}::uuid
+      order by ps.sequence_number
+      limit 1
+    `;
+    const schedule = await this.#sql`
+      select
+        ss.id::text,
+        ss.planned_start::text,
+        ss.duration_seconds,
+        ss.purpose_code::text,
+        ss.is_recovery,
+        ss.status
+      from api.plans p
+      join api.plan_versions pv on pv.id = p.active_plan_version_id
+      join api.plan_steps ps on ps.plan_version_id = pv.id
+      join api.scheduled_sessions ss on ss.plan_step_id = ps.id
+      where p.dog_id = ${dogId}::uuid
+      order by ss.planned_start
+    `;
+    const step = steps[0];
+    const difficultyParameters = step?.difficulty_parameters;
+    return {
+      ...context,
+      calendar: schedule.map((entry) => ({
+        durationSeconds: Number(entry.duration_seconds),
+        id: String(entry.id),
+        isRecovery: Boolean(entry.is_recovery),
+        plannedStart: String(entry.planned_start),
+        purposeCode: String(entry.purpose_code),
+        status: String(entry.status),
+      })),
+      currentStep:
+        step === undefined
+          ? null
+          : {
+              difficulty:
+                typeof difficultyParameters === "object" &&
+                difficultyParameters !== null &&
+                "level" in difficultyParameters
+                  ? Number(
+                      (difficultyParameters as Record<string, unknown>).level,
+                    )
+                  : 1,
+              durationSeconds: Number(step.duration_seconds),
+              repetitions: Number(step.repetitions),
+              stepCode: String(step.protocol_step_code),
+              stopConditionCodes: Array.isArray(step.stop_condition_codes)
+                ? step.stop_condition_codes.map(String)
+                : [],
+            },
+      goalText: String(goal?.owner_goal_text ?? context.goal),
+    };
+  }
+
+  async findByDog(
+    dogId: string,
+    householdId?: string,
+  ): Promise<DogProductContext | null> {
     const rows = await this.#sql`
       select
         d.id::text as dog_id,
@@ -124,6 +240,11 @@ export class OnboardingRepository {
       join api.risk_assessments ra on ra.id = op.risk_assessment_id
       left join api.plans p on p.id = op.plan_id
       where d.id = ${dogId}::uuid
+        ${
+          householdId === undefined
+            ? this.#sql``
+            : this.#sql`and d.household_id = ${householdId}::uuid`
+        }
       limit 1
     `;
     const row = rows[0];

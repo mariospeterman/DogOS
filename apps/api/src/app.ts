@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import Fastify, {
@@ -15,7 +16,12 @@ import {
   InMemoryCoachConversationStore,
 } from "@dogos/conversation";
 import type { WhatsAppWebhookService } from "@dogos/whatsapp";
-import type { AccountRepository } from "@dogos/database";
+import {
+  IdempotencyConflictError,
+  type AccountRepository,
+  type OnboardingRepository,
+  type PostgresRepository,
+} from "@dogos/database";
 import { ProductService } from "./product-service.js";
 import {
   SignedActionError,
@@ -120,10 +126,19 @@ function key(request: FastifyRequest): string {
   return value;
 }
 
+function requestHash(body: unknown): string {
+  return createHash("sha256").update(JSON.stringify(body)).digest("hex");
+}
+
 export interface BuildAppOptions {
   accounts?: Pick<AccountRepository, "resolveByAppUser">;
   authenticator?: RequestAuthenticator;
   coach?: CoachConversationService;
+  products?: Pick<
+    OnboardingRepository,
+    "dashboardByDog" | "findPrimaryByHousehold"
+  >;
+  commands?: Pick<PostgresRepository, "completeSession" | "startSession">;
   product?: ProductService;
   signedActions?: SignedActionService;
   twilio?: {
@@ -220,37 +235,46 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
                 error.code,
                 "The signed action is not valid",
               )
-            : message === "IDEMPOTENCY_CONFLICT"
+            : error instanceof IdempotencyConflictError ||
+                message === "IDEMPOTENCY_CONFLICT"
               ? new ApiError(
                   409,
                   "IDEMPOTENCY_CONFLICT",
                   "The key was already used for another command",
                 )
-              : message === "SAFETY_REVIEW_REQUIRED"
-                ? new ApiError(
-                    409,
-                    "SAFETY_REVIEW_REQUIRED",
-                    "Professional review is required before training",
-                  )
-                : message === "PLAN_GENERATION_BLOCKED"
+              : message === "RESOURCE_NOT_FOUND"
+                ? new ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
+                : message === "STALE_VERSION"
                   ? new ApiError(
                       409,
-                      "PLAN_GENERATION_BLOCKED",
-                      "Safety assessment blocks plan generation",
+                      "STALE_VERSION",
+                      "The resource has already changed",
                     )
-                  : message === "IDENTITY_LINK_INVALID"
+                  : message === "SAFETY_REVIEW_REQUIRED"
                     ? new ApiError(
-                        400,
-                        "SIGNED_ACTION_INVALID",
-                        "The identity link is invalid or expired",
+                        409,
+                        "SAFETY_REVIEW_REQUIRED",
+                        "Professional review is required before training",
                       )
-                    : new ApiError(
-                        hasValidation ? 400 : 500,
-                        "VALIDATION_FAILED",
-                        hasValidation
-                          ? "Request validation failed"
-                          : "The request could not be completed",
-                      );
+                    : message === "PLAN_GENERATION_BLOCKED"
+                      ? new ApiError(
+                          409,
+                          "PLAN_GENERATION_BLOCKED",
+                          "Safety assessment blocks plan generation",
+                        )
+                      : message === "IDENTITY_LINK_INVALID"
+                        ? new ApiError(
+                            400,
+                            "SIGNED_ACTION_INVALID",
+                            "The identity link is invalid or expired",
+                          )
+                        : new ApiError(
+                            hasValidation ? 400 : 500,
+                            "VALIDATION_FAILED",
+                            hasValidation
+                              ? "Request validation failed"
+                              : "The request could not be completed",
+                          );
     void reply.status(apiError.status).send({
       error: { code: apiError.code, message: apiError.message },
       traceId: request.id,
@@ -536,6 +560,33 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     );
 
     routes.get(
+      "/v1/product",
+      {
+        schema: {
+          operationId: "getProductDashboard",
+          tags: ["product"],
+          headers: authHeaders,
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dashboard = await options.products?.findPrimaryByHousehold(
+          actor.householdId,
+        );
+        return dashboard === null || dashboard === undefined
+          ? { status: "onboarding_required", householdId: actor.householdId }
+          : { status: "ready", ...dashboard };
+      },
+    );
+
+    routes.get(
       "/v1/coach/conversation",
       {
         schema: {
@@ -556,12 +607,23 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           request.headers,
           request.id,
         );
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
         const dogId = (request.query as { dogId: string }).dogId;
+        const dashboard = await options.products?.dashboardByDog(
+          dogId,
+          actor.householdId,
+        );
         const snapshot = product.snapshot();
+        if (options.products !== undefined && dashboard === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
         if (
-          actor.householdId !== snapshot.household.id ||
-          dogId !== snapshot.dog.id ||
-          actor.identity === "unrelated"
+          options.products === undefined &&
+          (actor.householdId !== snapshot.household.id ||
+            dogId !== snapshot.dog.id ||
+            actor.identity === "unrelated")
         ) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }
@@ -604,17 +666,28 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           request.id,
         );
         requireWrite(actor);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
         const body = request.body as {
           dogId: string;
           message: string;
           contextKind?: "today" | "plan" | "session" | "progress" | "general";
           contextSubjectId?: string;
         };
+        const dashboard = await options.products?.dashboardByDog(
+          body.dogId,
+          actor.householdId,
+        );
         const snapshot = product.snapshot();
+        if (options.products !== undefined && dashboard === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
         if (
-          actor.householdId !== snapshot.household.id ||
-          body.dogId !== snapshot.dog.id ||
-          actor.identity === "unrelated"
+          options.products === undefined &&
+          (actor.householdId !== snapshot.household.id ||
+            body.dogId !== snapshot.dog.id ||
+            actor.identity === "unrelated")
         ) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }
@@ -622,14 +695,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           channel: "web",
           clientMessageId: key(request),
           context: {
-            dogName: snapshot.dog.name,
-            durationMinutes: 4,
-            evidenceCount: snapshot.sessions.length,
-            goal:
-              snapshot.locale === "de-CH"
-                ? "lockerer Leine im Alltag"
-                : "a loose leash on daily walks",
-            latestDecision: snapshot.latestDecision,
+            dogName: dashboard?.dogName ?? snapshot.dog.name,
+            durationMinutes: Math.round(
+              (dashboard?.currentStep?.durationSeconds ?? 240) / 60,
+            ),
+            evidenceCount: dashboard?.sessionCount ?? snapshot.sessions.length,
+            goal: dashboard?.goalText ?? snapshot.goal,
+            latestDecision:
+              dashboard?.latestDecision ?? snapshot.latestDecision,
             stage:
               snapshot.locale === "de-CH"
                 ? "Orientierung unter wenig Ablenkung"
@@ -685,12 +758,39 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             request.headers,
             request.id,
           );
-          if (
-            actor.householdId !== product.snapshot().household.id ||
-            actor.identity === "unrelated"
-          )
+          if (actor.householdId === null)
             throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
-          return product.snapshot();
+          if (options.products === undefined) {
+            if (
+              actor.householdId !== product.snapshot().household.id ||
+              actor.identity === "unrelated"
+            ) {
+              throw new ApiError(
+                403,
+                "ACCESS_DENIED",
+                "Household access denied",
+              );
+            }
+            return product.snapshot();
+          }
+          const dashboard = await options.products.findPrimaryByHousehold(
+            actor.householdId,
+          );
+          if (dashboard === null) {
+            throw new ApiError(404, "RESOURCE_NOT_FOUND", "Product not found");
+          }
+          const requestedId = (request.params as { id: string }).id;
+          const expectedIds = new Set([
+            actor.householdId,
+            dashboard.dogId,
+            dashboard.planId,
+            dashboard.todaySessionId,
+            ...dashboard.calendar.map((entry) => entry.id),
+          ]);
+          if (!expectedIds.has(requestedId)) {
+            throw new ApiError(404, "RESOURCE_NOT_FOUND", "Product not found");
+          }
+          return dashboard;
         },
       );
 
@@ -794,9 +894,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         foodAccepted: { type: "boolean" },
         avoidance: { type: "boolean" },
         repetitions: { type: "integer", minimum: 0, maximum: 20 },
+        successes: { type: "integer", minimum: 0, maximum: 20 },
         distractionLevel: { type: "integer", minimum: 0, maximum: 5 },
         difficulty: { type: "integer", minimum: 1, maximum: 5 },
         confidence: { type: "integer", minimum: 1, maximum: 5 },
+        concernNotes: { type: "string", maxLength: 1_000 },
+        outcome: { type: "string", enum: ["clean", "mixed", "stopped"] },
       },
     } as const;
     routes.post(
@@ -821,12 +924,108 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           success: number;
           foodAccepted: boolean;
           avoidance?: boolean;
+          repetitions?: number;
+          successes?: number;
+          distractionLevel?: number;
+          difficulty?: number;
+          confidence?: number;
+          concernNotes?: string;
+          outcome?: "clean" | "mixed" | "stopped";
         };
+        if (options.commands !== undefined) {
+          if (actor.householdId === null) {
+            throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+          }
+          const repetitions = body.repetitions ?? 0;
+          const successes =
+            body.successes ?? Math.round((body.success / 100) * repetitions);
+          if (successes > repetitions) {
+            throw new ApiError(
+              400,
+              "VALIDATION_FAILED",
+              "Successes cannot exceed repetitions",
+            );
+          }
+          const account = await options.accounts?.resolveByAppUser(
+            actor.actorId,
+          );
+          const result = await options.commands.completeSession(
+            {
+              actorUserId: actor.actorId,
+              commandCode: "command.complete_session",
+              idempotencyKey: key(request),
+              requestHash: requestHash(body),
+              traceId: request.id,
+            },
+            (request.params as { id: string }).id,
+            actor.householdId,
+            {
+              concernNotes: body.concernNotes?.trim() || null,
+              confidence: body.confidence ?? null,
+              difficulty: body.difficulty ?? null,
+              distractionLevel: body.distractionLevel ?? null,
+              foodAccepted: body.foodAccepted,
+              locale: account?.locale ?? "de-CH",
+              outcome:
+                body.outcome ?? (body.avoidance === true ? "stopped" : "mixed"),
+              repetitions,
+              successes,
+            },
+          );
+          reply.header("x-idempotent-replay", String(result.replayed));
+          return result.body;
+        }
         const command = product.command(actor.actorId, key(request), body, () =>
           product.completeSession(body, request.id),
         );
         reply.header("x-idempotent-replay", String(command.replayed));
         return command.result;
+      },
+    );
+
+    routes.post(
+      "/v1/scheduled-sessions/:id/start",
+      {
+        schema: {
+          operationId: "startScheduledSession",
+          tags: ["sessions"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            properties: {},
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request, reply) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (options.commands === undefined) {
+          product.assertSessionStartAllowed();
+          return product.snapshot();
+        }
+        const body = request.body as object;
+        const result = await options.commands.startSession(
+          {
+            actorUserId: actor.actorId,
+            commandCode: "command.start_session",
+            idempotencyKey: key(request),
+            requestHash: requestHash(body),
+            traceId: request.id,
+          },
+          (request.params as { id: string }).id,
+          actor.householdId,
+        );
+        reply.header("x-idempotent-replay", String(result.replayed));
+        return result.body;
       },
     );
 
@@ -837,7 +1036,6 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       ["/v1/anamneses/:id/answers", "submitAnamnesisAnswer"],
       ["/v1/dogs/:id/goals", "createGoal"],
       ["/v1/goals/:id/generate-plan", "generatePlan"],
-      ["/v1/sessions/:id/start", "startSession"],
       ["/v1/sessions/:id/check-in", "submitCheckin"],
       ["/v1/plans/:id/evaluate-progress", "evaluatePlanProgress"],
       ["/v1/plans/:id/adjust", "adjustPlan"],
@@ -870,8 +1068,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           );
           requireWrite(actor);
           const body = request.body as object;
-          if (operationId === "startSession")
-            product.assertSessionStartAllowed();
+          if (options.products !== undefined) {
+            throw new ApiError(
+              400,
+              "VALIDATION_FAILED",
+              "This command is not available in the current product flow",
+            );
+          }
           if (operationId === "generatePlan")
             product.assertPlanGenerationAllowed();
           const command = product.command(

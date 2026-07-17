@@ -10,7 +10,7 @@ export function AppShell({
   action,
   wide = false,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   title: string;
   eyebrow?: string;
   action?: ReactNode;

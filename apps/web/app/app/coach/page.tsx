@@ -4,7 +4,7 @@ import { CoachConversation } from "../../../components/coach-conversation";
 
 export default function CoachPage() {
   return (
-    <AppShell title="Coach" eyebrow="Milo · gemeinsamer Verlauf" wide>
+    <AppShell title="Coach" eyebrow="Gemeinsamer Verlauf" wide>
       <Suspense
         fallback={<div className="coach-loading">Coach wird geladen ...</div>}
       >

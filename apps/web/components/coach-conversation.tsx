@@ -3,10 +3,9 @@
 import { ArrowUp, ExternalLink, MessageCircle, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { dogosApiHeaders, dogosApiUrl } from "../lib/api-client";
-
-const DOG_ID = "30000000-0000-0000-0000-000000000001";
+import { useProductDashboard } from "../lib/product";
 
 interface CoachMessage {
   id: string;
@@ -26,11 +25,16 @@ interface CoachConversation {
 const contextLabels: Record<string, string> = {
   today: "Heutiger Trainingsblock",
   plan: "Aktiver Plan",
-  progress: "Milos Fortschritt",
+  progress: "Gemessener Fortschritt",
   session: "Trainingseinheit",
 };
 
 export function CoachConversation() {
+  const {
+    error: productError,
+    loading: productLoading,
+    product,
+  } = useProductDashboard();
   const searchParams = useSearchParams();
   const contextKind = searchParams.get("context") ?? "general";
   const initialPrompt = searchParams.get("prompt") ?? "";
@@ -43,10 +47,13 @@ export function CoachConversation() {
   const endRef = useRef<HTMLDivElement>(null);
   const operationRef = useRef(0);
 
-  async function load() {
+  const load = useCallback(async () => {
+    if (product === null) return;
     const operation = ++operationRef.current;
     const response = await fetch(
-      dogosApiUrl(`/v1/coach/conversation?dogId=${encodeURIComponent(DOG_ID)}`),
+      dogosApiUrl(
+        `/v1/coach/conversation?dogId=${encodeURIComponent(product.dogId)}`,
+      ),
       { headers: await dogosApiHeaders(), cache: "no-store" },
     );
     if (!response.ok) throw new Error("Coach konnte nicht geladen werden.");
@@ -54,7 +61,7 @@ export function CoachConversation() {
     if (operation !== operationRef.current) return;
     setConversation(nextConversation);
     setError(null);
-  }
+  }, [product]);
 
   useEffect(() => {
     load().catch((reason: unknown) =>
@@ -62,7 +69,7 @@ export function CoachConversation() {
         reason instanceof Error ? reason.message : "Coach nicht verfügbar.",
       ),
     );
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -71,7 +78,7 @@ export function CoachConversation() {
   async function send(event: FormEvent) {
     event.preventDefault();
     const text = message.trim();
-    if (!text || sending) return;
+    if (!text || sending || product === null) return;
     const operation = ++operationRef.current;
     setSending(true);
     setError(null);
@@ -79,7 +86,11 @@ export function CoachConversation() {
       const response = await fetch(dogosApiUrl("/v1/coach/messages"), {
         method: "POST",
         headers: await dogosApiHeaders(true),
-        body: JSON.stringify({ dogId: DOG_ID, message: text, contextKind }),
+        body: JSON.stringify({
+          dogId: product.dogId,
+          message: text,
+          contextKind,
+        }),
       });
       if (!response.ok)
         throw new Error("Nachricht konnte nicht gesendet werden.");
@@ -102,13 +113,30 @@ export function CoachConversation() {
   const messages = conversation?.messages ?? [];
   const whatsappUrl = `${
     process.env.NEXT_PUBLIC_WHATSAPP_CHAT_URL ?? "https://wa.me/15551617622"
-  }?text=${encodeURIComponent(message || "Was trainieren wir heute mit Milo?")}`;
+  }?text=${encodeURIComponent(message || `Was trainieren wir heute mit ${product?.dogName ?? "meinem Hund"}?`)}`;
+
+  if (productLoading) {
+    return <div className="coach-loading">Coach wird geladen ...</div>;
+  }
+  if (product === null) {
+    return (
+      <section className="success-panel">
+        <strong>Starte mit DogOS in WhatsApp</strong>
+        <p>
+          {productError ?? "Dort erfassen wir zuerst deinen Hund und das Ziel."}
+        </p>
+        <a className="button primary" href={whatsappUrl}>
+          WhatsApp öffnen
+        </a>
+      </section>
+    );
+  }
 
   return (
     <section className="coach-surface" aria-label="DogOS Coach">
       <div className="coach-contextbar">
         <span>
-          <span className="status-dot" /> Milo · Coach aktiv
+          <span className="status-dot" /> {product.dogName} · Coach aktiv
         </span>
         <a href={whatsappUrl} target="_blank" rel="noreferrer">
           In WhatsApp fortsetzen <ExternalLink size={14} />
@@ -120,8 +148,8 @@ export function CoachConversation() {
           <div className="coach-avatar">D</div>
           <div>
             <p>
-              Frag mich nach Milos heutigem Block, seinem Plan oder dem
-              gemessenen Fortschritt. Du kannst hier oder in WhatsApp
+              Frag mich nach {product.dogName}s heutigem Block, dem Plan oder
+              dem gemessenen Fortschritt. Du kannst hier oder in WhatsApp
               weitermachen.
             </p>
             <span>DogOS Coach</span>
@@ -176,7 +204,7 @@ export function CoachConversation() {
           aria-label="Nachricht an DogOS"
           maxLength={2000}
           onChange={(event) => setMessage(event.target.value)}
-          placeholder="Schreib DogOS über Milo ..."
+          placeholder={`Schreib DogOS über ${product.dogName} ...`}
           rows={1}
           value={message}
         />

@@ -196,4 +196,189 @@ export class PostgresRepository {
     }
     return String(row?.id);
   }
+
+  startSession(
+    context: CommandContext,
+    scheduledSessionId: string,
+    householdId: string,
+  ): Promise<{
+    body: { sessionId: string; status: "in_progress" };
+    replayed: boolean;
+    status: number;
+  }> {
+    return this.executeCommand(
+      context,
+      "session.started",
+      "session",
+      async (tx) => {
+        const [scheduled] = await tx`
+          select ss.id, d.id as dog_id
+          from api.scheduled_sessions ss
+          join api.plan_steps ps on ps.id = ss.plan_step_id
+          join api.plan_versions pv on pv.id = ps.plan_version_id
+          join api.plans p on p.id = pv.plan_id
+          join api.dogs d on d.id = p.dog_id
+          where ss.id = ${scheduledSessionId}::uuid
+            and d.household_id = ${householdId}::uuid
+            and p.active_plan_version_id = pv.id
+          for update of ss
+        `;
+        if (scheduled === undefined) throw new Error("RESOURCE_NOT_FOUND");
+        const [existing] = await tx`
+          select id, completion_status from api.sessions
+          where scheduled_session_id = ${scheduledSessionId}::uuid
+          order by created_at
+          limit 1
+        `;
+        if (
+          existing !== undefined &&
+          existing.completion_status !== "in_progress"
+        ) {
+          throw new Error("STALE_VERSION");
+        }
+        const sessionId =
+          existing === undefined
+            ? String(
+                (
+                  await tx`
+                    insert into api.sessions
+                      (scheduled_session_id, dog_id, handler_user_id, started_at,
+                       completion_status)
+                    values (${scheduledSessionId}, ${scheduled.dog_id},
+                      ${context.actorUserId}, now(), 'in_progress')
+                    returning id
+                  `
+                )[0]!.id,
+              )
+            : String(existing.id);
+        return {
+          body: { sessionId, status: "in_progress" as const },
+          status: 200,
+          targetId: sessionId,
+        };
+      },
+    );
+  }
+
+  completeSession(
+    context: CommandContext,
+    sessionId: string,
+    householdId: string,
+    input: {
+      concernNotes: string | null;
+      confidence: number | null;
+      difficulty: number | null;
+      distractionLevel: number | null;
+      foodAccepted: boolean | null;
+      locale: string;
+      outcome: "clean" | "mixed" | "stopped";
+      repetitions: number;
+      successes: number;
+    },
+  ): Promise<{
+    body: { sessionId: string; status: "completed" | "interrupted" };
+    replayed: boolean;
+    status: number;
+  }> {
+    return this.executeCommand(
+      context,
+      "session.completed",
+      "session",
+      async (tx) => {
+        const [session] = await tx`
+          select s.id, s.scheduled_session_id, s.completion_status
+          from api.sessions s
+          join api.dogs d on d.id = s.dog_id
+          where s.id = ${sessionId}::uuid
+            and d.household_id = ${householdId}::uuid
+          for update of s
+        `;
+        if (session === undefined) throw new Error("RESOURCE_NOT_FOUND");
+        if (session.completion_status !== "in_progress") {
+          throw new Error("STALE_VERSION");
+        }
+        const completionStatus =
+          input.outcome === "stopped" ? "interrupted" : "completed";
+        await tx`
+          update api.sessions
+          set completion_status = ${completionStatus}, ended_at = now()
+          where id = ${sessionId}::uuid
+        `;
+        if (session.scheduled_session_id !== null) {
+          await tx`
+            update api.scheduled_sessions
+            set status = 'completed', updated_at = now()
+            where id = ${session.scheduled_session_id}
+          `;
+        }
+        await tx`
+          insert into api.session_context
+            (session_id, distraction_level, feeding_context)
+          values (${sessionId}, ${input.distractionLevel},
+            ${tx.json({ accepted: input.foodAccepted })})
+          on conflict (session_id) do nothing
+        `;
+        const measurements: Array<{
+          code: string;
+          unit: string | null;
+          value: boolean | number | null;
+        }> = [
+          {
+            code: "metric.repetition_count",
+            unit: "unit.count",
+            value: input.repetitions,
+          },
+          {
+            code: "metric.success_count",
+            unit: "unit.count",
+            value: input.successes,
+          },
+          {
+            code: "metric.success_rate",
+            unit: "unit.percent",
+            value:
+              input.repetitions === 0
+                ? null
+                : (input.successes / input.repetitions) * 100,
+          },
+          {
+            code: "metric.food_acceptance",
+            unit: null,
+            value: input.foodAccepted,
+          },
+        ];
+        for (const measurement of measurements) {
+          const unknown = measurement.value === null;
+          await tx`
+            insert into api.session_measurements
+              (session_id, metric_code, value_numeric, value_boolean, is_unknown,
+               unknown_reason, unit_code, source, method_code, measured_at, quality)
+            values (${sessionId}, ${measurement.code},
+              ${typeof measurement.value === "number" ? measurement.value : null},
+              ${typeof measurement.value === "boolean" ? measurement.value : null},
+              ${unknown}, ${unknown ? "unknown.not_measured" : null},
+              ${measurement.unit}, 'owner_report', 'method.session_summary',
+              now(), ${unknown ? "unavailable" : "moderate"})
+          `;
+        }
+        await tx`
+          insert into api.owner_checkins
+            (session_id, user_id, difficulty_rating, confidence_rating,
+             perceived_outcome_code, concern_codes, notes, notes_locale)
+          values (${sessionId}, ${context.actorUserId}, ${input.difficulty},
+            ${input.confidence}, ${`outcome.${input.outcome}`},
+            ${input.concernNotes === null ? [] : ["concern.owner_reported"]},
+            ${input.concernNotes}, ${input.locale})
+        `;
+        return {
+          body: {
+            sessionId,
+            status: completionStatus as "completed" | "interrupted",
+          },
+          status: 200,
+          targetId: sessionId,
+        };
+      },
+    );
+  }
 }

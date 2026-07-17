@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import postgres from "postgres";
-import { OnboardingRepository } from "@dogos/database";
+import { OnboardingRepository, PostgresRepository } from "@dogos/database";
 import { OnboardingService } from "./onboarding-service.js";
 
 const connection = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const sql = postgres(connection, { prepare: false });
 const repository = new OnboardingRepository(connection);
+const commands = new PostgresRepository(connection);
 const service = new OnboardingService(repository);
 const contactId = randomUUID();
 
@@ -23,6 +24,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await commands.close();
   await repository.close();
   await sql.end();
 });
@@ -85,6 +87,93 @@ describe("durable WhatsApp onboarding", () => {
       plans: 1,
       projections: 1,
       scheduled_sessions: 4,
+    });
+
+    const dashboard = await repository.dashboardByDog(
+      first.dogId,
+      contact.householdId,
+    );
+    expect(dashboard?.todaySessionId).toEqual(expect.any(String));
+    const scheduledSessionId = dashboard!.todaySessionId!;
+    const startContext = {
+      actorUserId: contact.userId,
+      commandCode: "command.start_session",
+      idempotencyKey: randomUUID(),
+      requestHash: "empty-body",
+      traceId: randomUUID(),
+    };
+    const started = await commands.startSession(
+      startContext,
+      scheduledSessionId,
+      contact.householdId,
+    );
+    const startReplay = await commands.startSession(
+      startContext,
+      scheduledSessionId,
+      contact.householdId,
+    );
+    expect(started).toMatchObject({ replayed: false, status: 200 });
+    expect(startReplay).toMatchObject({
+      body: started.body,
+      replayed: true,
+      status: 200,
+    });
+
+    const completeContext = {
+      actorUserId: contact.userId,
+      commandCode: "command.complete_session",
+      idempotencyKey: randomUUID(),
+      requestHash: "complete-body",
+      traceId: randomUUID(),
+    };
+    const completion = await commands.completeSession(
+      completeContext,
+      started.body.sessionId,
+      contact.householdId,
+      {
+        concernNotes: null,
+        confidence: 4,
+        difficulty: 2,
+        distractionLevel: 1,
+        foodAccepted: true,
+        locale: "en",
+        outcome: "clean",
+        repetitions: 4,
+        successes: 3,
+      },
+    );
+    const completionReplay = await commands.completeSession(
+      completeContext,
+      started.body.sessionId,
+      contact.householdId,
+      {
+        concernNotes: null,
+        confidence: 4,
+        difficulty: 2,
+        distractionLevel: 1,
+        foodAccepted: true,
+        locale: "en",
+        outcome: "clean",
+        repetitions: 4,
+        successes: 3,
+      },
+    );
+    expect(completion.body.status).toBe("completed");
+    expect(completionReplay.replayed).toBe(true);
+    const [sessionCounts] = await sql`
+      select
+        (select count(*)::integer from api.sessions where id = ${started.body.sessionId}) as sessions,
+        (select count(*)::integer from api.session_measurements where session_id = ${started.body.sessionId}) as measurements,
+        (select count(*)::integer from api.owner_checkins where session_id = ${started.body.sessionId}) as checkins,
+        (select count(*)::integer from private.audit_events
+          where target_id = ${started.body.sessionId}::uuid
+            and action in ('session.started', 'session.completed')) as audits
+    `;
+    expect(sessionCounts).toMatchObject({
+      audits: 2,
+      checkins: 1,
+      measurements: 4,
+      sessions: 1,
     });
   });
 });

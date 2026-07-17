@@ -15,12 +15,15 @@ import {
   InMemoryCoachConversationStore,
   PostgresCoachConversationStore,
 } from "@dogos/conversation";
-import { AccountRepository, OnboardingRepository } from "@dogos/database";
+import {
+  AccountRepository,
+  OnboardingRepository,
+  PostgresRepository,
+} from "@dogos/database";
 
 import { buildApp } from "./app.js";
 import { createRequestAuthenticator } from "./auth.js";
 import { OnboardingService } from "./onboarding-service.js";
-import { ProductService } from "./product-service.js";
 import { SignedActionService } from "./signed-actions.js";
 
 const environment = loadApiEnv(process.env);
@@ -29,6 +32,9 @@ const accounts = environment.DATABASE_URL
   : undefined;
 const onboardingRepository = environment.DATABASE_URL
   ? new OnboardingRepository(environment.DATABASE_URL)
+  : undefined;
+const commands = environment.DATABASE_URL
+  ? new PostgresRepository(environment.DATABASE_URL)
   : undefined;
 const onboarding =
   onboardingRepository === undefined
@@ -60,7 +66,6 @@ const whatsappProvider =
           process.env.WHATSAPP_VERIFY_TOKEN ?? "local-whatsapp-secret",
         )
       : new MetaCloudWhatsAppProvider(metaConfig);
-const product = new ProductService();
 const coachStore = environment.DATABASE_URL
   ? new PostgresCoachConversationStore(environment.DATABASE_URL)
   : new InMemoryCoachConversationStore();
@@ -153,7 +158,10 @@ const app = buildApp({
   ...(accounts === undefined ? {} : { accounts }),
   authenticator,
   coach,
-  product,
+  ...(commands === undefined ? {} : { commands }),
+  ...(onboardingRepository === undefined
+    ? {}
+    : { products: onboardingRepository }),
   signedActions,
   whatsapp,
   ...(twilioConfig === null
