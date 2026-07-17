@@ -44,9 +44,8 @@ test("scenario 1: German low-risk owner reaches and uses the plan", async ({
   page,
   request,
 }, testInfo) => {
-  test.setTimeout(60_000);
   await reset(request);
-  await page.goto("/app/today");
+  await page.goto("/app/today", { waitUntil: "domcontentloaded" });
   await expect(
     page.getByRole("heading", { name: "Rex / Heute" }),
   ).toBeVisible();
@@ -117,7 +116,10 @@ test("scenario 4: food refusal and avoidance reduce autonomous work without diag
     latestDecision: "reduce_difficulty",
     safety: "stop_training",
   });
-  await page.goto("/app/today");
+  await page.goto("/app/today", { waitUntil: "domcontentloaded" });
+  await expect(
+    page.getByRole("heading", { name: "Rex / Heute" }),
+  ).toBeVisible();
   await expect(
     page.getByText("Futterverweigerung, Meiden, Schmerzzeichen"),
   ).not.toBeVisible();
@@ -130,7 +132,6 @@ test("scenario 5: suspected pain blocks further session starts", async ({
   request,
   page,
 }, testInfo) => {
-  test.setTimeout(60_000);
   await reset(request);
   await request.post(`${api}/v1/dogs/dog-1/safety-assessments`, {
     headers: headers("pain-1"),
@@ -145,7 +146,9 @@ test("scenario 5: suspected pain blocks further session starts", async ({
   );
   expect(blocked.status()).toBe(409);
   expect((await blocked.json()).error.code).toBe("SAFETY_REVIEW_REQUIRED");
-  await page.goto("/app/referral/referral-1");
+  await page.goto("/app/referral/referral-1", {
+    waitUntil: "domcontentloaded",
+  });
   await expect(
     page.getByRole("heading", {
       name: "Beobachtung professionell einordnen lassen",
@@ -154,7 +157,6 @@ test("scenario 5: suspected pain blocks further session starts", async ({
   if (testInfo.project.name === "chromium")
     await page.screenshot({
       path: resolve(screenshots, "safety-escalation.png"),
-      fullPage: true,
     });
 });
 
@@ -334,6 +336,8 @@ test("web Coach shares a focused timeline and keeps WhatsApp handoff explicit", 
   await expect(
     page.getByText("Rex arbeitet gerade an", { exact: false }).last(),
   ).toBeVisible();
+  await expect(page.getByText("goal.loose_leash_walking")).toHaveCount(0);
+  await expect(page.getByText("step.low_distraction_baseline")).toHaveCount(0);
   await expect(page.getByText("DogOS", { exact: true }).last()).toBeVisible();
   await page.screenshot({
     path: resolve(
@@ -356,22 +360,24 @@ test("account language follows conversation without a selector", async ({
   ).toBeVisible();
 });
 
-test("calendar supports bounded rescheduling and a revocable ICS feed", async ({
+test("calendar renders the canonical schedule without fake booking controls", async ({
   page,
-  request,
 }) => {
-  test.setTimeout(60_000);
   await page.goto("/app/calendar");
-  await clickButton(page, "Freitag auf 17:30 verschieben");
-  await expect(page.getByText("17:30 · 4 Min.")).toBeVisible();
-
-  const invalid = await request.get("/api/calendar.ics");
-  expect(invalid.status()).toBe(401);
-  const valid = await request.get(
-    "/api/calendar.ics?token=local-review-calendar-v1",
+  const firstSession = page.locator(
+    '.calendar-list a[href="/app/session/session-1"]',
   );
-  expect(valid.headers()["content-type"]).toContain("text/calendar");
-  expect(await valid.text()).toContain("BEGIN:VEVENT");
+  await expect(firstSession).toHaveCount(1);
+  await expect(firstSession).toContainText("Mikrotraining");
+  const observation = page.locator('.calendar-list a[href="/app/progress"]');
+  await expect(observation).toHaveCount(1);
+  await expect(observation).toContainText("Beobachtungstag");
+  await expect(
+    page.getByRole("button", { name: "Freitag auf 17:30 verschieben" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Kalender abonnieren" }),
+  ).toHaveCount(0);
 });
 
 test("public start is WhatsApp-first and referral codes grant no access", async ({

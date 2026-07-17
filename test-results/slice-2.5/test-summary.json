@@ -1,33 +1,35 @@
 {
   "slice": "2.5",
   "status": "pass",
-  "generatedAt": "2026-07-16T16:00:00.000Z",
+  "generatedAt": "2026-07-17T12:14:53.000Z",
   "suites": {
     "unit": {
-      "tests": 147,
-      "passed": 147
+      "tests": 176,
+      "passed": 176
     },
     "integration": {
-      "tests": 2,
-      "passed": 2
+      "tests": 5,
+      "passed": 5
     },
     "e2e": {
-      "tests": 24,
-      "passed": 24,
+      "tests": 32,
+      "passed": 32,
       "projects": [
         "Desktop Chrome",
         "Pixel 7"
       ]
     },
     "pgTap": {
-      "tests": 90,
-      "passed": 90
+      "tests": 127,
+      "passed": 127
     }
   },
   "canonicalEquivalence": true,
   "providers": {
     "whatsapp": "restricted-meta-pilot",
-    "stripe": "not-started",
-    "calcom": "not-started"
+    "stripe": "implemented-unconfigured",
+    "calcom": "optional-adapter-deferred",
+    "llm": "deterministic-default-bounded-openai-optional",
+    "video": "not-started"
   }
 }

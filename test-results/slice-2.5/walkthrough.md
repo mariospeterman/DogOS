@@ -4,7 +4,7 @@
 
 `pnpm demo:product`
 
-Open [Today](http://127.0.0.1:3000/app/today). The command resets and seeds local data, starts the API and web product, and prints the deterministic local identities. WhatsApp conversations are exercised through provider contract and webhook tests rather than a user-facing web simulator.
+Open [Today](http://127.0.0.1:3100/app/today). The command resets and seeds only local data, starts the isolated review API on port 4100 and web product on port 3100, and prints the deterministic local identities. WhatsApp conversations are exercised through provider contract and webhook tests rather than a user-facing web simulator.
 
 ## Restricted WhatsApp pilot
 
@@ -41,7 +41,7 @@ pnpm audit
 pnpm demo:product:check
 ```
 
-Executed on 2026-07-16: 147 unit, 2 integration, 24 browser E2E (Desktop Chrome and Pixel 7), and 90 pgTAP tests passed: 263 automated tests total. Clean database reset, generated database types, application builds, the hosted migration, credential scan, and dependency audit also passed.
+Executed on 2026-07-17: 176 unit, 5 integration, 32 browser E2E (Desktop Chrome and Pixel 7), and 127 pgTAP tests passed: 340 automated tests total. Clean database reset, generated database types, application builds, credential scan, and dependency audit also passed.
 
 ## Owner-review findings
 
@@ -57,4 +57,4 @@ Send `x-dogos-user: owner|caregiver|viewer|trainer|unrelated` to the API. Mutati
 
 ## Warnings
 
-Protocols are development-only and await professional approval. Meta WhatsApp is a restricted pilot. Trainers and booking are mock data. Video analysis, Stripe, Cal.com, and production deployment are not implemented.
+Protocols are development-only and await professional approval. Meta WhatsApp is a restricted pilot. No trainer is listed until its credentials and availability are verified. Stripe billing is implemented but requires a configured catalog. Cal.com remains an optional booking adapter; video analysis and production deployment are not implemented.

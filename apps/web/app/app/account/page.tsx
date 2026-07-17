@@ -106,7 +106,9 @@ export default function AccountPage() {
           <strong>Supabase Auth</strong>
         </div>
       </section>
-      {account?.billingAvailable ? <BillingActions tier={account.tier} /> : null}
+      {account?.billingAvailable ? (
+        <BillingActions tier={account.tier} />
+      ) : null}
       <p className="helper">
         Antworte DogOS einfach in deiner Sprache. Zeitzone{" "}
         {account?.timezone ?? "..."}, Land, Währung und frühere Antworten

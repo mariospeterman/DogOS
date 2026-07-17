@@ -36,6 +36,7 @@ import {
   type RequestAuthenticator,
 } from "./auth.js";
 import type { StripeBillingService } from "./billing.js";
+import { presentGoal, presentStage } from "./training-presentation.js";
 
 const errorCodes = [
   "AUTH_REQUIRED",
@@ -859,6 +860,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             "The daily coaching limit has been reached",
           );
         }
+        const locale = account?.locale === "en" ? "en" : "de-CH";
         return coach.send({
           channel: "web",
           clientMessageId: key(request),
@@ -868,10 +870,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
               (dashboard?.currentStep?.durationSeconds ?? 240) / 60,
             ),
             evidenceCount: dashboard?.sessionCount ?? snapshot.sessions.length,
-            goal: dashboard?.goalText ?? snapshot.goal,
+            goal: presentGoal(dashboard?.goal ?? snapshot.goal, locale),
             latestDecision:
               dashboard?.latestDecision ?? snapshot.latestDecision,
-            stage: dashboard?.currentStep?.stepCode ?? "orientation foundation",
+            stage: presentStage(dashboard?.currentStep?.stepCode, locale),
           },
           ...(body.contextKind === undefined
             ? {}
@@ -892,7 +894,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             actorUserId: actor.actorId,
             dogId: body.dogId,
             householdId: actor.householdId,
-            locale: account?.locale === "en" ? "en" : "de-CH",
+            locale,
           },
           tier: account?.tier ?? "freemium",
           traceId: request.id,

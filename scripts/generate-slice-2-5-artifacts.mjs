@@ -9,18 +9,20 @@ mkdirSync(resolve(output, "screenshots"), { recursive: true });
 const summary = {
   slice: "2.5",
   status: "pass",
-  generatedAt: "2026-07-16T16:00:00.000Z",
+  generatedAt: "2026-07-17T12:14:53.000Z",
   suites: {
-    unit: { tests: 147, passed: 147 },
-    integration: { tests: 2, passed: 2 },
-    e2e: { tests: 24, passed: 24, projects: ["Desktop Chrome", "Pixel 7"] },
-    pgTap: { tests: 90, passed: 90 },
+    unit: { tests: 176, passed: 176 },
+    integration: { tests: 5, passed: 5 },
+    e2e: { tests: 32, passed: 32, projects: ["Desktop Chrome", "Pixel 7"] },
+    pgTap: { tests: 127, passed: 127 },
   },
   canonicalEquivalence: true,
   providers: {
     whatsapp: "restricted-meta-pilot",
-    stripe: "not-started",
-    calcom: "not-started",
+    stripe: "implemented-unconfigured",
+    calcom: "optional-adapter-deferred",
+    llm: "deterministic-default-bounded-openai-optional",
+    video: "not-started",
   },
 };
 writeFileSync(
@@ -73,7 +75,7 @@ pnpm audit
 pnpm demo:product:check
 \`\`\`
 
-Executed on 2026-07-16: 147 unit, 2 integration, 24 browser E2E (Desktop Chrome and Pixel 7), and 90 pgTAP tests passed: 263 automated tests total. Clean database reset, generated database types, application builds, the hosted migration, credential scan, and dependency audit also passed.
+Executed on 2026-07-17: 176 unit, 5 integration, 32 browser E2E (Desktop Chrome and Pixel 7), and 127 pgTAP tests passed: 340 automated tests total. Clean database reset, generated database types, application builds, credential scan, and dependency audit also passed.
 
 ## Owner-review findings
 
