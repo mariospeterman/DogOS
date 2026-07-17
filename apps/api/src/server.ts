@@ -17,12 +17,14 @@ import {
 } from "@dogos/conversation";
 import {
   AccountRepository,
+  BillingRepository,
   OnboardingRepository,
   PostgresRepository,
 } from "@dogos/database";
 
 import { buildApp } from "./app.js";
 import { createRequestAuthenticator } from "./auth.js";
+import { loadStripeBillingConfig, StripeBillingService } from "./billing.js";
 import { OnboardingService } from "./onboarding-service.js";
 import { SignedActionService } from "./signed-actions.js";
 
@@ -36,6 +38,15 @@ const onboardingRepository = environment.DATABASE_URL
 const commands = environment.DATABASE_URL
   ? new PostgresRepository(environment.DATABASE_URL)
   : undefined;
+const stripeConfig = loadStripeBillingConfig(process.env);
+const billingRepository =
+  environment.DATABASE_URL && stripeConfig
+    ? new BillingRepository(environment.DATABASE_URL)
+    : undefined;
+const billing =
+  stripeConfig && billingRepository
+    ? new StripeBillingService(stripeConfig, billingRepository)
+    : undefined;
 const onboarding =
   onboardingRepository === undefined
     ? undefined
@@ -120,11 +131,15 @@ const conversation = new WhatsAppConversationOrchestrator({
   ...(accounts === undefined
     ? {}
     : {
-        tierForContact: async (contact) => {
-          if (contact.userId === null) return "freemium" as const;
+        capabilitiesForContact: async (contact) => {
+          if (contact.userId === null) {
+            return { coachingMessagesPerDay: 12 };
+          }
           const account = await accounts.resolveByAppUser(contact.userId);
           if (account === null) throw new Error("ACCOUNT_NOT_FOUND");
-          return account.tier;
+          return {
+            coachingMessagesPerDay: account.capabilities.coachingMessagesPerDay,
+          };
         },
       }),
 });
@@ -157,6 +172,7 @@ const whatsapp = new WhatsAppWebhookService(
 const app = buildApp({
   ...(accounts === undefined ? {} : { accounts }),
   authenticator,
+  ...(billing === undefined ? {} : { billing }),
   coach,
   ...(commands === undefined ? {} : { commands }),
   ...(onboardingRepository === undefined

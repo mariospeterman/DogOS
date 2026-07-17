@@ -199,6 +199,8 @@ describe("product API", () => {
     const expectedPaths = [
       "/v1/account/locale",
       "/v1/anamneses/{id}/answers",
+      "/v1/billing/checkout",
+      "/v1/billing/portal",
       "/v1/coach/conversation",
       "/v1/coach/messages",
       "/v1/dogs/{id}",
@@ -217,11 +219,12 @@ describe("product API", () => {
       "/v1/plans/{id}/calendar",
       "/v1/plans/{id}/evaluate-progress",
       "/v1/plans/{id}/progress",
+      "/v1/product",
       "/v1/referrals/{id}",
+      "/v1/scheduled-sessions/{id}/start",
       "/v1/sessions/{id}",
       "/v1/sessions/{id}/check-in",
       "/v1/sessions/{id}/complete",
-      "/v1/sessions/{id}/start",
       "/v1/signed-actions",
       "/v1/signed-actions/resolve",
     ];

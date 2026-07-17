@@ -34,6 +34,7 @@ import {
   LocalRequestAuthenticator,
   type RequestAuthenticator,
 } from "./auth.js";
+import type { StripeBillingService } from "./billing.js";
 
 const errorCodes = [
   "AUTH_REQUIRED",
@@ -49,6 +50,7 @@ const errorCodes = [
   "SIGNED_ACTION_INVALID",
   "SIGNED_ACTION_EXPIRED",
   "SIGNED_ACTION_REPLAYED",
+  "BILLING_UNAVAILABLE",
 ] as const;
 type ErrorCode = (typeof errorCodes)[number];
 
@@ -119,6 +121,15 @@ function requireWrite(actor: AgentActorContext): void {
       "This role cannot change the household",
     );
 }
+function requireOwner(actor: AgentActorContext): void {
+  if (actor.role !== "owner") {
+    throw new ApiError(
+      403,
+      "ACCESS_DENIED",
+      "Only an owner can manage billing",
+    );
+  }
+}
 function key(request: FastifyRequest): string {
   const value = request.headers["idempotency-key"];
   if (typeof value !== "string")
@@ -133,6 +144,10 @@ function requestHash(body: unknown): string {
 export interface BuildAppOptions {
   accounts?: Pick<AccountRepository, "resolveByAppUser">;
   authenticator?: RequestAuthenticator;
+  billing?: Pick<
+    StripeBillingService,
+    "createCheckout" | "createPortal" | "processWebhook"
+  >;
   coach?: CoachConversationService;
   products?: Pick<
     OnboardingRepository,
@@ -339,6 +354,37 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
               return reply.status(401).send();
             }
             throw error;
+          }
+          return reply.status(200).send({ received: true });
+        },
+      );
+    }
+
+    if (options.billing !== undefined) {
+      routes.post(
+        "/webhooks/stripe",
+        {
+          config: { rawBody: true },
+          schema: {
+            hide: true,
+            headers: {
+              type: "object",
+              required: ["stripe-signature"],
+              properties: { "stripe-signature": { type: "string" } },
+            },
+          },
+        },
+        async (request, reply) => {
+          const raw = (request as FastifyRequest & { rawBody?: string })
+            .rawBody;
+          const signature = request.headers["stripe-signature"];
+          if (raw === undefined || typeof signature !== "string") {
+            return reply.status(400).send();
+          }
+          try {
+            await options.billing!.processWebhook(raw, signature);
+          } catch {
+            return reply.status(400).send();
           }
           return reply.status(200).send({ received: true });
         },
@@ -556,6 +602,96 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
                 timezone: account.timezone,
               }),
         };
+      },
+    );
+
+    routes.post(
+      "/v1/billing/checkout",
+      {
+        schema: {
+          operationId: "createBillingCheckout",
+          tags: ["billing"],
+          headers: mutationHeaders,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["tier"],
+            properties: {
+              tier: { type: "string", enum: ["plus", "pro", "ultra"] },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null || options.billing === undefined) {
+          throw new ApiError(
+            409,
+            "BILLING_UNAVAILABLE",
+            "Billing is not configured for this environment",
+          );
+        }
+        const body = request.body as { tier: "plus" | "pro" | "ultra" };
+        const url = await options.billing.createCheckout({
+          householdId: actor.householdId,
+          returnBaseUrl: configuredWebOrigin ?? "http://localhost:3000",
+          tier: body.tier,
+        });
+        return { url };
+      },
+    );
+
+    routes.post(
+      "/v1/billing/portal",
+      {
+        schema: {
+          operationId: "createBillingPortal",
+          tags: ["billing"],
+          headers: mutationHeaders,
+          body: { type: "object", additionalProperties: false, properties: {} },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null || options.billing === undefined) {
+          throw new ApiError(
+            409,
+            "BILLING_UNAVAILABLE",
+            "Billing is not configured for this environment",
+          );
+        }
+        try {
+          return {
+            url: await options.billing.createPortal({
+              householdId: actor.householdId,
+              returnBaseUrl: configuredWebOrigin ?? "http://localhost:3000",
+            }),
+          };
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message === "STRIPE_CUSTOMER_NOT_FOUND"
+          ) {
+            throw new ApiError(
+              409,
+              "BILLING_UNAVAILABLE",
+              "No billing account exists yet",
+            );
+          }
+          throw error;
+        }
       },
     );
 

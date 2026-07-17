@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/app-shell";
+import { BillingActions } from "../../../components/billing-actions";
 import { DistributionActions } from "../../../components/distribution-actions";
 import { createClient } from "../../../lib/supabase/client";
 import { dogosApiHeaders, dogosApiUrl } from "../../../lib/api-client";
@@ -104,6 +105,7 @@ export default function AccountPage() {
           <strong>Supabase Auth</strong>
         </div>
       </section>
+      {account ? <BillingActions tier={account.tier} /> : null}
       <p className="helper">
         Antworte DogOS einfach in deiner Sprache. Zeitzone{" "}
         {account?.timezone ?? "..."}, Land, Währung und frühere Antworten

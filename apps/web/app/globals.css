@@ -112,6 +112,30 @@ body {
   justify-content: space-between;
   padding: 22px 0;
 }
+.billing-actions {
+  background: #fff;
+  border-left: 3px solid var(--blue);
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px;
+}
+.billing-actions > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+.billing-actions span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.tier-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+}
+.tier-actions .button {
+  min-width: 0;
+}
 .start-return > div:first-child,
 .account-distribution > div:first-child {
   display: flex;

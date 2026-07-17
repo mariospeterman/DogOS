@@ -1,4 +1,4 @@
-import { capabilitiesForTier, type SubscriptionTier } from "@dogos/contracts";
+import type { TierCapabilities } from "@dogos/contracts";
 import { composeCoachReply } from "@dogos/conversation";
 
 import {
@@ -101,7 +101,9 @@ export interface WhatsAppConversationDependencies {
   ) => Promise<ConversationProductContext>;
   provider: WhatsAppProvider;
   store: WhatsAppStateStore;
-  tierForContact?: (contact: ProviderContact) => Promise<SubscriptionTier>;
+  capabilitiesForContact?: (
+    contact: ProviderContact,
+  ) => Promise<Pick<TierCapabilities, "coachingMessagesPerDay">>;
 }
 
 export class WhatsAppConversationOrchestrator {
@@ -143,11 +145,11 @@ export class WhatsAppConversationOrchestrator {
     const current = machine.view();
     const locale = current.locale;
     const localeChanged = locale !== beforeResolution.locale;
-    const tier =
-      (await this.dependencies.tierForContact?.(contact)) ?? "freemium";
+    const capabilities =
+      await this.dependencies.capabilitiesForContact?.(contact);
     const allowed = await this.dependencies.store.consumeDailyMessage(
       contact.id,
-      capabilitiesForTier(tier).coachingMessagesPerDay,
+      capabilities?.coachingMessagesPerDay ?? 12,
     );
     if (!allowed) {
       if (localeChanged) await this.persist(contact.id, current);
