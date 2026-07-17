@@ -70,5 +70,11 @@ jobs:
       - run: pnpm db:reset
       - run: pnpm db:test
       - run: pnpm db:lint
-      - run: pnpm db:types
+      - name: Generate database types
+        run: |
+          for attempt in 1 2 3; do
+            pnpm db:types && exit 0
+            test "$attempt" = 3 && exit 1
+            sleep $((attempt * 15))
+          done
       - run: git diff --exit-code -- packages/database/src/database.types.ts
