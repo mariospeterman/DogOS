@@ -48,6 +48,13 @@ insert into api.household_members (
   ('21000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000004', 'caregiver', 'revoked', now() - interval '30 days', now() - interval '1 day'),
   ('21000000-0000-0000-0000-000000000005', '20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000005', 'owner', 'active', now(), null);
 
+select * from private.bootstrap_account(
+  '00000000-0000-0000-0000-000000000001', 'Development Owner', 'de-CH'
+);
+select * from private.bootstrap_account(
+  '00000000-0000-0000-0000-000000000005', 'Isolation Owner', 'en'
+);
+
 insert into api.conversation_sessions (
   id, user_id, household_id, channel, detected_locale, active_locale,
   detected_locale_confidence, locale_source

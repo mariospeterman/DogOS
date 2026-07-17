@@ -15,6 +15,7 @@ import {
   InMemoryCoachConversationStore,
   PostgresCoachConversationStore,
 } from "@dogos/conversation";
+import { AccountRepository } from "@dogos/database";
 
 import { buildApp } from "./app.js";
 import { createRequestAuthenticator } from "./auth.js";
@@ -22,7 +23,11 @@ import { ProductService } from "./product-service.js";
 import { SignedActionService } from "./signed-actions.js";
 
 const environment = loadApiEnv(process.env);
+const accounts = environment.DATABASE_URL
+  ? new AccountRepository(environment.DATABASE_URL)
+  : undefined;
 const authenticator = createRequestAuthenticator({
+  ...(accounts === undefined ? {} : { accountRepository: accounts }),
   authMode: environment.DOGOS_AUTH_MODE,
   databaseUrl: environment.DATABASE_URL,
   environment: environment.DOGOS_ENV,
@@ -115,6 +120,7 @@ const whatsapp = new WhatsAppWebhookService(
   },
 );
 const app = buildApp({
+  ...(accounts === undefined ? {} : { accounts }),
   authenticator,
   coach,
   product,

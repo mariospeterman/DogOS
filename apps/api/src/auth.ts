@@ -1,9 +1,12 @@
 import type { IncomingHttpHeaders } from "node:http";
-import postgres, { type Sql } from "postgres";
 
-import type { AgentActorContext, LocalAgentIdentity } from "@dogos/agent-auth";
-
-import { localIdentities } from "./local-identities.js";
+import {
+  createLocalActor,
+  localAgentIdentities,
+  type AgentActorContext,
+  type LocalAgentIdentity,
+} from "@dogos/agent-auth";
+import { AccountRepository } from "@dogos/database";
 
 export interface RequestAuthenticator {
   authenticate(
@@ -48,40 +51,42 @@ export class LocalRequestAuthenticator implements RequestAuthenticator {
       return Promise.reject(new AuthenticationError("AUTH_REQUIRED"));
     }
     const value = headers["x-dogos-user"];
-    if (typeof value !== "string" || !(value in localIdentities)) {
+    if (
+      typeof value !== "string" ||
+      !localAgentIdentities.includes(value as LocalAgentIdentity)
+    ) {
       return Promise.reject(new AuthenticationError("AUTH_REQUIRED"));
     }
     const identity = value as LocalAgentIdentity;
-    const actor = localIdentities[identity];
+    const actor = createLocalActor(identity, this.environment);
     return Promise.resolve({
-      actorId: actor.id,
-      authMode: "development",
-      householdId: actor.householdId,
-      identity,
-      role: actor.role as AgentActorContext["role"],
+      ...actor,
       traceId,
     });
   }
 }
 
 interface SupabaseUserResponse {
+  email?: string;
   id?: string;
+  user_metadata?: Record<string, unknown>;
 }
 
 export class SupabaseRequestAuthenticator implements RequestAuthenticator {
-  readonly #sql: Sql;
+  readonly #accounts: AccountRepository;
 
   constructor(
     private readonly supabaseUrl: string,
     private readonly publishableKey: string,
     databaseUrl: string,
     private readonly fetcher: typeof fetch = fetch,
+    accountRepository?: AccountRepository,
   ) {
-    this.#sql = postgres(databaseUrl, { max: 5, prepare: false });
+    this.#accounts = accountRepository ?? new AccountRepository(databaseUrl);
   }
 
   async close(): Promise<void> {
-    await this.#sql.end();
+    await this.#accounts.close();
   }
 
   async authenticate(
@@ -109,39 +114,40 @@ export class SupabaseRequestAuthenticator implements RequestAuthenticator {
       throw new AuthenticationError("AUTH_REQUIRED");
     }
 
-    const rows = await this.#sql<
-      Array<{ app_user_id: string; household_id: string; role: string }>
-    >`
-      select u.id::text as app_user_id, hm.household_id::text, hm.role::text
-      from api.users u
-      join api.household_members hm on hm.user_id = u.id
-      where u.auth_user_id = ${authUser.id}
-        and u.status = 'active'
-        and hm.status = 'active'
-      order by case hm.role when 'owner' then 0 when 'caregiver' then 1 else 2 end,
-        hm.created_at
-      limit 1
-    `;
-    const membership = rows[0];
-    if (membership === undefined) {
-      throw new AuthenticationError("ACCESS_DENIED");
-    }
-    if (!["owner", "caregiver", "viewer"].includes(membership.role)) {
-      throw new AuthenticationError("ACCESS_DENIED");
+    let account = await this.#accounts.resolveByAuthUser(authUser.id);
+    if (account === null) {
+      const metadata = authUser.user_metadata ?? {};
+      const rawName = metadata.full_name;
+      const displayName =
+        typeof rawName === "string" && rawName.trim().length > 0
+          ? rawName.trim()
+          : (authUser.email?.split("@")[0] ?? "DogOS owner");
+      const rawLocale = metadata.locale;
+      const locale =
+        typeof rawLocale === "string" &&
+        rawLocale.toLowerCase().startsWith("de")
+          ? "de-CH"
+          : "en";
+      account = await this.#accounts.bootstrap({
+        authUserId: authUser.id,
+        displayName,
+        locale,
+      });
     }
 
     return {
-      actorId: membership.app_user_id,
+      actorId: account.appUserId,
       authMode: "supabase",
-      householdId: membership.household_id,
-      identity: membership.role as "owner" | "caregiver" | "viewer",
-      role: membership.role as "owner" | "caregiver" | "viewer",
+      householdId: account.householdId,
+      identity: account.role,
+      role: account.role,
       traceId,
     };
   }
 }
 
 export function createRequestAuthenticator(input: {
+  accountRepository?: AccountRepository;
   authMode: "hybrid" | "local" | "supabase";
   databaseUrl: string | undefined;
   environment: "local" | "preview" | "production" | "test";
@@ -167,6 +173,8 @@ export function createRequestAuthenticator(input: {
     input.supabaseUrl,
     input.publishableKey,
     input.databaseUrl,
+    fetch,
+    input.accountRepository,
   );
   return input.authMode === "hybrid"
     ? new CompositeRequestAuthenticator([

@@ -78,6 +78,14 @@ function SignInForm() {
         </button>
         {error === null ? null : <p className="error-note">{error}</p>}
       </section>
+      <div className="auth-links">
+        <a className="text-link" href="/auth/forgot-password">
+          Passwort vergessen
+        </a>
+        <a className="text-link" href="/auth/sign-up">
+          Konto erstellen
+        </a>
+      </div>
     </AppShell>
   );
 }

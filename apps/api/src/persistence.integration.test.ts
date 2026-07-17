@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import postgres from "postgres";
 import type { RiskAssessment } from "@dogos/contracts";
-import { PostgresRepository } from "@dogos/database";
+import { AccountRepository, PostgresRepository } from "@dogos/database";
 
 const connection = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const sql = postgres(connection, { prepare: false });
 const repository = new PostgresRepository(connection);
+const accounts = new AccountRepository(connection);
 const actorUserId = "10000000-0000-0000-0000-000000000001";
 const dogId = "30000000-0000-0000-0000-000000000001";
 const canonicalRuleSetId = "52000000-0000-4000-8000-000000000001";
@@ -22,10 +23,29 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await repository.close();
+  await accounts.close();
   await sql.end();
 });
 
 describe("PostgreSQL decision transaction", () => {
+  it("loads the persisted account and complete entitlement set", async () => {
+    await expect(accounts.resolveByAppUser(actorUserId)).resolves.toMatchObject(
+      {
+        appUserId: actorUserId,
+        capabilities: {
+          coachingMessagesPerDay: 12,
+          concurrentDogs: 1,
+          liveCoachingMinutesPerMonth: 0,
+          planAdjustmentsPerMonth: 1,
+          videoAnalysesPerMonth: 0,
+        },
+        householdId: "20000000-0000-0000-0000-000000000001",
+        role: "owner",
+        tier: "freemium",
+      },
+    );
+  });
+
   it("persists canonical reasons, replays once, and audits once", async () => {
     const decision: RiskAssessment = {
       riskLevel: "high",

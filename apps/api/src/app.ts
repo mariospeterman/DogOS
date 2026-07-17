@@ -6,13 +6,16 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import rawBody from "fastify-raw-body";
-import type { AgentActorContext } from "@dogos/agent-auth";
+import {
+  localAgentIdentities,
+  type AgentActorContext,
+} from "@dogos/agent-auth";
 import {
   CoachConversationService,
   InMemoryCoachConversationStore,
 } from "@dogos/conversation";
 import type { WhatsAppWebhookService } from "@dogos/whatsapp";
-import { localIdentities } from "./local-identities.js";
+import type { AccountRepository } from "@dogos/database";
 import { ProductService } from "./product-service.js";
 import {
   SignedActionError,
@@ -83,7 +86,7 @@ const mutationHeaders = {
   required: ["idempotency-key"],
   properties: {
     authorization: { type: "string" },
-    "x-dogos-user": { type: "string", enum: Object.keys(localIdentities) },
+    "x-dogos-user": { type: "string", enum: localAgentIdentities },
     "idempotency-key": { type: "string", minLength: 4, maxLength: 120 },
     "x-request-id": { type: "string" },
   },
@@ -92,7 +95,7 @@ const authHeaders = {
   type: "object",
   properties: {
     authorization: { type: "string" },
-    "x-dogos-user": { type: "string", enum: Object.keys(localIdentities) },
+    "x-dogos-user": { type: "string", enum: localAgentIdentities },
   },
 } as const;
 const idParams = {
@@ -118,6 +121,7 @@ function key(request: FastifyRequest): string {
 }
 
 export interface BuildAppOptions {
+  accounts?: Pick<AccountRepository, "resolveByAppUser">;
   authenticator?: RequestAuthenticator;
   coach?: CoachConversationService;
   product?: ProductService;
@@ -502,13 +506,31 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           request.headers,
           request.id,
         );
+        const account =
+          options.accounts === undefined
+            ? null
+            : await options.accounts.resolveByAppUser(actor.actorId);
+        if (options.accounts !== undefined && account === null) {
+          throw new ApiError(404, "RESOURCE_NOT_FOUND", "Account not found");
+        }
         return {
           identity: actor.identity,
           id: actor.actorId,
           role: actor.role,
           householdId: actor.householdId,
           authMode: actor.authMode,
-          locale: product.snapshot().locale,
+          locale: account?.locale ?? product.snapshot().locale,
+          ...(account === null
+            ? {}
+            : {
+                capabilities: account.capabilities,
+                country: account.country,
+                currency: account.currency,
+                displayName: account.displayName,
+                householdName: account.householdName,
+                tier: account.tier,
+                timezone: account.timezone,
+              }),
         };
       },
     );

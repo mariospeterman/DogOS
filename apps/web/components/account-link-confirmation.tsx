@@ -1,7 +1,7 @@
 "use client";
 
 import { Link2, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "../lib/supabase/client";
 import { AppShell, DevelopmentNotice } from "./app-shell";
 
@@ -9,6 +9,25 @@ export function AccountLinkConfirmation({ token }: { token: string }) {
   const [status, setStatus] = useState<"idle" | "working" | "linked" | "error">(
     "idle",
   );
+  const [householdName, setHouseholdName] = useState<string | null>(null);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const session = (await createClient().auth.getSession()).data.session;
+        if (session === null) return;
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000"}/v1/me`,
+          { headers: { authorization: `Bearer ${session.access_token}` } },
+        );
+        if (response.ok) {
+          const account = (await response.json()) as { householdName?: string };
+          setHouseholdName(account.householdName ?? null);
+        }
+      } catch {
+        // Confirmation still reports a precise error after the user submits.
+      }
+    })();
+  }, []);
   async function confirm() {
     setStatus("working");
     try {
@@ -54,7 +73,7 @@ export function AccountLinkConfirmation({ token }: { token: string }) {
             <ShieldCheck />
             Bestätigte Anmeldung
           </span>
-          <strong>Familie Keller</strong>
+          <strong>{householdName ?? "Angemeldetes DogOS Konto"}</strong>
         </div>
         <p className="helper">
           WhatsApp erhält erst nach dieser Bestätigung Zugriff auf Hund, Plan

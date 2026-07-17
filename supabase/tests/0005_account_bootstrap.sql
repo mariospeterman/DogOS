@@ -40,6 +40,7 @@ select results_eq(
     join api.household_members hm on hm.household_id = s.household_id
     join api.users u on u.id = hm.user_id
     where u.auth_user_id = '00000000-0000-0000-0000-000000000004'
+      and hm.status = 'active'
       and s.tier_code = 'tier.freemium' and s.canonical_status = 'active'$$,
   array[1],
   'one freemium subscription is created'
@@ -49,6 +50,7 @@ select results_eq(
     join api.household_members hm on hm.household_id = e.household_id
     join api.users u on u.id = hm.user_id
     where u.auth_user_id = '00000000-0000-0000-0000-000000000004'
+      and hm.status = 'active'
       and e.status = 'active'$$,
   array[5],
   'all freemium capabilities are materialized'
@@ -58,6 +60,7 @@ select results_eq(
     join api.household_members hm on hm.household_id = e.household_id
     join api.users u on u.id = hm.user_id
     where u.auth_user_id = '00000000-0000-0000-0000-000000000004'
+      and hm.status = 'active'
       and e.capability_code = 'capability.coaching_messages'$$,
   array[12],
   'the daily coach allowance comes from persisted entitlements'
@@ -80,7 +83,8 @@ select results_eq(
   $$select count(*)::integer from api.subscriptions s
     join api.household_members hm on hm.household_id = s.household_id
     join api.users u on u.id = hm.user_id
-    where u.auth_user_id = '00000000-0000-0000-0000-000000000004'$$,
+    where u.auth_user_id = '00000000-0000-0000-0000-000000000004'
+      and hm.status = 'active'$$,
   array[1],
   'retries do not duplicate subscriptions'
 );

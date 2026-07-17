@@ -1529,6 +1529,11 @@ a {
 .auth-form .button {
   margin-top: 18px;
 }
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+}
 .button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
