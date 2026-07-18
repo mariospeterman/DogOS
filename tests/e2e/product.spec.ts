@@ -38,7 +38,9 @@ test("scenario 1: German low-risk owner reaches the chat-first coach", async ({
   await page.getByLabel("Nachricht an DogOS").fill("Warum dieser Block?");
   await page.getByLabel("Nachricht an DogOS").press("Enter");
   await expect(
-    page.getByText("Warum dieser Block?", { exact: true }),
+    page.getByRole("article").getByText("Warum dieser Block?", {
+      exact: true,
+    }),
   ).toBeVisible();
   if (testInfo.project.name === "chromium")
     await page.screenshot({
@@ -113,6 +115,10 @@ test("scenario 4: food refusal and avoidance reduce autonomous work without diag
   await expect(
     page.getByText("Neue Beobachtung zu Rex", { exact: false }),
   ).toBeVisible();
+  await page.goto("/app/coach", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Training gestoppt")).toBeVisible();
+  await expect(page.getByText("Training starten")).not.toBeVisible();
+  await expect(page.getByText("Zuerst fachlich abklären")).not.toBeVisible();
 });
 
 test("scenario 5: suspected pain blocks further session starts", async ({
@@ -300,26 +306,29 @@ test("public account creation is available without a provider simulator", async 
 
 test("chat-first Coach and management views remain one PWA", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto("/app/coach");
   await expect(page).toHaveURL(/\/app\/coach$/);
   await expect(page.getByText("Rexs Coach")).toBeVisible();
-  const navigation = page.getByRole("navigation", {
-    name: "Produktnavigation",
-  });
-  for (const name of ["Coach", "Plan", "Training", "Fortschritt", "Video"]) {
+  if (testInfo.project.name === "chromium") {
     await expect(
-      navigation.getByRole("link", { name, exact: true }),
+      page.getByRole("complementary", { name: "DogOS navigation" }),
     ).toBeVisible();
   }
-  await expect(page.getByLabel("Verlauf")).toBeVisible();
+  for (const name of ["Plan", "Training", "Fortschritt", "Live"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  await expect(page.getByLabel("Trainingsvideo hochladen")).toBeVisible();
+  if (testInfo.project.name === "chromium") {
+    await expect(page.getByLabel("Live Video starten")).toBeVisible();
+    await expect(page.getByLabel("Sprachnotiz folgt")).toBeDisabled();
+  }
   await expect(page.getByLabel("Konto")).toBeVisible();
   await page.goto("/app/plan");
   await expect(page).toHaveURL(/\/app\/coach\?space=plan/);
-  await expect(navigation.getByRole("link", { name: "Plan" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(
+    page.getByRole("button", { exact: true, name: "Plan" }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("account language follows conversation without a selector", async ({

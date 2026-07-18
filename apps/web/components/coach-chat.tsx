@@ -5,12 +5,14 @@ import {
   Camera,
   CircleUserRound,
   Clock3,
+  CreditCard,
   History,
   Mic,
   Moon,
   Plus,
   Route,
   Send,
+  Settings,
   Sparkles,
   Sun,
   Target,
@@ -97,12 +99,88 @@ function splitSources(text: string, locale: "de-CH" | "en") {
   return { body, sources };
 }
 
-function canRenderTrainingAction(product: ProductDashboard): boolean {
-  return (
-    product.planStatus === "active" &&
-    product.todaySessionId !== null &&
-    !/review|professional|blocked|safety/i.test(product.riskDisposition)
-  );
+type TrainingActionState =
+  "ready" | "not_scheduled" | "needs_information" | "stopped";
+
+function trainingActionState(product: ProductDashboard): TrainingActionState {
+  if (product.riskDisposition === "require_more_information") {
+    return "needs_information";
+  }
+  if (product.riskDisposition !== "continue_low_risk_training") {
+    return "stopped";
+  }
+  if (product.planStatus !== "active" || product.todaySessionId === null) {
+    return "not_scheduled";
+  }
+  return "ready";
+}
+
+function trainingDecisionLabel(decision: string, english: boolean): string {
+  if (decision === "increase_difficulty") {
+    return english ? "ready for the next level" : "nächste Stufe möglich";
+  }
+  if (decision === "reduce_difficulty") {
+    return english ? "make this easier" : "Übung vereinfachen";
+  }
+  if (decision === "ask_for_information") {
+    return english ? "one observation missing" : "eine Beobachtung fehlt";
+  }
+  return english ? "repeat this level" : "aktuelle Stufe wiederholen";
+}
+
+function heldTrainingCopy(
+  state: TrainingActionState,
+  english: boolean,
+): { label: string; status: string; title: string; body: string } {
+  if (state === "needs_information") {
+    return english
+      ? {
+          body: "DogOS needs one more observation before it shows another autonomous training start.",
+          label: "Training held",
+          status: "Info",
+          title: "One observation is missing",
+        }
+      : {
+          body: "DogOS braucht zuerst eine weitere Beobachtung, bevor eine neue autonome Trainingseinheit startet.",
+          label: "Training pausiert",
+          status: "Info",
+          title: "Eine Beobachtung fehlt",
+        };
+  }
+  if (state === "not_scheduled") {
+    return english
+      ? {
+          body: "The plan stays visible, but there is no startable session scheduled right now.",
+          label: "No session",
+          status: "Plan",
+          title: "Nothing scheduled yet",
+        }
+      : {
+          body: "Der Plan bleibt sichtbar, aber aktuell ist keine startbare Einheit geplant.",
+          label: "Keine Einheit",
+          status: "Plan",
+          title: "Noch nichts geplant",
+        };
+  }
+  return english
+    ? {
+        body: "DogOS keeps the history visible, but stops autonomous training until the risk state is reviewed.",
+        label: "Training stopped",
+        status: "Stop",
+        title: "Review before training",
+      }
+    : {
+        body: "DogOS zeigt den Verlauf weiter, stoppt aber autonomes Training bis zur Abklärung des Risikozustands.",
+        label: "Training gestoppt",
+        status: "Stop",
+        title: "Abklärung vor Training",
+      };
+}
+
+function historyLabel(text: string, fallback: string): string {
+  const first = text.replace(/\s+/g, " ").trim();
+  if (first.length === 0) return fallback;
+  return first.length > 42 ? `${first.slice(0, 42)}...` : first;
 }
 
 export function CoachChat({ product }: { product: ProductDashboard }) {
@@ -204,7 +282,6 @@ function CoachRuntime({
     1,
     Math.ceil((product.currentStep?.durationSeconds ?? 180) / 60),
   );
-  const trainingAllowed = canRenderTrainingAction(product);
   const placeholder =
     activeSpace === "plan"
       ? english
@@ -257,312 +334,417 @@ function CoachRuntime({
   }
 
   const hasHistory = messages.length > 0;
-  const spaces = [
+  const trainingState = trainingActionState(product);
+  const trainingAllowed = trainingState === "ready";
+  const historyEntries = messages
+    .filter((message) => message.role === "user")
+    .slice(-8)
+    .reverse()
+    .map((message, index) => ({
+      href: `#message-${message.id}`,
+      id: message.id,
+      label: historyLabel(textOf(message), english ? "Conversation" : "Chat"),
+      meta:
+        index === 0
+          ? english
+            ? "Latest"
+            : "Aktuell"
+          : english
+            ? "Coach"
+            : "Coach",
+    }));
+  const quickActions = [
     {
-      href: "/app/coach?space=coach",
-      id: "coach",
-      label: "Coach",
-      icon: Sparkles,
+      action: () =>
+        submit(
+          english
+            ? `Explain ${product.dogName}'s current plan.`
+            : `Erkläre mir ${product.dogName}s aktuellen Plan.`,
+        ),
+      icon: Route,
+      id: "plan",
+      label: "Plan",
     },
-    { href: "/app/coach?space=plan", id: "plan", label: "Plan", icon: Route },
     {
-      href: "/app/coach?space=train",
+      action: () =>
+        trainingAllowed
+          ? window.location.assign(
+              `/app/coach?space=train&session=${product.todaySessionId}`,
+            )
+          : submit(
+              english
+                ? `What is blocking ${product.dogName}'s next training session?`
+                : `Was blockiert ${product.dogName}s nächste Trainingseinheit?`,
+            ),
+      icon: Clock3,
       id: "train",
       label: english ? "Train" : "Training",
-      icon: Clock3,
     },
     {
-      href: "/app/coach?space=progress",
+      action: () =>
+        submit(
+          english
+            ? `Show ${product.dogName}'s recent progress.`
+            : `Zeig mir ${product.dogName}s Fortschritt.`,
+        ),
+      icon: Target,
       id: "progress",
       label: english ? "Progress" : "Fortschritt",
-      icon: Target,
     },
     {
-      href: "/app/coach?space=media",
-      id: "media",
-      label: "Video",
       icon: Video,
+      id: "live",
+      label: "Live",
+      action: () => window.location.assign("/app/live"),
     },
   ] as const;
+  const heldCopy = heldTrainingCopy(trainingState, english);
   return (
     <div className="coach-shell" data-theme={theme}>
-      <header className="coach-header">
-        <div className="coach-identity">
+      <aside className="coach-sidebar" aria-label="DogOS navigation">
+        <div className="sidebar-brand">
           <span className="coach-mark">D</span>
-          <div>
-            <strong>
-              {english
-                ? `${product.dogName}'s Coach`
-                : `${product.dogName}s Coach`}
-            </strong>
-            <span>
-              {product.goalText} · {presentation.stage} ·{" "}
-              {product.baselineSuccessRate}% → {product.targetSuccessRate ?? 80}
-              %
-            </span>
-          </div>
+          <strong>DogOS</strong>
         </div>
-        <div className="coach-header-actions">
-          <Link
-            className="icon-link"
-            href="/app/account/history"
-            aria-label={english ? "History" : "Verlauf"}
-          >
-            <History size={20} />
+        <Link className="new-chat-link" href="/app/coach">
+          <Sparkles size={16} />
+          {english ? "Coach chat" : "Coach Chat"}
+        </Link>
+        <section className="sidebar-section">
+          <span>{english ? "History" : "Verlauf"}</span>
+          {historyEntries.length === 0 ? (
+            <p>{english ? "No messages yet" : "Noch keine Nachrichten"}</p>
+          ) : (
+            historyEntries.map((entry) => (
+              <a href={entry.href} key={entry.id}>
+                <strong>{entry.label}</strong>
+                <small>{entry.meta}</small>
+              </a>
+            ))
+          )}
+        </section>
+        <section className="sidebar-section">
+          <span>{english ? "Training" : "Training"}</span>
+          <Link href="/app/coach?space=plan">Plan</Link>
+          <Link href="/app/coach?space=train">
+            {english ? "Session overview" : "Einheitenübersicht"}
           </Link>
-          <button
-            className="icon-link"
-            type="button"
-            aria-label={theme === "dark" ? "Light theme" : "Dark theme"}
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
-          </button>
-          <Link
-            className="icon-link"
-            href="/app/account"
-            aria-label={english ? "Account" : "Konto"}
-          >
-            <CircleUserRound size={21} />
+          <Link href="/app/coach?space=progress">
+            {english ? "Progress" : "Fortschritt"}
+          </Link>
+        </section>
+        <div className="sidebar-account">
+          <Link href="/app/account">
+            <CircleUserRound size={17} />
+            {english ? "Profile" : "Profil"}
+          </Link>
+          <Link href="/app/account/settings">
+            <Settings size={17} />
+            Settings
+          </Link>
+          <Link href="/app/account/billing">
+            <CreditCard size={17} />
+            Billing
           </Link>
         </div>
-      </header>
+      </aside>
 
-      <nav className="workspace-tabs" aria-label="Produktnavigation">
-        {spaces.map(({ href, icon: Icon, id, label }) => (
-          <Link
-            aria-current={activeSpace === id ? "page" : undefined}
-            href={href}
-            key={id}
-          >
-            <Icon size={17} />
-            <span>{label}</span>
-          </Link>
-        ))}
-      </nav>
-
-      <div className="coach-messages" ref={viewport} aria-live="polite">
-        {!hasHistory ? (
-          <div className="coach-welcome">
-            <span className="coach-avatar">D</span>
-            <div className="message-bubble assistant">
-              <p>
-                {english
-                  ? `I coach you and ${product.dogName} through the training. Tell me what happened today or what you want to improve next.`
-                  : `Ich begleite dich und ${product.dogName} im Training. Erzähl mir, was heute passiert ist oder was du als Nächstes verbessern möchtest.`}
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        {messages.map((message, index) => {
-          const text = textOf(message);
-          if (text.length === 0) return null;
-          const { body, sources } = splitSources(text, locale);
-          const showAvatar =
-            message.role === "assistant" &&
-            messages[index - 1]?.role !== "assistant";
-          return (
-            <article
-              className={`coach-message ${message.role}`}
-              key={message.id}
-            >
-              {showAvatar ? <span className="coach-avatar">D</span> : null}
-              <div
-                className={
-                  message.role === "assistant"
-                    ? "assistant-response"
-                    : "message-bubble user"
-                }
-              >
-                {body.split("\n").map((line, index) => (
-                  <p key={`${message.id}:${index}`}>{line || "\u00a0"}</p>
-                ))}
-                {sources.length === 0 ? null : (
-                  <details className="source-disclosure">
-                    <summary>
-                      {english
-                        ? `${sources.length} references and plan facts`
-                        : `${sources.length} Referenzen und Planfakten`}
-                    </summary>
-                    <ul>
-                      {sources.map((source, sourceIndex) => (
-                        <li key={`${message.id}:source:${sourceIndex}`}>
-                          {source}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </div>
-            </article>
-          );
-        })}
-
-        {trainingAllowed ? (
-          <section className="inline-training-card">
-            <div className="inline-card-heading">
-              <span>
-                {english
-                  ? `Today with ${product.dogName}`
-                  : `Heute mit ${product.dogName}`}
-              </span>
-              <em>{english ? "Ready" : "Bereit"}</em>
-              <strong>{presentation.title}</strong>
-            </div>
-            <div className="inline-card-meta">
-              <span>
-                <Clock3 size={15} /> {duration} Min.
-              </span>
-              <span>
-                <Target size={15} /> {product.currentStep?.repetitions ?? 6}{" "}
-                {presentation.unit}
-              </span>
-            </div>
-            <p>{presentation.instruction(product.dogName)}</p>
-            <small>
-              {english
-                ? `Why this: ${product.sessionCount} comparable sessions; repeat the current level.`
-                : `Warum: ${product.sessionCount} vergleichbare Einheiten; aktuelle Stufe wiederholen.`}
-            </small>
-            <div className="inline-card-actions">
-              <Link
-                className="button primary"
-                href={`/app/coach?space=train&session=${product.todaySessionId}`}
-              >
-                {english ? "Start training" : "Training starten"}
-              </Link>
-              <Link className="text-link inline" href="/app/coach?space=plan">
-                {english ? "View plan" : "Plan ansehen"}
-              </Link>
-            </div>
-          </section>
-        ) : (
-          <section className="inline-training-card held">
-            <div className="inline-card-heading">
-              <span>{english ? "Training held" : "Training pausiert"}</span>
-              <em>{english ? "Review" : "Prüfung"}</em>
+      <main className="coach-main">
+        <header className="coach-header">
+          <div className="coach-identity">
+            <span className="coach-mark">D</span>
+            <div>
               <strong>
                 {english
-                  ? "Professional handoff first"
-                  : "Zuerst fachlich abklären"}
+                  ? `${product.dogName}'s Coach`
+                  : `${product.dogName}s Coach`}
               </strong>
-            </div>
-            <p>
-              {english
-                ? "DogOS keeps the plan visible, but does not show a session start action while autonomous training is blocked."
-                : "DogOS zeigt den Plan weiter, aber keine Startaktion, solange autonomes Training blockiert ist."}
-            </p>
-          </section>
-        )}
-
-        {busy ? (
-          <div className="coach-message assistant">
-            <span className="coach-avatar">D</span>
-            <div className="typing-indicator" aria-label="DogOS antwortet">
-              <i /> <i /> <i />
+              <span>
+                {product.goalText} · {presentation.stage} ·{" "}
+                {product.baselineSuccessRate}% →{" "}
+                {product.targetSuccessRate ?? 80}%
+              </span>
             </div>
           </div>
-        ) : null}
-        {error === undefined ? null : (
-          <p className="coach-error">
-            Die Antwort ist fehlgeschlagen. Deine Nachricht bleibt erhalten.
-          </p>
-        )}
-      </div>
+          <div className="coach-header-actions">
+            <Link
+              className="icon-link mobile-only"
+              href="/app/account/history"
+              aria-label={english ? "History" : "Verlauf"}
+            >
+              <History size={20} />
+            </Link>
+            <button
+              aria-pressed={theme === "dark"}
+              className="icon-link"
+              type="button"
+              aria-label={theme === "dark" ? "Light theme" : "Dark theme"}
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
+            </button>
+            <Link
+              className="icon-link"
+              href="/app/account"
+              aria-label={english ? "Account" : "Konto"}
+            >
+              <CircleUserRound size={21} />
+            </Link>
+          </div>
+        </header>
 
-      {!hasHistory ? (
-        <div className="coach-suggestions">
-          <button onClick={() => submit("Was trainieren wir heute?")}>
-            {english ? "Today's training" : "Heutiges Training"}
-          </button>
-          <button
-            onClick={() =>
-              submit(
-                english
-                  ? `Explain ${product.dogName}'s current plan.`
-                  : `Erkläre mir ${product.dogName}s aktuellen Plan.`,
-              )
-            }
-          >
-            {english ? "Explain plan" : "Plan erklären"}
-          </button>
-          <button
-            onClick={() =>
-              submit(
-                english
-                  ? `I want to share an observation about ${product.dogName}.`
-                  : `Ich möchte eine Beobachtung zu ${product.dogName} teilen.`,
-              )
-            }
-          >
-            {english ? "Share observation" : "Beobachtung teilen"}
-          </button>
+        <div className="coach-messages" ref={viewport} aria-live="polite">
+          {!hasHistory ? (
+            <div className="coach-welcome">
+              <span className="coach-avatar">D</span>
+              <div className="message-bubble assistant">
+                <p>
+                  {english
+                    ? `I coach you and ${product.dogName} through the training. Tell me what happened today or what you want to improve next.`
+                    : `Ich begleite dich und ${product.dogName} im Training. Erzähl mir, was heute passiert ist oder was du als Nächstes verbessern möchtest.`}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {messages.map((message, index) => {
+            const text = textOf(message);
+            if (text.length === 0) return null;
+            const { body, sources } = splitSources(text, locale);
+            const showAvatar =
+              message.role === "assistant" &&
+              messages[index - 1]?.role !== "assistant";
+            return (
+              <article
+                className={`coach-message ${message.role}`}
+                id={`message-${message.id}`}
+                key={message.id}
+              >
+                {showAvatar ? <span className="coach-avatar">D</span> : null}
+                <div
+                  className={
+                    message.role === "assistant"
+                      ? "assistant-response"
+                      : "message-bubble user"
+                  }
+                >
+                  {body.split("\n").map((line, index) => (
+                    <p key={`${message.id}:${index}`}>{line || "\u00a0"}</p>
+                  ))}
+                  {sources.length === 0 ? null : (
+                    <details className="source-disclosure">
+                      <summary>
+                        {english
+                          ? `${sources.length} references and plan facts`
+                          : `${sources.length} Referenzen und Planfakten`}
+                      </summary>
+                      <ul>
+                        {sources.map((source, sourceIndex) => (
+                          <li key={`${message.id}:source:${sourceIndex}`}>
+                            {source}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+
+          {trainingAllowed ? (
+            <section className="inline-training-card">
+              <div className="inline-card-heading">
+                <span>
+                  {english
+                    ? `Today with ${product.dogName}`
+                    : `Heute mit ${product.dogName}`}
+                </span>
+                <em>{english ? "Ready" : "Bereit"}</em>
+                <strong>{presentation.title}</strong>
+              </div>
+              <div className="inline-card-meta">
+                <span>
+                  <Clock3 size={15} /> {duration} Min.
+                </span>
+                <span>
+                  <Target size={15} /> {product.currentStep?.repetitions ?? 6}{" "}
+                  {presentation.unit}
+                </span>
+              </div>
+              <p>{presentation.instruction(product.dogName)}</p>
+              <small>
+                {english
+                  ? `Why this: ${product.sessionCount} sessions; ${trainingDecisionLabel(product.latestDecision, english)}.`
+                  : `Warum: ${product.sessionCount} Einheiten; ${trainingDecisionLabel(product.latestDecision, english)}.`}
+              </small>
+              <div className="inline-card-actions">
+                <Link
+                  className="button primary"
+                  href={`/app/coach?space=train&session=${product.todaySessionId}`}
+                >
+                  {english ? "Start training" : "Training starten"}
+                </Link>
+                <Link className="text-link inline" href="/app/coach?space=plan">
+                  {english ? "View plan" : "Plan ansehen"}
+                </Link>
+              </div>
+            </section>
+          ) : (
+            <section className="inline-training-card held">
+              <div className="inline-card-heading">
+                <span>{heldCopy.label}</span>
+                <em>{heldCopy.status}</em>
+                <strong>{heldCopy.title}</strong>
+              </div>
+              <p>{heldCopy.body}</p>
+            </section>
+          )}
+
+          {busy ? (
+            <div className="coach-message assistant">
+              <span className="coach-avatar">D</span>
+              <div className="typing-indicator" aria-label="DogOS antwortet">
+                <i /> <i /> <i />
+              </div>
+            </div>
+          ) : null}
+          {error === undefined ? null : (
+            <p className="coach-error">
+              Die Antwort ist fehlgeschlagen. Deine Nachricht bleibt erhalten.
+            </p>
+          )}
         </div>
-      ) : null}
 
-      <form
-        className="coach-composer"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void submit();
-        }}
-      >
-        <button
-          aria-label={english ? "Add attachment" : "Anhang hinzufügen"}
-          className="composer-tool"
-          type="button"
-        >
-          <Plus size={19} />
-        </button>
-        <textarea
-          aria-label={english ? "Message DogOS" : "Nachricht an DogOS"}
-          maxLength={2_000}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              void submit();
-            }
+        {!hasHistory ? (
+          <div className="coach-suggestions">
+            <button onClick={() => submit("Was trainieren wir heute?")}>
+              {english ? "Today's training" : "Heutiges Training"}
+            </button>
+            <button
+              onClick={() =>
+                submit(
+                  english
+                    ? `Explain ${product.dogName}'s current plan.`
+                    : `Erkläre mir ${product.dogName}s aktuellen Plan.`,
+                )
+              }
+            >
+              {english ? "Explain plan" : "Plan erklären"}
+            </button>
+            <button
+              onClick={() =>
+                submit(
+                  english
+                    ? `I want to share an observation about ${product.dogName}.`
+                    : `Ich möchte eine Beobachtung zu ${product.dogName} teilen.`,
+                )
+              }
+            >
+              {english ? "Share observation" : "Beobachtung teilen"}
+            </button>
+          </div>
+        ) : null}
+
+        <div className="composer-quick-actions" aria-label="Coach actions">
+          {quickActions.map(({ action, icon: Icon, id, label }) => (
+            <button
+              aria-pressed={activeSpace === id}
+              key={id}
+              onClick={() => void action()}
+              type="button"
+            >
+              <Icon size={16} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <form
+          className="coach-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
           }}
-          placeholder={placeholder}
-          rows={1}
-          value={input}
-        />
-        <button
-          aria-label={english ? "Voice note" : "Sprachnotiz"}
-          className="composer-tool optional"
-          type="button"
         >
-          <Mic size={18} />
-        </button>
-        <button
-          aria-label={english ? "Camera" : "Kamera"}
-          className="composer-tool optional"
-          type="button"
-        >
-          <Camera size={18} />
-        </button>
-        {busy ? (
-          <button aria-label="Antwort stoppen" onClick={stop} type="button">
-            <span className="stop-square" />
-          </button>
-        ) : (
-          <button
-            aria-label="Senden"
-            disabled={input.trim().length === 0}
-            type="submit"
+          <Link
+            aria-label={
+              english ? "Upload training video" : "Trainingsvideo hochladen"
+            }
+            className="composer-tool"
+            href="/app/video"
+            title={
+              english
+                ? "Video analysis is available on paid plans."
+                : "Videoanalyse ist in bezahlten Tarifen verfügbar."
+            }
           >
-            <Send size={19} />
+            <Plus size={19} />
+          </Link>
+          <textarea
+            aria-label={english ? "Message DogOS" : "Nachricht an DogOS"}
+            maxLength={2_000}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void submit();
+              }
+            }}
+            placeholder={placeholder}
+            rows={1}
+            value={input}
+          />
+          <button
+            aria-label={
+              english ? "Voice note not available yet" : "Sprachnotiz folgt"
+            }
+            className="composer-tool optional"
+            disabled
+            title={
+              english
+                ? "Voice notes are not enabled in this pilot yet."
+                : "Sprachnotizen sind in diesem Pilot noch nicht aktiv."
+            }
+            type="button"
+          >
+            <Mic size={18} />
           </button>
-        )}
-      </form>
-      <div className="coach-disclosure">
-        <Sparkles size={12} />{" "}
-        {english
-          ? "AI-assisted · not diagnosis or emergency care"
-          : "KI-gestützt · keine Diagnose oder Notfallhilfe"}
-      </div>
+          <Link
+            aria-label={
+              english ? "Start live video coaching" : "Live Video starten"
+            }
+            className="composer-tool optional"
+            href="/app/live"
+            title={
+              english
+                ? "Live video coaching requires Pro or Ultra."
+                : "Live Video Coaching erfordert Pro oder Ultra."
+            }
+          >
+            <Camera size={18} />
+          </Link>
+          {busy ? (
+            <button aria-label="Antwort stoppen" onClick={stop} type="button">
+              <span className="stop-square" />
+            </button>
+          ) : (
+            <button
+              aria-label="Senden"
+              disabled={input.trim().length === 0}
+              type="submit"
+            >
+              <Send size={19} />
+            </button>
+          )}
+        </form>
+        <div className="coach-disclosure">
+          <Sparkles size={12} />{" "}
+          {english
+            ? "AI-assisted · not diagnosis or emergency care"
+            : "KI-gestützt · keine Diagnose oder Notfallhilfe"}
+        </div>
+      </main>
     </div>
   );
 }
