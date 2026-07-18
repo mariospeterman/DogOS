@@ -5,6 +5,9 @@ const webEnvironmentSchema = z.object({
   NEXT_PUBLIC_DOGOS_ENV: z
     .enum(["local", "preview", "production", "test"])
     .default("local"),
+  NEXT_PUBLIC_DOGOS_LOCAL_IDENTITY: z
+    .enum(["owner", "caregiver", "viewer", "trainer", "unrelated"])
+    .optional(),
 });
 
 const privateNamePattern = /(SECRET|SERVICE_ROLE|PRIVATE_KEY|ACCESS_TOKEN)/i;

@@ -32,16 +32,23 @@ afterAll(async () => {
   await sql.end();
 });
 
-describe("PostgreSQL omnichannel Coach", () => {
-  it("keeps WhatsApp and web in one deduplicated timeline", async () => {
-    await service.recordWhatsAppExchange({
-      contactId: "70000000-0000-0000-0000-000000000001",
-      inboundId: "wamid.integration-in",
-      inboundText: "Heute",
-      outboundId: "wamid.integration-out",
-      outboundText: "Vier Minuten Orientierung.",
+describe("PostgreSQL chat-first Coach", () => {
+  it("keeps onboarding and coaching in one deduplicated timeline", async () => {
+    await service.importHistory({
+      messages: [
+        {
+          content: "Tell me about your dog.",
+          id: "onboarding-intro",
+          role: "assistant",
+        },
+        {
+          content: "Milo is working on lead handling.",
+          id: "onboarding-answer",
+          role: "user",
+        },
+      ],
       scope,
-      traceId: "trace:coach-whatsapp",
+      traceId: "trace:coach-onboarding",
     });
     const input = {
       channel: "web" as const,
@@ -71,12 +78,12 @@ describe("PostgreSQL omnichannel Coach", () => {
     expect(replay.conversation.messages).toHaveLength(4);
     expect(
       replay.conversation.messages.map((message) => message.channel),
-    ).toEqual(["whatsapp", "whatsapp", "web", "web"]);
+    ).toEqual(["web", "web", "web", "web"]);
     const [counts] = await sql`
       select
         (select count(*)::int from private.coach_channel_bindings) as bindings,
         (select count(*)::int from private.coach_messages) as messages
     `;
-    expect(counts).toMatchObject({ bindings: 2, messages: 4 });
+    expect(counts).toMatchObject({ bindings: 1, messages: 4 });
   });
 });

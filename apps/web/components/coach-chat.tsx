@@ -21,6 +21,7 @@ import { AppNavigation } from "./app-navigation";
 
 interface PersistedConversation {
   id: string;
+  locale: "de-CH" | "en";
   messages: Array<{
     content: string;
     id: string;
@@ -46,9 +47,8 @@ function textOf(message: UIMessage): string {
 }
 
 export function CoachChat({ product }: { product: ProductDashboard }) {
-  const [initialMessages, setInitialMessages] = useState<UIMessage[] | null>(
-    null,
-  );
+  const [conversation, setConversation] =
+    useState<PersistedConversation | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export function CoachChat({ product }: { product: ProductDashboard }) {
         }
         if (!response.ok) throw new Error("COACH_UNAVAILABLE");
         const conversation = (await response.json()) as PersistedConversation;
-        if (active) setInitialMessages(toUiMessages(conversation));
+        if (active) setConversation(conversation);
       } catch {
         if (active) setLoadError("Der Coach konnte nicht geladen werden.");
       }
@@ -77,7 +77,7 @@ export function CoachChat({ product }: { product: ProductDashboard }) {
     };
   }, [product.dogId]);
 
-  if (initialMessages === null) {
+  if (conversation === null) {
     return (
       <div className="coach-loading">
         <span className="coach-pulse" />
@@ -85,14 +85,22 @@ export function CoachChat({ product }: { product: ProductDashboard }) {
       </div>
     );
   }
-  return <CoachRuntime initialMessages={initialMessages} product={product} />;
+  return (
+    <CoachRuntime
+      initialMessages={toUiMessages(conversation)}
+      locale={conversation.locale}
+      product={product}
+    />
+  );
 }
 
 function CoachRuntime({
   initialMessages,
+  locale,
   product,
 }: {
   initialMessages: UIMessage[];
+  locale: "de-CH" | "en";
   product: ProductDashboard;
 }) {
   const [input, setInput] = useState("");
@@ -113,7 +121,8 @@ function CoachRuntime({
     transport,
   });
   const busy = status === "submitted" || status === "streaming";
-  const presentation = trainingPresentation(product);
+  const presentation = trainingPresentation(product, locale);
+  const english = locale === "en";
   const duration = Math.max(
     1,
     Math.ceil((product.currentStep?.durationSeconds ?? 180) / 60),
@@ -153,11 +162,18 @@ function CoachRuntime({
           <div>
             <strong>DogOS</strong>
             <span>
-              <i /> {product.dogName}s Coach
+              <i />{" "}
+              {english
+                ? `${product.dogName}'s Coach`
+                : `${product.dogName}s Coach`}
             </span>
           </div>
         </div>
-        <Link className="icon-link" href="/app/account" aria-label="Konto">
+        <Link
+          className="icon-link"
+          href="/app/account"
+          aria-label={english ? "Account" : "Konto"}
+        >
           <CircleUserRound size={21} />
         </Link>
       </header>
@@ -166,14 +182,14 @@ function CoachRuntime({
         <Link href="/app/plan">
           <Route size={16} />
           <span>
-            <small>Aktives Ziel</small>
+            <small>{english ? "Active goal" : "Aktives Ziel"}</small>
             {product.goalText}
           </span>
         </Link>
         <Link href="/app/progress">
           <Target size={16} />
           <span>
-            <small>Etappe</small>
+            <small>{english ? "Milestone" : "Etappe"}</small>
             {product.baselineSuccessRate}% → {product.targetSuccessRate ?? 80}%
           </span>
         </Link>
@@ -185,9 +201,9 @@ function CoachRuntime({
             <span className="coach-avatar">D</span>
             <div className="message-bubble assistant">
               <p>
-                Ich begleite dich und {product.dogName} im Training. Erzähl mir,
-                was heute passiert ist oder was du als Nächstes verbessern
-                möchtest.
+                {english
+                  ? `I coach you and ${product.dogName} through the training. Tell me what happened today or what you want to improve next.`
+                  : `Ich begleite dich und ${product.dogName} im Training. Erzähl mir, was heute passiert ist oder was du als Nächstes verbessern möchtest.`}
               </p>
             </div>
           </div>
@@ -215,7 +231,11 @@ function CoachRuntime({
 
         <section className="inline-training-card">
           <div className="inline-card-heading">
-            <span>Heute mit {product.dogName}</span>
+            <span>
+              {english
+                ? `Today with ${product.dogName}`
+                : `Heute mit ${product.dogName}`}
+            </span>
             <strong>{presentation.title}</strong>
           </div>
           <div className="inline-card-meta">
@@ -237,11 +257,11 @@ function CoachRuntime({
                   : "/app/plan"
               }
             >
-              Training starten
+              {english ? "Start training" : "Training starten"}
             </Link>
             <Link className="button secondary" href="/app/calendar">
               <CalendarDays size={17} />
-              Kalender
+              {english ? "Calendar" : "Kalender"}
             </Link>
           </div>
         </section>
@@ -264,23 +284,29 @@ function CoachRuntime({
       {!hasHistory ? (
         <div className="coach-suggestions">
           <button onClick={() => submit("Was trainieren wir heute?")}>
-            Heutiges Training
-          </button>
-          <button
-            onClick={() =>
-              submit(`Erkläre mir ${product.dogName}s aktuellen Plan.`)
-            }
-          >
-            Plan erklären
+            {english ? "Today's training" : "Heutiges Training"}
           </button>
           <button
             onClick={() =>
               submit(
-                `Ich möchte eine Beobachtung zu ${product.dogName} teilen.`,
+                english
+                  ? `Explain ${product.dogName}'s current plan.`
+                  : `Erkläre mir ${product.dogName}s aktuellen Plan.`,
               )
             }
           >
-            Beobachtung teilen
+            {english ? "Explain plan" : "Plan erklären"}
+          </button>
+          <button
+            onClick={() =>
+              submit(
+                english
+                  ? `I want to share an observation about ${product.dogName}.`
+                  : `Ich möchte eine Beobachtung zu ${product.dogName} teilen.`,
+              )
+            }
+          >
+            {english ? "Share observation" : "Beobachtung teilen"}
           </button>
         </div>
       ) : null}
@@ -293,7 +319,7 @@ function CoachRuntime({
         }}
       >
         <textarea
-          aria-label="Nachricht an DogOS"
+          aria-label={english ? "Message DogOS" : "Nachricht an DogOS"}
           maxLength={2_000}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
@@ -302,7 +328,11 @@ function CoachRuntime({
               void submit();
             }
           }}
-          placeholder={`Schreib über ${product.dogName} ...`}
+          placeholder={
+            english
+              ? `Write about ${product.dogName} ...`
+              : `Schreib über ${product.dogName} ...`
+          }
           rows={1}
           value={input}
         />
@@ -321,9 +351,12 @@ function CoachRuntime({
         )}
       </form>
       <div className="coach-disclosure">
-        <Sparkles size={12} /> KI-gestützt · keine Diagnose oder Notfallhilfe
+        <Sparkles size={12} />{" "}
+        {english
+          ? "AI-assisted · not diagnosis or emergency care"
+          : "KI-gestützt · keine Diagnose oder Notfallhilfe"}
       </div>
-      <AppNavigation />
+      <AppNavigation locale={locale} />
     </div>
   );
 }

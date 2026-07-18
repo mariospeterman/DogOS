@@ -22,3 +22,4 @@ test-results/*
 .DS_Store
 *.log
 *.tsbuildinfo
+.gstack/

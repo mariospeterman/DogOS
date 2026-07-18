@@ -57,6 +57,7 @@
       "passThroughEnv": [
         "NEXT_PUBLIC_API_URL",
         "NEXT_PUBLIC_DOGOS_ENV",
+        "NEXT_PUBLIC_DOGOS_LOCAL_IDENTITY",
         "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
         "NEXT_PUBLIC_SUPABASE_URL",
         "WEB_ORIGIN"

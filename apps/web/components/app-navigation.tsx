@@ -9,15 +9,26 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const navigation = [
-  { href: "/app/coach", label: "Coach", icon: MessageCircle },
-  { href: "/app/plan", label: "Plan", icon: Route },
-  { href: "/app/progress", label: "Fortschritt", icon: TrendingUp },
-  { href: "/app/account", label: "Konto", icon: CircleUserRound },
-] as const;
-
-export function AppNavigation() {
+export function AppNavigation({
+  locale = "de-CH",
+}: {
+  locale?: "de-CH" | "en";
+}) {
   const pathname = usePathname();
+  const navigation = [
+    { href: "/app/coach", label: "Coach", icon: MessageCircle },
+    { href: "/app/plan", label: "Plan", icon: Route },
+    {
+      href: "/app/progress",
+      label: locale === "en" ? "Progress" : "Fortschritt",
+      icon: TrendingUp,
+    },
+    {
+      href: "/app/account",
+      label: locale === "en" ? "Account" : "Konto",
+      icon: CircleUserRound,
+    },
+  ] as const;
   return (
     <nav className="bottom-nav" aria-label="Produktnavigation">
       {navigation.map(({ href, icon: Icon, label }) => {

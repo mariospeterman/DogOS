@@ -40,6 +40,35 @@ export class CoachConversationService {
     return this.store.ensure({ ...scope, channel });
   }
 
+  async importHistory(input: {
+    messages: Array<{
+      content: string;
+      id: string;
+      role: "assistant" | "user";
+    }>;
+    scope: CoachScope;
+    traceId: string;
+  }): Promise<CoachConversation> {
+    const conversation = await this.store.ensure({
+      ...input.scope,
+      channel: "web",
+    });
+    await this.store.setLocale(conversation.id, input.scope.locale);
+    for (const historyMessage of input.messages) {
+      await this.store.append({
+        actorUserId:
+          historyMessage.role === "user" ? input.scope.actorUserId : null,
+        channel: "web",
+        clientMessageId: `history:${historyMessage.id}`,
+        content: historyMessage.content,
+        conversationId: conversation.id,
+        role: historyMessage.role,
+        traceId: input.traceId,
+      });
+    }
+    return this.store.get(conversation.id);
+  }
+
   async send(input: {
     channel: CoachChannel;
     clientMessageId: string;

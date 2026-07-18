@@ -109,6 +109,35 @@ describe("DogOS Coach conversation", () => {
     expect(generations).toBe(1);
   });
 
+  it("imports onboarding history once into the durable coach thread", async () => {
+    const service = new CoachConversationService(
+      new InMemoryCoachConversationStore(),
+    );
+    const messages = [
+      {
+        content: "Tell me about Echo.",
+        id: "intro",
+        role: "assistant" as const,
+      },
+      { content: "Echo is my Malinois.", id: "answer", role: "user" as const },
+    ];
+    const first = await service.importHistory({
+      messages,
+      scope: { ...scope, locale: "en" },
+      traceId: "onboarding:owner",
+    });
+    const replay = await service.importHistory({
+      messages,
+      scope: { ...scope, locale: "en" },
+      traceId: "onboarding:owner",
+    });
+    expect(first.messages.map((entry) => entry.content)).toEqual(
+      messages.map((entry) => entry.content),
+    );
+    expect(replay.messages).toHaveLength(2);
+    expect(replay.locale).toBe("en");
+  });
+
   it("allows bounded presentation rewriting and falls back deterministically", async () => {
     const generated = new CoachConversationService(
       new InMemoryCoachConversationStore(),

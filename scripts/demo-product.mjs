@@ -99,6 +99,7 @@ start(
     NEXT_DIST_DIR: ".next-demo",
     NEXT_PUBLIC_API_URL: apiOrigin,
     NEXT_PUBLIC_DOGOS_ENV: "local",
+    NEXT_PUBLIC_DOGOS_LOCAL_IDENTITY: "unrelated",
     WEB_ORIGIN: webOrigin,
   },
 );

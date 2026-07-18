@@ -16,7 +16,8 @@ export async function dogosApiHeaders(
     if (!local) throw error;
   }
   if (headers.authorization === undefined && local) {
-    headers["x-dogos-user"] = "owner";
+    headers["x-dogos-user"] =
+      process.env.NEXT_PUBLIC_DOGOS_LOCAL_IDENTITY ?? "owner";
   }
   if (mutation) headers["idempotency-key"] = crypto.randomUUID();
   return headers;

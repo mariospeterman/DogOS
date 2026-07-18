@@ -38,6 +38,22 @@ const actor = {
 };
 
 describe("WebOnboardingService", () => {
+  it("converges concurrent first loads on one durable session", async () => {
+    const sessions = new MemorySessions();
+    const service = new WebOnboardingService({
+      projector: { projectOwner: vi.fn() },
+      sessions,
+    });
+    const [first, second] = await Promise.all([
+      service.get(actor),
+      service.get(actor),
+    ]);
+    expect(first.version).toBe(1);
+    expect(second.version).toBe(1);
+    expect(first.snapshot.state).toBe("dog_identity");
+    expect(second.snapshot.state).toBe("dog_identity");
+  });
+
   it("persists a natural intake and projects the canonical product once", async () => {
     const sessions = new MemorySessions();
     const projectOwner = vi.fn(async () => ({
@@ -52,7 +68,9 @@ describe("WebOnboardingService", () => {
       sessionCount: 0,
       todaySessionId: null,
     }));
+    const activateConversation = vi.fn(async () => undefined);
     const service = new WebOnboardingService({
+      activateConversation,
       interpret: async () => ({
         acknowledgement: "Echo has a solid training foundation.",
         answers: {
@@ -89,6 +107,13 @@ describe("WebOnboardingService", () => {
     expect(completed.dogId).toBe("30000000-0000-4000-8000-000000000001");
     expect(completed.messages.at(-1)?.content).toMatch(/plan is ready/i);
     expect(projectOwner).toHaveBeenCalledOnce();
+    expect(activateConversation).toHaveBeenCalledOnce();
+    expect(activateConversation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dogId: "30000000-0000-4000-8000-000000000001",
+        locale: "en",
+      }),
+    );
 
     const replay = await service.send({
       ...actor,
@@ -97,6 +122,7 @@ describe("WebOnboardingService", () => {
     });
     expect(replay.messages).toHaveLength(completed.messages.length);
     expect(projectOwner).toHaveBeenCalledOnce();
+    expect(activateConversation).toHaveBeenCalledOnce();
   });
 
   it("keeps the conversation usable when model extraction is unavailable", async () => {

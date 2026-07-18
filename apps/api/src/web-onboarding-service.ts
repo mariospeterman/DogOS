@@ -15,7 +15,7 @@ interface OnboardingInterpretation {
   notes: Record<string, string>;
 }
 
-interface OnboardingMessage {
+export interface OnboardingMessage {
   content: string;
   createdAt: string;
   id: string;
@@ -35,6 +35,13 @@ export interface WebOnboardingView extends OnboardingChatState {
 }
 
 export interface WebOnboardingDependencies {
+  activateConversation?: (input: {
+    actorUserId: string;
+    dogId: string;
+    householdId: string;
+    locale: ConversationLocale;
+    messages: OnboardingMessage[];
+  }) => Promise<void>;
   interpret?: (input: {
     message: string;
     snapshot: ConversationSnapshot;
@@ -185,17 +192,32 @@ export class WebOnboardingService {
     householdId: string;
     locale: ConversationLocale;
   }): Promise<WebOnboardingView> {
-    const stored = await this.dependencies.sessions.load(input.actorUserId);
-    const state = parseStoredState(stored?.state) ?? initialState(input.locale);
+    let stored = await this.dependencies.sessions.load(input.actorUserId);
+    let state = parseStoredState(stored?.state) ?? initialState(input.locale);
+    let version = stored?.version ?? 1;
     if (stored === null) {
-      await this.dependencies.sessions.save({
-        expectedVersion: null,
-        householdId: input.householdId,
-        ownerUserId: input.actorUserId,
-        state,
-      });
+      try {
+        version = await this.dependencies.sessions.save({
+          expectedVersion: null,
+          householdId: input.householdId,
+          ownerUserId: input.actorUserId,
+          state,
+        });
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          error.message !== "ONBOARDING_SESSION_STALE"
+        ) {
+          throw error;
+        }
+        stored = await this.dependencies.sessions.load(input.actorUserId);
+        const concurrentState = parseStoredState(stored?.state);
+        if (stored === null || concurrentState === null) throw error;
+        state = concurrentState;
+        version = stored.version;
+      }
     }
-    return this.view(state, stored?.version ?? 1, null);
+    return this.view(state, version, null);
   }
 
   async send(input: {
@@ -258,6 +280,15 @@ export class WebOnboardingService {
       ],
       snapshot: snapshotOf(next),
     };
+    if (dogId !== null) {
+      await this.dependencies.activateConversation?.({
+        actorUserId: input.actorUserId,
+        dogId,
+        householdId: input.householdId,
+        locale: next.locale,
+        messages: updated.messages,
+      });
+    }
     const version = await this.dependencies.sessions.save({
       expectedVersion: stored.version,
       householdId: input.householdId,

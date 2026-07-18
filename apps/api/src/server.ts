@@ -71,18 +71,6 @@ const onboarding =
   onboardingRepository === undefined
     ? undefined
     : new OnboardingService(onboardingRepository);
-const webOnboarding =
-  onboarding === undefined || onboardingSessions === undefined
-    ? undefined
-    : new WebOnboardingService({
-        ...(onboardingInterpreter === undefined
-          ? {}
-          : {
-              interpret: (input) => onboardingInterpreter.interpret(input),
-            }),
-        projector: onboarding,
-        sessions: onboardingSessions,
-      });
 const authenticator = createRequestAuthenticator({
   ...(accounts === undefined ? {} : { accountRepository: accounts }),
   authMode: environment.DOGOS_AUTH_MODE,
@@ -95,6 +83,30 @@ const coachStore = environment.DATABASE_URL
   ? new PostgresCoachConversationStore(environment.DATABASE_URL)
   : new InMemoryCoachConversationStore();
 const coach = new CoachConversationService(coachStore, coachGenerator);
+const webOnboarding =
+  onboarding === undefined || onboardingSessions === undefined
+    ? undefined
+    : new WebOnboardingService({
+        activateConversation: async (input) => {
+          await coach.importHistory({
+            messages: input.messages,
+            scope: {
+              actorUserId: input.actorUserId,
+              dogId: input.dogId,
+              householdId: input.householdId,
+              locale: input.locale,
+            },
+            traceId: `onboarding:${input.actorUserId}`,
+          });
+        },
+        ...(onboardingInterpreter === undefined
+          ? {}
+          : {
+              interpret: (input) => onboardingInterpreter.interpret(input),
+            }),
+        projector: onboarding,
+        sessions: onboardingSessions,
+      });
 const signedActions = new SignedActionService(
   {
     pilot1:
