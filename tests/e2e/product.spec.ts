@@ -314,13 +314,30 @@ test("chat-first Coach and management views remain one PWA", async ({
     await expect(
       page.getByRole("complementary", { name: "DogOS navigation" }),
     ).toBeVisible();
+    await expect(page.getByLabel("Verlauf suchen")).toBeVisible();
+    await page.getByLabel("Seitenleiste einklappen").click();
+    await expect(page.getByLabel("Seitenleiste öffnen")).toBeVisible();
+    await page.getByLabel("Seitenleiste öffnen").click();
+    await expect(page.getByLabel("Verlauf suchen")).toBeVisible();
   }
   for (const name of ["Plan", "Training", "Fortschritt", "Live"]) {
     await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
   }
+  await expect(page.getByLabel("Coach teilen")).toBeVisible();
+  await page.getByLabel("Coach Menü").click();
+  await expect(page.getByText("Verlauf suchen")).toBeVisible();
+  await page.getByRole("button", { name: "Video hochladen" }).click();
+  await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
+  await page.getByLabel("Panel schliessen").click();
   await expect(page.getByLabel("Trainingsvideo hochladen")).toBeVisible();
+  await page.getByLabel("Trainingsvideo hochladen").click();
+  await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
+  await page.getByLabel("Panel schliessen").click();
   if (testInfo.project.name === "chromium") {
     await expect(page.getByLabel("Live Video starten")).toBeVisible();
+    await page.getByLabel("Live Video starten").click();
+    await expect(page.getByText("Live Coaching")).toBeVisible();
+    await page.getByLabel("Panel schliessen").click();
     await expect(page.getByLabel("Sprachnotiz folgt")).toBeDisabled();
   }
   await expect(page.getByLabel("Konto")).toBeVisible();

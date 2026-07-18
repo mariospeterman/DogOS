@@ -7,16 +7,23 @@ import {
   Clock3,
   CreditCard,
   History,
+  MoreHorizontal,
   Mic,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Route,
+  Search,
   Send,
   Settings,
+  Share2,
   Sparkles,
   Sun,
   Target,
+  Upload,
   Video,
+  X,
 } from "lucide-react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import Link from "next/link";
@@ -36,6 +43,37 @@ interface PersistedConversation {
     role: "assistant" | "system" | "user";
   }>;
 }
+
+interface VideoAnalysis {
+  completedAt: string | null;
+  findings: Array<{
+    confidence: number;
+    evidence: string;
+    label: string;
+    recommendation: string;
+  }>;
+  id: string;
+  jobId: string | null;
+  originalFilename: string;
+  status: string;
+}
+
+interface VideoUpload {
+  expiresInSeconds: number;
+  method: "PUT";
+  url: string;
+}
+
+interface LiveSession {
+  consumedMinutes: number;
+  id: string;
+  plannedMinutes: number;
+  roomName: string;
+  status: string;
+  summary: string | null;
+}
+
+type InlinePanelKind = "billing" | "live" | "settings" | "video";
 
 function toUiMessages(conversation: PersistedConversation): UIMessage[] {
   return conversation.messages
@@ -231,6 +269,347 @@ export function CoachChat({ product }: { product: ProductDashboard }) {
   );
 }
 
+function InlineWorkspacePanel({
+  english,
+  kind,
+  onClose,
+  product,
+}: {
+  english: boolean;
+  kind: InlinePanelKind;
+  onClose: () => void;
+  product: ProductDashboard;
+}) {
+  const [analyses, setAnalyses] = useState<VideoAnalysis[]>([]);
+  const [consent, setConsent] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [liveMessage, setLiveMessage] = useState<string | null>(null);
+  const [liveSession, setLiveSession] = useState<LiveSession | null>(null);
+  const [plannedMinutes, setPlannedMinutes] = useState(10);
+  const [videoMessage, setVideoMessage] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+
+  useEffect(() => {
+    if (kind !== "video") return;
+    let active = true;
+    void (async () => {
+      const response = await fetch(
+        dogosApiUrl(`/v1/dogs/${product.dogId}/video-analyses`),
+        { cache: "no-store", headers: await dogosApiHeaders() },
+      );
+      if (!active || !response.ok) return;
+      const body = (await response.json()) as { analyses: VideoAnalysis[] };
+      setAnalyses(body.analyses);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [kind, product.dogId]);
+
+  async function uploadVideo() {
+    if (file === null) return;
+    setWorking(true);
+    setVideoMessage(null);
+    try {
+      const createResponse = await fetch(
+        dogosApiUrl(`/v1/dogs/${product.dogId}/video-analyses`),
+        {
+          body: JSON.stringify({
+            contentType: file.type,
+            originalFilename: file.name,
+            sizeBytes: file.size,
+          }),
+          headers: await dogosApiHeaders(true),
+          method: "POST",
+        },
+      );
+      if (!createResponse.ok) {
+        setVideoMessage(
+          createResponse.status === 409
+            ? english
+              ? "Your current plan has no remaining video allowance."
+              : "Dein aktueller Tarif hat kein freies Video-Kontingent."
+            : english
+              ? "The video could not be prepared."
+              : "Das Video konnte nicht vorbereitet werden.",
+        );
+        return;
+      }
+      const created = (await createResponse.json()) as {
+        analysis: VideoAnalysis;
+        upload: VideoUpload;
+      };
+      const uploadResponse = await fetch(created.upload.url, {
+        body: file,
+        headers: { "content-type": file.type },
+        method: created.upload.method,
+      });
+      if (!uploadResponse.ok) {
+        setAnalyses((current) => [created.analysis, ...current]);
+        setVideoMessage(
+          english
+            ? "The private upload failed. Please try again."
+            : "Der private Upload ist fehlgeschlagen. Bitte erneut versuchen.",
+        );
+        return;
+      }
+      const completeResponse = await fetch(
+        dogosApiUrl(
+          `/v1/video-analyses/${created.analysis.id}/complete-upload`,
+        ),
+        {
+          body: JSON.stringify({}),
+          headers: await dogosApiHeaders(true),
+          method: "POST",
+        },
+      );
+      if (!completeResponse.ok) {
+        setAnalyses((current) => [created.analysis, ...current]);
+        setVideoMessage(
+          english
+            ? "The upload is saved, but analysis could not be queued yet."
+            : "Der Upload ist gespeichert, konnte aber noch nicht eingereiht werden.",
+        );
+        return;
+      }
+      const queued = (await completeResponse.json()) as {
+        analysis: VideoAnalysis;
+      };
+      setAnalyses((current) => [queued.analysis, ...current]);
+      setFile(null);
+      setVideoMessage(
+        english
+          ? "Upload saved. DogOS analyzes the clip asynchronously."
+          : "Upload gespeichert. DogOS analysiert den Clip asynchron.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function startLive() {
+    setWorking(true);
+    setLiveMessage(null);
+    try {
+      const response = await fetch(
+        dogosApiUrl(`/v1/dogs/${product.dogId}/live-sessions`),
+        {
+          body: JSON.stringify({ plannedMinutes }),
+          headers: await dogosApiHeaders(true),
+          method: "POST",
+        },
+      );
+      if (!response.ok) {
+        setLiveMessage(
+          response.status === 409
+            ? english
+              ? "Live coaching is not enabled or your allowance is used."
+              : "Live Coaching ist noch nicht freigeschaltet oder dein Kontingent ist aufgebraucht."
+            : english
+              ? "Live coaching could not be started."
+              : "Live Coaching konnte nicht gestartet werden.",
+        );
+        return;
+      }
+      const body = (await response.json()) as {
+        liveKit: { token: string; url: string };
+        session: LiveSession;
+      };
+      setLiveSession(body.session);
+      setLiveMessage(
+        english
+          ? "Live room ready. Credentials stay hidden and are only used for the connection."
+          : "Live Raum bereit. Zugangsdaten bleiben verborgen und werden nur für die Verbindung genutzt.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const title =
+    kind === "video"
+      ? english
+        ? "Analyze training video"
+        : "Trainingsvideo analysieren"
+      : kind === "live"
+        ? "Live Coaching"
+        : kind === "billing"
+          ? "Billing"
+          : "Settings";
+
+  return (
+    <section className="chat-inline-panel" id={kind}>
+      <div className="inline-panel-header">
+        <span>{title}</span>
+        <button
+          aria-label={english ? "Close panel" : "Panel schliessen"}
+          onClick={onClose}
+          type="button"
+        >
+          <X size={17} />
+        </button>
+      </div>
+
+      {kind === "video" ? (
+        <div className="inline-panel-body">
+          <p>
+            {english
+              ? "Upload clips in chat. DogOS stores them privately, queues analysis, and only returns reviewed observations."
+              : "Lade Clips direkt im Chat hoch. DogOS speichert sie privat, reiht die Analyse ein und zeigt nur geprüfte Beobachtungen."}
+          </p>
+          <label className="inline-file-input">
+            <Upload size={17} />
+            <span>
+              {file?.name ?? (english ? "Choose file" : "Datei wählen")}
+            </span>
+            <input
+              accept="video/mp4,video/quicktime,video/webm"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              type="file"
+            />
+          </label>
+          <button
+            className="button primary"
+            disabled={file === null || working}
+            onClick={() => void uploadVideo()}
+            type="button"
+          >
+            <Upload size={17} />
+            {working
+              ? english
+                ? "Uploading..."
+                : "Upload läuft..."
+              : english
+                ? "Upload video"
+                : "Video hochladen"}
+          </button>
+          {videoMessage === null ? null : (
+            <p className="helper">{videoMessage}</p>
+          )}
+          <div className="inline-panel-list">
+            {analyses.length === 0 ? (
+              <span>
+                {english
+                  ? "No videos in review yet."
+                  : "Noch keine Videos in Prüfung."}
+              </span>
+            ) : (
+              analyses.slice(0, 4).map((analysis) => (
+                <span key={analysis.id}>
+                  <strong>{analysis.originalFilename}</strong>
+                  <small>
+                    {analysis.status === "uploaded"
+                      ? english
+                        ? "Queued"
+                        : "In der Warteschlange"
+                      : analysis.status}
+                  </small>
+                </span>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {kind === "live" ? (
+        <div className="inline-panel-body">
+          <p>
+            {english
+              ? "Start near real-time coaching from the chat workspace. DogOS keeps consent, entitlements, retention and summaries authoritative."
+              : "Starte Near-Realtime-Coaching direkt aus dem Chat. DogOS bleibt für Einwilligung, Kontingent, Aufbewahrung und Zusammenfassung autoritativ."}
+          </p>
+          <label>
+            {english ? "Minutes" : "Minuten"}
+            <input
+              max={60}
+              min={1}
+              onChange={(event) =>
+                setPlannedMinutes(Number(event.target.value) || 1)
+              }
+              type="number"
+              value={plannedMinutes}
+            />
+          </label>
+          <label className="checkbox-row">
+            <input
+              checked={consent}
+              onChange={(event) => setConsent(event.target.checked)}
+              type="checkbox"
+            />
+            <span>
+              {english
+                ? "I consent to live transmission for this session."
+                : "Ich stimme der Live-Übertragung für diese Session zu."}
+            </span>
+          </label>
+          <button
+            className="button primary"
+            disabled={working || !consent}
+            onClick={() => void startLive()}
+            type="button"
+          >
+            <Camera size={17} />
+            {working
+              ? english
+                ? "Starting..."
+                : "Startet..."
+              : english
+                ? "Start live session"
+                : "Live Session starten"}
+          </button>
+          {liveMessage === null ? null : (
+            <p className="helper">{liveMessage}</p>
+          )}
+          {liveSession === null ? null : (
+            <div className="inline-panel-list">
+              <span>
+                <strong>{english ? "Room ready" : "Raum bereit"}</strong>
+                <small>
+                  {liveSession.status} · {liveSession.plannedMinutes} Min.
+                </small>
+              </span>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {kind === "settings" ? (
+        <div className="inline-panel-body">
+          <p>
+            {english
+              ? "Keep account work out of the main navigation, but reachable from chat."
+              : "Kontothemen bleiben aus der Hauptnavigation, sind aber direkt im Chat erreichbar."}
+          </p>
+          <div className="inline-panel-list">
+            <Link href="/app/account/settings">Settings</Link>
+            <Link href="/app/account/history">
+              {english ? "History and search" : "Verlauf und Suche"}
+            </Link>
+            <Link href="/app/account/privacy">Privacy</Link>
+            <Link href="/app/account/memory">Memory</Link>
+          </div>
+        </div>
+      ) : null}
+
+      {kind === "billing" ? (
+        <div className="inline-panel-body">
+          <p>
+            {english
+              ? "Video analysis, live coaching and trainer handoff stay tied to entitlement checks before checkout or usage."
+              : "Videoanalyse, Live Coaching und Trainerübergabe bleiben vor Checkout oder Nutzung an Entitlements gebunden."}
+          </p>
+          <div className="inline-panel-list">
+            <Link href="/app/account/billing">Billing</Link>
+            <Link href="/app/account/plans">
+              {english ? "Plans" : "Tarife"}
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function CoachRuntime({
   initialMessages,
   locale,
@@ -242,6 +621,11 @@ function CoachRuntime({
 }) {
   const searchParams = useSearchParams();
   const [input, setInput] = useState("");
+  const [activePanel, setActivePanel] = useState<InlinePanelKind | null>(null);
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "light";
     return window.localStorage.getItem("dogos-theme") === "dark"
@@ -308,7 +692,7 @@ function CoachRuntime({
       behavior: "smooth",
       top: viewport.current.scrollHeight,
     });
-  }, [messages, status]);
+  }, [activePanel, messages, status]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -333,6 +717,25 @@ function CoachRuntime({
     await sendMessage({ text: value });
   }
 
+  async function shareWorkspace() {
+    const shareData = {
+      title: "DogOS Coach",
+      url: window.location.href,
+    };
+    try {
+      if (navigator.share !== undefined) {
+        await navigator.share(shareData);
+        setShareMessage(english ? "Shared" : "Geteilt");
+      } else {
+        await navigator.clipboard.writeText(shareData.url);
+        setShareMessage(english ? "Link copied" : "Link kopiert");
+      }
+    } catch {
+      setShareMessage(english ? "Could not share" : "Teilen nicht möglich");
+    }
+    window.setTimeout(() => setShareMessage(null), 2200);
+  }
+
   const hasHistory = messages.length > 0;
   const trainingState = trainingActionState(product);
   const trainingAllowed = trainingState === "ready";
@@ -352,6 +755,27 @@ function CoachRuntime({
           : english
             ? "Coach"
             : "Coach",
+    }));
+  const filteredHistoryEntries = historyEntries.filter((entry) => {
+    const query = historyQuery.trim().toLowerCase();
+    return query.length === 0 || entry.label.toLowerCase().includes(query);
+  });
+  const navigatorEntries = messages
+    .filter((message) => textOf(message).trim().length > 0)
+    .slice(-18)
+    .map((message, index) => ({
+      href: `#message-${message.id}`,
+      id: message.id,
+      label: historyLabel(
+        textOf(message),
+        message.role === "user"
+          ? english
+            ? "Your message"
+            : "Deine Nachricht"
+          : "DogOS",
+      ),
+      role: message.role,
+      step: index + 1,
     }));
   const quickActions = [
     {
@@ -395,27 +819,50 @@ function CoachRuntime({
       icon: Video,
       id: "live",
       label: "Live",
-      action: () => window.location.assign("/app/live"),
+      action: () => setActivePanel("live"),
     },
   ] as const;
   const heldCopy = heldTrainingCopy(trainingState, english);
   return (
-    <div className="coach-shell" data-theme={theme}>
+    <div
+      className="coach-shell"
+      data-sidebar={sidebarOpen ? "open" : "closed"}
+      data-theme={theme}
+    >
       <aside className="coach-sidebar" aria-label="DogOS navigation">
         <div className="sidebar-brand">
           <span className="coach-mark">D</span>
           <strong>DogOS</strong>
+          <button
+            aria-label={
+              english ? "Collapse sidebar" : "Seitenleiste einklappen"
+            }
+            className="sidebar-icon-button"
+            onClick={() => setSidebarOpen(false)}
+            type="button"
+          >
+            <PanelLeftClose size={18} />
+          </button>
         </div>
         <Link className="new-chat-link" href="/app/coach">
           <Sparkles size={16} />
           {english ? "Coach chat" : "Coach Chat"}
         </Link>
+        <label className="sidebar-search">
+          <Search size={15} />
+          <input
+            aria-label={english ? "Search history" : "Verlauf suchen"}
+            onChange={(event) => setHistoryQuery(event.target.value)}
+            placeholder={english ? "Search" : "Suchen"}
+            value={historyQuery}
+          />
+        </label>
         <section className="sidebar-section">
           <span>{english ? "History" : "Verlauf"}</span>
-          {historyEntries.length === 0 ? (
+          {filteredHistoryEntries.length === 0 ? (
             <p>{english ? "No messages yet" : "Noch keine Nachrichten"}</p>
           ) : (
-            historyEntries.map((entry) => (
+            filteredHistoryEntries.map((entry) => (
               <a href={entry.href} key={entry.id}>
                 <strong>{entry.label}</strong>
                 <small>{entry.meta}</small>
@@ -434,24 +881,32 @@ function CoachRuntime({
           </Link>
         </section>
         <div className="sidebar-account">
-          <Link href="/app/account">
+          <button onClick={() => setActivePanel("settings")} type="button">
             <CircleUserRound size={17} />
             {english ? "Profile" : "Profil"}
-          </Link>
-          <Link href="/app/account/settings">
+          </button>
+          <button onClick={() => setActivePanel("settings")} type="button">
             <Settings size={17} />
             Settings
-          </Link>
-          <Link href="/app/account/billing">
+          </button>
+          <button onClick={() => setActivePanel("billing")} type="button">
             <CreditCard size={17} />
             Billing
-          </Link>
+          </button>
         </div>
       </aside>
 
       <main className="coach-main">
         <header className="coach-header">
           <div className="coach-identity">
+            <button
+              aria-label={english ? "Open sidebar" : "Seitenleiste öffnen"}
+              className="icon-link sidebar-toggle-main"
+              onClick={() => setSidebarOpen(true)}
+              type="button"
+            >
+              <PanelLeftOpen size={20} />
+            </button>
             <span className="coach-mark">D</span>
             <div>
               <strong>
@@ -467,6 +922,14 @@ function CoachRuntime({
             </div>
           </div>
           <div className="coach-header-actions">
+            <button
+              aria-label={english ? "Share coach" : "Coach teilen"}
+              className="icon-link"
+              onClick={() => void shareWorkspace()}
+              type="button"
+            >
+              <Share2 size={19} />
+            </button>
             <Link
               className="icon-link mobile-only"
               href="/app/account/history"
@@ -490,6 +953,62 @@ function CoachRuntime({
             >
               <CircleUserRound size={21} />
             </Link>
+            <button
+              aria-expanded={menuOpen}
+              aria-label={english ? "Coach menu" : "Coach Menü"}
+              className="icon-link"
+              onClick={() => setMenuOpen((open) => !open)}
+              type="button"
+            >
+              <MoreHorizontal size={20} />
+            </button>
+            {menuOpen ? (
+              <div className="coach-menu-popover">
+                <button
+                  onClick={() => {
+                    setSidebarOpen(true);
+                    setMenuOpen(false);
+                  }}
+                  type="button"
+                >
+                  <Search size={17} />
+                  {english ? "Search history" : "Verlauf suchen"}
+                </button>
+                <button
+                  onClick={() => {
+                    setActivePanel("video");
+                    setMenuOpen(false);
+                  }}
+                  type="button"
+                >
+                  <Upload size={17} />
+                  {english ? "Upload video" : "Video hochladen"}
+                </button>
+                <button
+                  onClick={() => {
+                    setActivePanel("settings");
+                    setMenuOpen(false);
+                  }}
+                  type="button"
+                >
+                  <Settings size={17} />
+                  Settings
+                </button>
+                <button
+                  onClick={() => {
+                    setActivePanel("billing");
+                    setMenuOpen(false);
+                  }}
+                  type="button"
+                >
+                  <CreditCard size={17} />
+                  Billing
+                </button>
+              </div>
+            ) : null}
+            {shareMessage === null ? null : (
+              <span className="share-status">{shareMessage}</span>
+            )}
           </div>
         </header>
 
@@ -601,6 +1120,15 @@ function CoachRuntime({
             </section>
           )}
 
+          {activePanel === null ? null : (
+            <InlineWorkspacePanel
+              english={english}
+              kind={activePanel}
+              onClose={() => setActivePanel(null)}
+              product={product}
+            />
+          )}
+
           {busy ? (
             <div className="coach-message assistant">
               <span className="coach-avatar">D</span>
@@ -672,7 +1200,11 @@ function CoachRuntime({
               english ? "Upload training video" : "Trainingsvideo hochladen"
             }
             className="composer-tool"
-            href="/app/video"
+            href="#video"
+            onClick={(event) => {
+              event.preventDefault();
+              setActivePanel("video");
+            }}
             title={
               english
                 ? "Video analysis is available on paid plans."
@@ -715,7 +1247,11 @@ function CoachRuntime({
               english ? "Start live video coaching" : "Live Video starten"
             }
             className="composer-tool optional"
-            href="/app/live"
+            href="#live"
+            onClick={(event) => {
+              event.preventDefault();
+              setActivePanel("live");
+            }}
             title={
               english
                 ? "Live video coaching requires Pro or Ultra."
@@ -744,6 +1280,23 @@ function CoachRuntime({
             ? "AI-assisted · not diagnosis or emergency care"
             : "KI-gestützt · keine Diagnose oder Notfallhilfe"}
         </div>
+        {navigatorEntries.length < 2 ? null : (
+          <nav
+            aria-label={english ? "Message navigator" : "Nachrichten-Navigator"}
+            className="message-navigator"
+          >
+            {navigatorEntries.map((entry) => (
+              <a
+                aria-label={`${entry.step}. ${entry.label}`}
+                className={entry.role}
+                href={entry.href}
+                key={entry.id}
+              >
+                <span>{entry.label}</span>
+              </a>
+            ))}
+          </nav>
+        )}
       </main>
     </div>
   );
