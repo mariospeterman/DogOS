@@ -1,12 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import {
-  expect,
-  type APIRequestContext,
-  type Page,
-  test,
-} from "@playwright/test";
+import { expect, type APIRequestContext, test } from "@playwright/test";
 
 const api = "http://127.0.0.1:4200";
 const screenshots = resolve("test-results/chat-first-pwa/screenshots");
@@ -24,12 +19,6 @@ async function reset(
     data: { locale },
   });
   expect(response.ok()).toBeTruthy();
-}
-
-async function clickButton(page: Page, name: string) {
-  const button = page.getByRole("button", { name, exact: true });
-  await expect(button).toHaveCount(1);
-  await button.click();
 }
 
 test.beforeAll(async () => {
@@ -295,47 +284,36 @@ test("scenario 10: language switch preserves account and workflow", async ({
   });
 });
 
-test("account link hydrates and confirms without exposing a simulator", async ({
+test("public account creation is available without a provider simulator", async ({
   page,
 }) => {
-  await page.route("**/v1/whatsapp/link/confirm", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ linked: true }),
-    });
-  });
-  await page.goto(`/app/account/link?token=${"a".repeat(32)}`);
-  await clickButton(page, "Verbindung bestätigen");
-  await expect(page.getByText("WhatsApp ist verbunden.")).toBeVisible();
-
+  await page.goto("/auth/sign-up?next=%2Fapp%2Fcoach");
+  await expect(
+    page.getByRole("heading", { name: "Konto erstellen" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Starten" })).toBeVisible();
   const simulator = await page.goto("/simulator");
   expect(simulator?.status()).toBe(404);
 });
 
-test("web product keeps coaching in WhatsApp and management in the app", async ({
+test("chat-first Coach and management views remain one PWA", async ({
   page,
 }) => {
   await page.goto("/app/coach");
-  await expect(page).toHaveURL(/\/app\/today$/);
-  await expect(
-    page.getByRole("heading", { name: "Rex / Heute" }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/coach$/);
+  await expect(page.getByText("Rexs Coach")).toBeVisible();
   const navigation = page.getByRole("navigation", {
     name: "Produktnavigation",
   });
-  for (const name of ["Heute", "Plan", "Fortschritt", "Konto"]) {
+  for (const name of ["Coach", "Plan", "Fortschritt", "Konto"]) {
     await expect(
       navigation.getByRole("link", { name, exact: true }),
     ).toBeVisible();
   }
-  await expect(
-    navigation.getByRole("link", { name: "Coach", exact: true }),
-  ).toHaveCount(0);
   await page.goto("/app/plan");
   await expect(
     page.getByRole("link", { name: "Plan mit Coach besprechen" }),
-  ).toHaveAttribute("href", /wa\.me\/.*text=.*vollst%C3%A4ndigen/);
+  ).toHaveAttribute("href", /\/app\/coach\?prompt=/);
 });
 
 test("account language follows conversation without a selector", async ({
@@ -371,26 +349,23 @@ test("calendar renders the canonical schedule without fake booking controls", as
   ).toHaveCount(0);
 });
 
-test("public start is WhatsApp-first and referral codes grant no access", async ({
+test("public start opens account creation and preserves referral attribution", async ({
   page,
 }, testInfo) => {
   await page.goto("/?ref=DOGOS26");
   await expect(
     page.getByRole("heading", {
-      name: "Im WhatsApp-Chat starten. In DogOS dranbleiben.",
+      name: "Erzähl mir von deinem Hund.",
     }),
   ).toBeVisible();
-  const start = page.getByRole("link", { name: "In WhatsApp starten" });
-  await expect(start).toHaveAttribute("href", /text=DogOS\+starten/);
-  await expect(start).toHaveAttribute("href", /Einladung\+DOGOS26/);
+  const start = page.getByRole("link", { name: /Gespräch starten/ });
+  await expect(start).toHaveAttribute("href", /\/auth\/sign-up/);
+  await expect(start).toHaveAttribute("href", /ref=DOGOS26/);
   await expect(
-    page.getByRole("link", { name: /Schon verbunden/ }),
+    page.getByRole("link", { name: /DogOS öffnen/ }),
   ).toHaveAttribute("href", "/auth/sign-in");
   await page.locator("main").screenshot({
-    path: resolve(
-      distributionScreenshots,
-      `start-${testInfo.project.name}.png`,
-    ),
+    path: resolve(screenshots, `start-${testInfo.project.name}.png`),
   });
 });
 
@@ -406,14 +381,14 @@ test("PWA manifest exposes install and durable product shortcuts", async ({
     start_url: string;
   };
   expect(manifest.display).toBe("standalone");
-  expect(manifest.start_url).toContain("/app/today");
+  expect(manifest.start_url).toContain("/app/coach");
   expect(manifest.icons.map((icon) => icon.sizes)).toEqual(
     expect.arrayContaining(["192x192", "512x512"]),
   );
   expect(manifest.shortcuts.map((shortcut) => shortcut.url)).toEqual(
     expect.arrayContaining([
-      "/app/plan?source=app_shortcut",
-      "/app/today?source=app_shortcut",
+      "/app/coach?source=app_shortcut",
+      "/app/coach?prompt=What%20should%20we%20train%20today%3F",
       "/app/progress?source=app_shortcut",
     ]),
   );
