@@ -771,6 +771,12 @@ a {
 .coach-menu-popover button:hover {
   background: color-mix(in srgb, var(--blue) 9%, transparent);
 }
+.coach-menu-popover button.danger {
+  color: var(--coral);
+}
+.coach-menu-popover button.danger:hover {
+  background: color-mix(in srgb, var(--coral) 10%, transparent);
+}
 .share-status {
   background: var(--ink);
   border-radius: 999px;
@@ -1244,37 +1250,53 @@ a {
 }
 .message-navigator {
   display: grid;
-  gap: 6px;
+  gap: 7px;
+  opacity: 0.45;
   position: absolute;
-  right: 18px;
+  right: 14px;
   top: 50%;
   transform: translateY(-50%);
+  transition: opacity 140ms ease;
   z-index: 3;
 }
+.message-navigator:hover,
+.message-navigator:focus-within {
+  opacity: 1;
+}
 .message-navigator a {
-  background: color-mix(in srgb, var(--muted) 50%, transparent);
+  background: color-mix(in srgb, var(--muted) 36%, transparent);
   border-radius: 999px;
-  height: 3px;
+  height: 2px;
   position: relative;
-  width: 28px;
+  transition:
+    background 140ms ease,
+    transform 140ms ease,
+    width 140ms ease;
+  width: 18px;
 }
 .message-navigator a.user {
+  background: color-mix(in srgb, var(--blue) 62%, transparent);
+}
+.message-navigator a:hover,
+.message-navigator a:focus {
   background: var(--blue);
+  transform: translateX(-4px);
+  width: 24px;
 }
 .message-navigator a span {
   background: color-mix(in srgb, var(--surface) 96%, var(--paper));
   border: 1px solid var(--line-soft);
-  border-radius: 12px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
   color: var(--ink);
   display: none;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   line-height: 1.25;
-  max-width: 300px;
+  max-width: 240px;
   overflow: hidden;
-  padding: 9px 10px;
+  padding: 7px 9px;
   position: absolute;
-  right: 38px;
+  right: 34px;
   text-overflow: ellipsis;
   top: 50%;
   transform: translateY(-50%);

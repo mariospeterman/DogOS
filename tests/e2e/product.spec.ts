@@ -325,8 +325,11 @@ test("chat-first Coach and management views remain one PWA", async ({
   }
   await expect(page.getByLabel("Coach teilen")).toBeVisible();
   await page.getByLabel("Coach Menü").click();
-  await expect(page.getByText("Verlauf suchen")).toBeVisible();
-  await page.getByRole("button", { name: "Video hochladen" }).click();
+  await expect(page.getByText("Dateien im Chat anzeigen")).toBeVisible();
+  await expect(page.getByText("Chat anheften")).toBeVisible();
+  await expect(page.getByText("Archivieren")).toBeVisible();
+  await expect(page.getByText("Löschen")).toBeVisible();
+  await page.getByRole("button", { name: "Dateien im Chat anzeigen" }).click();
   await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
   await page.getByLabel("Panel schliessen").click();
   await expect(page.getByLabel("Trainingsvideo hochladen")).toBeVisible();
@@ -346,6 +349,12 @@ test("chat-first Coach and management views remain one PWA", async ({
   await expect(
     page.getByRole("button", { exact: true, name: "Plan" }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page.goto("/app/video");
+  await expect(page).toHaveURL(/\/app\/coach\?action=upload-video/);
+  await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
+  await page.goto("/app/live");
+  await expect(page).toHaveURL(/\/app\/coach\?action=start-live/);
+  await expect(page.getByText("Live Coaching")).toBeVisible();
 });
 
 test("account language follows conversation without a selector", async ({

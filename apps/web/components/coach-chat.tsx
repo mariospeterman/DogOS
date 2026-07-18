@@ -2,16 +2,19 @@
 
 import { useChat } from "@ai-sdk/react";
 import {
+  Archive,
   Camera,
   CircleUserRound,
   Clock3,
   CreditCard,
+  FileText,
   History,
   MoreHorizontal,
   Mic,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  Pin,
   Plus,
   Route,
   Search,
@@ -21,13 +24,14 @@ import {
   Sparkles,
   Sun,
   Target,
+  Trash2,
   Upload,
   Video,
   X,
 } from "lucide-react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { dogosApiHeaders, dogosApiUrl } from "../lib/api-client";
@@ -619,9 +623,17 @@ function CoachRuntime({
   locale: "de-CH" | "en";
   product: ProductDashboard;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const action = searchParams.get("action");
   const [input, setInput] = useState("");
-  const [activePanel, setActivePanel] = useState<InlinePanelKind | null>(null);
+  const [activePanel, setActivePanel] = useState<InlinePanelKind | null>(() =>
+    action === "upload-video"
+      ? "video"
+      : action === "start-live"
+        ? "live"
+        : null,
+  );
   const [historyQuery, setHistoryQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
@@ -717,6 +729,11 @@ function CoachRuntime({
     await sendMessage({ text: value });
   }
 
+  function showStatus(value: string) {
+    setShareMessage(value);
+    window.setTimeout(() => setShareMessage(null), 2200);
+  }
+
   async function shareWorkspace() {
     const shareData = {
       title: "DogOS Coach",
@@ -725,15 +742,14 @@ function CoachRuntime({
     try {
       if (navigator.share !== undefined) {
         await navigator.share(shareData);
-        setShareMessage(english ? "Shared" : "Geteilt");
+        showStatus(english ? "Shared" : "Geteilt");
       } else {
         await navigator.clipboard.writeText(shareData.url);
-        setShareMessage(english ? "Link copied" : "Link kopiert");
+        showStatus(english ? "Link copied" : "Link kopiert");
       }
     } catch {
-      setShareMessage(english ? "Could not share" : "Teilen nicht möglich");
+      showStatus(english ? "Could not share" : "Teilen nicht möglich");
     }
-    window.setTimeout(() => setShareMessage(null), 2200);
   }
 
   const hasHistory = messages.length > 0;
@@ -779,12 +795,7 @@ function CoachRuntime({
     }));
   const quickActions = [
     {
-      action: () =>
-        submit(
-          english
-            ? `Explain ${product.dogName}'s current plan.`
-            : `Erkläre mir ${product.dogName}s aktuellen Plan.`,
-        ),
+      action: () => router.push("/app/coach?space=plan"),
       icon: Route,
       id: "plan",
       label: "Plan",
@@ -792,25 +803,16 @@ function CoachRuntime({
     {
       action: () =>
         trainingAllowed
-          ? window.location.assign(
+          ? router.push(
               `/app/coach?space=train&session=${product.todaySessionId}`,
             )
-          : submit(
-              english
-                ? `What is blocking ${product.dogName}'s next training session?`
-                : `Was blockiert ${product.dogName}s nächste Trainingseinheit?`,
-            ),
+          : router.push("/app/coach?space=train"),
       icon: Clock3,
       id: "train",
       label: english ? "Train" : "Training",
     },
     {
-      action: () =>
-        submit(
-          english
-            ? `Show ${product.dogName}'s recent progress.`
-            : `Zeig mir ${product.dogName}s Fortschritt.`,
-        ),
+      action: () => router.push("/app/coach?space=progress"),
       icon: Target,
       id: "progress",
       label: english ? "Progress" : "Fortschritt",
@@ -846,7 +848,7 @@ function CoachRuntime({
         </div>
         <Link className="new-chat-link" href="/app/coach">
           <Sparkles size={16} />
-          {english ? "Coach chat" : "Coach Chat"}
+          {english ? "New topic" : "Neues Thema"}
         </Link>
         <label className="sidebar-search">
           <Search size={15} />
@@ -966,43 +968,50 @@ function CoachRuntime({
               <div className="coach-menu-popover">
                 <button
                   onClick={() => {
-                    setSidebarOpen(true);
-                    setMenuOpen(false);
-                  }}
-                  type="button"
-                >
-                  <Search size={17} />
-                  {english ? "Search history" : "Verlauf suchen"}
-                </button>
-                <button
-                  onClick={() => {
                     setActivePanel("video");
                     setMenuOpen(false);
                   }}
                   type="button"
                 >
-                  <Upload size={17} />
-                  {english ? "Upload video" : "Video hochladen"}
+                  <FileText size={17} />
+                  {english ? "Show files in chat" : "Dateien im Chat anzeigen"}
                 </button>
                 <button
                   onClick={() => {
-                    setActivePanel("settings");
+                    showStatus(english ? "Pinning follows" : "Anheften folgt");
                     setMenuOpen(false);
                   }}
                   type="button"
                 >
-                  <Settings size={17} />
-                  Settings
+                  <Pin size={17} />
+                  {english ? "Pin chat" : "Chat anheften"}
                 </button>
                 <button
                   onClick={() => {
-                    setActivePanel("billing");
+                    showStatus(
+                      english ? "Archive follows" : "Archivieren folgt",
+                    );
                     setMenuOpen(false);
                   }}
                   type="button"
                 >
-                  <CreditCard size={17} />
-                  Billing
+                  <Archive size={17} />
+                  {english ? "Archive" : "Archivieren"}
+                </button>
+                <button
+                  className="danger"
+                  onClick={() => {
+                    showStatus(
+                      english
+                        ? "Deletion requires confirmation"
+                        : "Löschen braucht Bestätigung",
+                    );
+                    setMenuOpen(false);
+                  }}
+                  type="button"
+                >
+                  <Trash2 size={17} />
+                  {english ? "Delete" : "Löschen"}
                 </button>
               </div>
             ) : null}
@@ -1026,20 +1035,16 @@ function CoachRuntime({
             </div>
           ) : null}
 
-          {messages.map((message, index) => {
+          {messages.map((message) => {
             const text = textOf(message);
             if (text.length === 0) return null;
             const { body, sources } = splitSources(text, locale);
-            const showAvatar =
-              message.role === "assistant" &&
-              messages[index - 1]?.role !== "assistant";
             return (
               <article
                 className={`coach-message ${message.role}`}
                 id={`message-${message.id}`}
                 key={message.id}
               >
-                {showAvatar ? <span className="coach-avatar">D</span> : null}
                 <div
                   className={
                     message.role === "assistant"
