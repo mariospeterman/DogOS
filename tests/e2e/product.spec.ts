@@ -33,7 +33,7 @@ test("scenario 1: German low-risk owner reaches the chat-first coach", async ({
   await page.goto("/app/coach", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Rexs Coach")).toBeVisible();
   await expect(
-    page.getByText("Lockere Leine im ruhigen Abschnitt"),
+    page.getByRole("main").getByText("Lockere Leine im ruhigen Abschnitt"),
   ).toBeVisible();
   await page.getByLabel("Nachricht an DogOS").fill("Warum dieser Block?");
   await page.getByLabel("Nachricht an DogOS").press("Enter");
@@ -320,17 +320,48 @@ test("chat-first Coach and management views remain one PWA", async ({
     await page.getByLabel("Seitenleiste öffnen").click();
     await expect(page.getByLabel("Verlauf suchen")).toBeVisible();
   }
-  for (const name of ["Plan", "Training", "Fortschritt", "Live"]) {
-    await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  if (testInfo.project.name === "chromium") {
+    for (const name of ["Plan", "Training", "Fortschritt", "Live"]) {
+      await expect(
+        page.getByRole("button", { name, exact: true }),
+      ).not.toBeVisible();
+    }
+    await expect(
+      page.getByRole("link", { name: /Aktueller Plan/ }),
+    ).toBeVisible();
+  } else {
+    for (const name of ["Plan", "Training", "Fortschritt", "Live"]) {
+      await expect(
+        page.getByRole("button", { name, exact: true }),
+      ).toBeVisible();
+    }
   }
-  await expect(page.getByLabel("Coach teilen")).toBeVisible();
+  if (testInfo.project.name === "chromium") {
+    await expect(page.getByLabel("Coach teilen")).toBeVisible();
+  }
   await page.getByLabel("Coach Menü").click();
   await expect(page.getByText("Dateien im Chat anzeigen")).toBeVisible();
   await expect(page.getByText("Chat anheften")).toBeVisible();
   await expect(page.getByText("Archivieren")).toBeVisible();
   await expect(page.getByText("Löschen")).toBeVisible();
   await page.getByRole("button", { name: "Dateien im Chat anzeigen" }).click();
-  await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
+  await expect(page.getByText("Dateien im Chat")).toBeVisible();
+  await page.getByLabel("Panel schliessen").click();
+  await page.getByLabel("Coach Menü").click();
+  await page.getByRole("button", { name: "Chat anheften" }).click();
+  await expect(
+    page.locator(".chat-state-banner").getByText("Angeheftet"),
+  ).toBeVisible();
+  await page.getByLabel("Coach Menü").click();
+  await page.getByRole("button", { name: "Archivieren" }).click();
+  await expect(
+    page.locator(".chat-state-banner").getByText("Archiviert"),
+  ).toBeVisible();
+  await page.getByLabel("Coach Menü").click();
+  await page.getByRole("button", { name: "Löschen" }).click();
+  await expect(
+    page.locator("#delete .inline-panel-header").getByText("Chat löschen"),
+  ).toBeVisible();
   await page.getByLabel("Panel schliessen").click();
   await expect(page.getByLabel("Trainingsvideo hochladen")).toBeVisible();
   await page.getByLabel("Trainingsvideo hochladen").click();
@@ -343,12 +374,13 @@ test("chat-first Coach and management views remain one PWA", async ({
     await page.getByLabel("Panel schliessen").click();
     await expect(page.getByLabel("Sprachnotiz folgt")).toBeDisabled();
   }
-  await expect(page.getByLabel("Konto")).toBeVisible();
   await page.goto("/app/plan");
   await expect(page).toHaveURL(/\/app\/coach\?space=plan/);
-  await expect(
-    page.getByRole("button", { exact: true, name: "Plan" }),
-  ).toHaveAttribute("aria-pressed", "true");
+  if (testInfo.project.name !== "chromium") {
+    await expect(
+      page.getByRole("button", { exact: true, name: "Plan" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  }
   await page.goto("/app/video");
   await expect(page).toHaveURL(/\/app\/coach\?action=upload-video/);
   await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
@@ -361,12 +393,11 @@ test("account language follows conversation without a selector", async ({
   page,
 }) => {
   await page.goto("/app/account");
-  await expect(page.getByText("Automatisch", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/coach\?action=profile/);
+  await expect(page.locator("#profile").getByText("Profil")).toBeVisible();
   await expect(page.getByRole("combobox", { name: /Sprache/ })).toHaveCount(0);
   await expect(
-    page.getByText("Antworte DogOS einfach in deiner Sprache", {
-      exact: false,
-    }),
+    page.getByText("Land und Währung", { exact: false }),
   ).toBeVisible();
 });
 

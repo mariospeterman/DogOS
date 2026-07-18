@@ -739,6 +739,12 @@ a {
 .coach-shell[data-sidebar="open"] .sidebar-toggle-main {
   display: none;
 }
+.mobile-menu-button {
+  display: none;
+}
+.mobile-drawer {
+  display: none;
+}
 .coach-menu-popover {
   background: color-mix(in srgb, var(--surface) 94%, var(--paper));
   border: 1px solid var(--line-soft);
@@ -789,6 +795,24 @@ a {
   top: calc(100% + 10px);
   white-space: nowrap;
   z-index: 9;
+}
+.chat-state-banner {
+  align-self: center;
+  display: flex;
+  gap: 8px;
+  max-width: min(88%, 650px);
+}
+.chat-state-banner span {
+  align-items: center;
+  background: var(--composer);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.7rem;
+  font-weight: 800;
+  gap: 5px;
+  padding: 5px 9px;
 }
 .coach-identity {
   align-items: center;
@@ -1048,6 +1072,31 @@ a {
   color: var(--muted);
   font-size: 0.7rem;
 }
+.account-inline-person {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+.account-inline-person > span {
+  align-items: center;
+  background: #0b1f3a;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  flex: none;
+  font-weight: 800;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+.account-inline-person div {
+  display: grid;
+  gap: 3px;
+}
+.account-inline-person small {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
 .inline-training-card.held {
   border-color: color-mix(in srgb, var(--yellow) 45%, var(--line));
 }
@@ -1159,7 +1208,7 @@ a {
   padding: 0 12px;
 }
 .composer-quick-actions {
-  display: flex;
+  display: none;
   gap: 7px;
   margin: 0 max(18px, calc((100% - 780px) / 2)) 8px;
   overflow-x: auto;
@@ -1280,8 +1329,7 @@ a {
 .message-navigator a:hover,
 .message-navigator a:focus {
   background: var(--blue);
-  transform: translateX(-4px);
-  width: 24px;
+  width: 18px;
 }
 .message-navigator a span {
   background: color-mix(in srgb, var(--surface) 96%, var(--paper));
@@ -2477,6 +2525,37 @@ a {
   .coach-header-actions {
     gap: 5px;
   }
+  .desktop-header-action,
+  .desktop-only,
+  .coach-header .coach-mark {
+    display: none;
+  }
+  .mobile-menu-button {
+    display: flex;
+  }
+  .mobile-drawer {
+    display: block;
+    inset: 0;
+    position: fixed;
+    z-index: 50;
+  }
+  .mobile-drawer-backdrop {
+    background: rgba(0, 0, 0, 0.42);
+    border: 0;
+    inset: 0;
+    position: absolute;
+    width: 100%;
+  }
+  .mobile-drawer-panel {
+    background: color-mix(in srgb, var(--surface) 94%, var(--paper));
+    display: grid;
+    grid-template-rows: auto auto 1fr auto auto;
+    height: 100%;
+    max-width: 320px;
+    padding: 14px 12px;
+    position: relative;
+    width: 84vw;
+  }
   .coach-header-actions .icon-link {
     min-height: 34px;
     width: 34px;
@@ -2490,6 +2569,9 @@ a {
   .chat-inline-panel {
     margin-left: 34px;
     max-width: 94%;
+  }
+  .composer-quick-actions {
+    display: flex;
   }
   .coach-identity {
     gap: 9px;

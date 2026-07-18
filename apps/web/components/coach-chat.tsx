@@ -8,7 +8,6 @@ import {
   Clock3,
   CreditCard,
   FileText,
-  History,
   MoreHorizontal,
   Mic,
   Moon,
@@ -77,7 +76,19 @@ interface LiveSession {
   summary: string | null;
 }
 
-type InlinePanelKind = "billing" | "live" | "settings" | "video";
+interface AccountView {
+  billingAvailable: boolean;
+  country: string;
+  currency: string;
+  displayName: string | null;
+  householdName: string;
+  role: string;
+  tier: string;
+  timezone: string;
+}
+
+type InlinePanelKind =
+  "billing" | "delete" | "files" | "live" | "profile" | "settings" | "video";
 
 function toUiMessages(conversation: PersistedConversation): UIMessage[] {
   return conversation.messages
@@ -225,6 +236,37 @@ function historyLabel(text: string, fallback: string): string {
   return first.length > 42 ? `${first.slice(0, 42)}...` : first;
 }
 
+function chapterTitle(text: string, english: boolean): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length === 0)
+    return english ? "Training topic" : "Trainingsthema";
+  const lower = normalized.toLowerCase();
+  if (/video|clip|film|aufnahme/.test(lower)) {
+    return english ? "Video review" : "Videoauswertung";
+  }
+  if (/plan|block|übung|uebung|training/.test(lower)) {
+    return english ? "Training plan" : "Trainingsplan";
+  }
+  if (/fortschritt|progress|besser|trend/.test(lower)) {
+    return english ? "Progress review" : "Fortschritt prüfen";
+  }
+  return historyLabel(
+    normalized,
+    english ? "Training topic" : "Trainingsthema",
+  );
+}
+
+function sessionLabel(plannedStart: string, english: boolean): string {
+  const date = new Date(plannedStart);
+  if (Number.isNaN(date.getTime()))
+    return english ? "Scheduled session" : "Geplante Einheit";
+  return new Intl.DateTimeFormat(english ? "en" : "de-CH", {
+    day: "2-digit",
+    month: "short",
+    weekday: "short",
+  }).format(date);
+}
+
 export function CoachChat({ product }: { product: ProductDashboard }) {
   const [conversation, setConversation] =
     useState<PersistedConversation | null>(null);
@@ -274,16 +316,25 @@ export function CoachChat({ product }: { product: ProductDashboard }) {
 }
 
 function InlineWorkspacePanel({
+  chatArchived,
   english,
   kind,
+  onArchive,
   onClose,
+  onDelete,
+  onOpenVideo,
   product,
 }: {
+  chatArchived: boolean;
   english: boolean;
   kind: InlinePanelKind;
+  onArchive: () => void;
   onClose: () => void;
+  onDelete: () => void;
+  onOpenVideo: () => void;
   product: ProductDashboard;
 }) {
+  const [account, setAccount] = useState<AccountView | null>(null);
   const [analyses, setAnalyses] = useState<VideoAnalysis[]>([]);
   const [consent, setConsent] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -294,7 +345,7 @@ function InlineWorkspacePanel({
   const [working, setWorking] = useState(false);
 
   useEffect(() => {
-    if (kind !== "video") return;
+    if (kind !== "video" && kind !== "files") return;
     let active = true;
     void (async () => {
       const response = await fetch(
@@ -309,6 +360,23 @@ function InlineWorkspacePanel({
       active = false;
     };
   }, [kind, product.dogId]);
+
+  useEffect(() => {
+    if (kind !== "profile" && kind !== "settings" && kind !== "billing") {
+      return;
+    }
+    let active = true;
+    void (async () => {
+      const response = await fetch(dogosApiUrl("/v1/me"), {
+        headers: await dogosApiHeaders(),
+      });
+      if (!active || !response.ok) return;
+      setAccount((await response.json()) as AccountView);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [kind]);
 
   async function uploadVideo() {
     if (file === null) return;
@@ -431,15 +499,27 @@ function InlineWorkspacePanel({
   }
 
   const title =
-    kind === "video"
+    kind === "files"
       ? english
-        ? "Analyze training video"
-        : "Trainingsvideo analysieren"
-      : kind === "live"
-        ? "Live Coaching"
-        : kind === "billing"
-          ? "Billing"
-          : "Settings";
+        ? "Files in chat"
+        : "Dateien im Chat"
+      : kind === "video"
+        ? english
+          ? "Analyze training video"
+          : "Trainingsvideo analysieren"
+        : kind === "live"
+          ? "Live Coaching"
+          : kind === "billing"
+            ? "Billing"
+            : kind === "delete"
+              ? english
+                ? "Delete chat"
+                : "Chat löschen"
+              : kind === "profile"
+                ? english
+                  ? "Profile"
+                  : "Profil"
+                : "Settings";
 
   return (
     <section className="chat-inline-panel" id={kind}>
@@ -453,6 +533,40 @@ function InlineWorkspacePanel({
           <X size={17} />
         </button>
       </div>
+
+      {kind === "files" ? (
+        <div className="inline-panel-body">
+          <p>
+            {english
+              ? "Media stays attached to this Coach timeline. Upload a training video or review queued clips without leaving chat."
+              : "Medien bleiben an diese Coach-Timeline gebunden. Lade ein Trainingsvideo hoch oder prüfe wartende Clips direkt im Chat."}
+          </p>
+          <button
+            className="button primary"
+            onClick={onOpenVideo}
+            type="button"
+          >
+            <Upload size={17} />
+            {english ? "Upload training video" : "Trainingsvideo hochladen"}
+          </button>
+          <div className="inline-panel-list">
+            {analyses.length === 0 ? (
+              <span>
+                {english
+                  ? "No media attached yet."
+                  : "Noch keine Medien angehängt."}
+              </span>
+            ) : (
+              analyses.slice(0, 6).map((analysis) => (
+                <span key={analysis.id}>
+                  <strong>{analysis.originalFilename}</strong>
+                  <small>{analysis.status}</small>
+                </span>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {kind === "video" ? (
         <div className="inline-panel-body">
@@ -595,6 +709,47 @@ function InlineWorkspacePanel({
         </div>
       ) : null}
 
+      {kind === "profile" ? (
+        <div className="inline-panel-body">
+          <div className="account-inline-person">
+            <span>
+              {(account?.displayName ?? "DogOS Owner")
+                .split(/\s+/)
+                .map((part) => part[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase()}
+            </span>
+            <div>
+              <strong>{account?.displayName ?? "DogOS Owner"}</strong>
+              <small>
+                {account === null
+                  ? english
+                    ? "Loading account..."
+                    : "Konto wird geladen..."
+                  : `${account.role} · ${account.householdName}`}
+              </small>
+            </div>
+          </div>
+          <div className="inline-panel-list">
+            <span>
+              <strong>{english ? "Plan" : "Tarif"}</strong>
+              <small>{account?.tier ?? "..."}</small>
+            </span>
+            <span>
+              <strong>{english ? "Locale" : "Land und Währung"}</strong>
+              <small>
+                {account === null
+                  ? "..."
+                  : `${account.country} · ${account.currency} · ${account.timezone}`}
+              </small>
+            </span>
+            <Link href="/app/account/privacy">Privacy</Link>
+            <Link href="/app/account/memory">Memory</Link>
+          </div>
+        </div>
+      ) : null}
+
       {kind === "billing" ? (
         <div className="inline-panel-body">
           <p>
@@ -607,6 +762,37 @@ function InlineWorkspacePanel({
             <Link href="/app/account/plans">
               {english ? "Plans" : "Tarife"}
             </Link>
+          </div>
+        </div>
+      ) : null}
+
+      {kind === "delete" ? (
+        <div className="inline-panel-body">
+          <p>
+            {english
+              ? "Delete hides this chat from the current workspace. Durable safety, billing, privacy and training records are kept under their own retention rules."
+              : "Löschen blendet diesen Chat aus dem aktuellen Workspace aus. Dauerhafte Sicherheits-, Abrechnungs-, Datenschutz- und Trainingsdaten behalten ihre eigenen Aufbewahrungsregeln."}
+          </p>
+          <div className="inline-card-actions">
+            <button className="button danger" onClick={onDelete} type="button">
+              <Trash2 size={17} />
+              {english ? "Delete chat" : "Chat löschen"}
+            </button>
+            <button
+              className="button secondary"
+              disabled={chatArchived}
+              onClick={onArchive}
+              type="button"
+            >
+              <Archive size={17} />
+              {chatArchived
+                ? english
+                  ? "Archived"
+                  : "Archiviert"
+                : english
+                  ? "Archive instead"
+                  : "Stattdessen archivieren"}
+            </button>
           </div>
         </div>
       ) : null}
@@ -632,10 +818,20 @@ function CoachRuntime({
       ? "video"
       : action === "start-live"
         ? "live"
-        : null,
+        : action === "profile"
+          ? "profile"
+          : action === "files"
+            ? "files"
+            : action === "delete-chat"
+              ? "delete"
+              : null,
   );
   const [historyQuery, setHistoryQuery] = useState("");
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [chatArchived, setChatArchived] = useState(false);
+  const [chatDeleted, setChatDeleted] = useState(false);
+  const [chatPinned, setChatPinned] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
@@ -755,27 +951,69 @@ function CoachRuntime({
   const hasHistory = messages.length > 0;
   const trainingState = trainingActionState(product);
   const trainingAllowed = trainingState === "ready";
-  const historyEntries = messages
+  const conversationChapters = messages
     .filter((message) => message.role === "user")
-    .slice(-8)
-    .reverse()
-    .map((message, index) => ({
-      href: `#message-${message.id}`,
-      id: message.id,
-      label: historyLabel(textOf(message), english ? "Conversation" : "Chat"),
-      meta:
-        index === 0
-          ? english
-            ? "Latest"
-            : "Aktuell"
-          : english
-            ? "Coach"
-            : "Coach",
-    }));
-  const filteredHistoryEntries = historyEntries.filter((entry) => {
+    .reduce<
+      Array<{
+        href: string;
+        id: string;
+        label: string;
+        meta: string;
+        search: string;
+      }>
+    >((chapters, message, index) => {
+      const text = textOf(message);
+      const title = chapterTitle(text, english);
+      const previous = chapters.at(-1);
+      if (previous?.label.toLowerCase() === title.toLowerCase()) {
+        previous.search = `${previous.search} ${text}`;
+        return chapters;
+      }
+      chapters.push({
+        href: `#message-${message.id}`,
+        id: message.id,
+        label: title,
+        meta:
+          index === 0
+            ? english
+              ? "Latest topic"
+              : "Aktuelles Thema"
+            : english
+              ? "Conversation"
+              : "Gespräch",
+        search: text,
+      });
+      return chapters;
+    }, [])
+    .slice(-6)
+    .reverse();
+  const trainingEntries = product.calendar.slice(0, 6).map((session) => ({
+    href: `/app/coach?space=train&session=${session.id}`,
+    id: session.id,
+    label: session.isRecovery
+      ? english
+        ? "Recovery observation"
+        : "Beobachtungstag"
+      : presentation.title,
+    meta: `${sessionLabel(session.plannedStart, english)} · ${Math.ceil(session.durationSeconds / 60)} Min.`,
+    search: `${session.status} ${session.purposeCode} ${presentation.title}`,
+  }));
+  const filterNavigationEntries = <
+    T extends { label: string; meta: string; search: string },
+  >(
+    entries: T[],
+  ) => {
     const query = historyQuery.trim().toLowerCase();
-    return query.length === 0 || entry.label.toLowerCase().includes(query);
-  });
+    if (query.length === 0) return entries;
+    return entries.filter((entry) =>
+      `${entry.label} ${entry.meta} ${entry.search}`
+        .toLowerCase()
+        .includes(query),
+    );
+  };
+  const filteredConversationChapters =
+    filterNavigationEntries(conversationChapters);
+  const filteredTrainingEntries = filterNavigationEntries(trainingEntries);
   const navigatorEntries = messages
     .filter((message) => textOf(message).trim().length > 0)
     .slice(-18)
@@ -828,6 +1066,7 @@ function CoachRuntime({
   return (
     <div
       className="coach-shell"
+      data-mobile-drawer={mobileDrawerOpen ? "open" : "closed"}
       data-sidebar={sidebarOpen ? "open" : "closed"}
       data-theme={theme}
     >
@@ -860,11 +1099,11 @@ function CoachRuntime({
           />
         </label>
         <section className="sidebar-section">
-          <span>{english ? "History" : "Verlauf"}</span>
-          {filteredHistoryEntries.length === 0 ? (
-            <p>{english ? "No messages yet" : "Noch keine Nachrichten"}</p>
+          <span>{english ? "Conversations" : "Gespräche"}</span>
+          {filteredConversationChapters.length === 0 ? (
+            <p>{english ? "No topics found" : "Keine Themen gefunden"}</p>
           ) : (
-            filteredHistoryEntries.map((entry) => (
+            filteredConversationChapters.map((entry) => (
               <a href={entry.href} key={entry.id}>
                 <strong>{entry.label}</strong>
                 <small>{entry.meta}</small>
@@ -873,17 +1112,27 @@ function CoachRuntime({
           )}
         </section>
         <section className="sidebar-section">
-          <span>{english ? "Training" : "Training"}</span>
-          <Link href="/app/coach?space=plan">Plan</Link>
-          <Link href="/app/coach?space=train">
-            {english ? "Session overview" : "Einheitenübersicht"}
+          <span>{english ? "Training plan" : "Trainingsplan"}</span>
+          <Link href="/app/coach?space=plan">
+            <strong>{english ? "Current plan" : "Aktueller Plan"}</strong>
+            <small>{presentation.stage}</small>
           </Link>
           <Link href="/app/coach?space=progress">
-            {english ? "Progress" : "Fortschritt"}
+            <strong>{english ? "Progress" : "Fortschritt"}</strong>
+            <small>
+              {product.baselineSuccessRate}% → {product.targetSuccessRate ?? 80}
+              %
+            </small>
           </Link>
+          {filteredTrainingEntries.map((entry) => (
+            <Link href={entry.href} key={entry.id}>
+              <strong>{entry.label}</strong>
+              <small>{entry.meta}</small>
+            </Link>
+          ))}
         </section>
         <div className="sidebar-account">
-          <button onClick={() => setActivePanel("settings")} type="button">
+          <button onClick={() => setActivePanel("profile")} type="button">
             <CircleUserRound size={17} />
             {english ? "Profile" : "Profil"}
           </button>
@@ -898,12 +1147,102 @@ function CoachRuntime({
         </div>
       </aside>
 
+      {mobileDrawerOpen ? (
+        <div className="mobile-drawer" role="dialog" aria-label="DogOS Menü">
+          <button
+            aria-label={english ? "Close menu" : "Menü schliessen"}
+            className="mobile-drawer-backdrop"
+            onClick={() => setMobileDrawerOpen(false)}
+            type="button"
+          />
+          <div className="mobile-drawer-panel">
+            <div className="sidebar-brand">
+              <span className="coach-mark">D</span>
+              <strong>DogOS</strong>
+              <button
+                aria-label={english ? "Close menu" : "Menü schliessen"}
+                className="sidebar-icon-button"
+                onClick={() => setMobileDrawerOpen(false)}
+                type="button"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <label className="sidebar-search">
+              <Search size={15} />
+              <input
+                aria-label={english ? "Search history" : "Verlauf suchen"}
+                onChange={(event) => setHistoryQuery(event.target.value)}
+                placeholder={english ? "Search" : "Suchen"}
+                value={historyQuery}
+              />
+            </label>
+            <section className="sidebar-section">
+              <span>{english ? "Conversations" : "Gespräche"}</span>
+              {filteredConversationChapters.map((entry) => (
+                <a
+                  href={entry.href}
+                  key={entry.id}
+                  onClick={() => setMobileDrawerOpen(false)}
+                >
+                  <strong>{entry.label}</strong>
+                  <small>{entry.meta}</small>
+                </a>
+              ))}
+            </section>
+            <section className="sidebar-section">
+              <span>{english ? "Training plan" : "Trainingsplan"}</span>
+              {filteredTrainingEntries.map((entry) => (
+                <Link
+                  href={entry.href}
+                  key={entry.id}
+                  onClick={() => setMobileDrawerOpen(false)}
+                >
+                  <strong>{entry.label}</strong>
+                  <small>{entry.meta}</small>
+                </Link>
+              ))}
+            </section>
+            <div className="sidebar-account">
+              <button
+                onClick={() => {
+                  setActivePanel("profile");
+                  setMobileDrawerOpen(false);
+                }}
+                type="button"
+              >
+                <CircleUserRound size={17} />
+                {english ? "Profile" : "Profil"}
+              </button>
+              <button
+                onClick={() => {
+                  setActivePanel("billing");
+                  setMobileDrawerOpen(false);
+                }}
+                type="button"
+              >
+                <CreditCard size={17} />
+                Billing
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <main className="coach-main">
         <header className="coach-header">
           <div className="coach-identity">
             <button
+              aria-label={english ? "Open menu" : "Menü öffnen"}
+              className="icon-link mobile-menu-button"
+              onClick={() => setMobileDrawerOpen(true)}
+              type="button"
+            >
+              <PanelLeftOpen size={20} />
+            </button>
+            <button
               aria-label={english ? "Open sidebar" : "Seitenleiste öffnen"}
-              className="icon-link sidebar-toggle-main"
+              className="icon-link sidebar-toggle-main desktop-only"
               onClick={() => setSidebarOpen(true)}
               type="button"
             >
@@ -926,35 +1265,21 @@ function CoachRuntime({
           <div className="coach-header-actions">
             <button
               aria-label={english ? "Share coach" : "Coach teilen"}
-              className="icon-link"
+              className="icon-link desktop-header-action"
               onClick={() => void shareWorkspace()}
               type="button"
             >
               <Share2 size={19} />
             </button>
-            <Link
-              className="icon-link mobile-only"
-              href="/app/account/history"
-              aria-label={english ? "History" : "Verlauf"}
-            >
-              <History size={20} />
-            </Link>
             <button
               aria-pressed={theme === "dark"}
-              className="icon-link"
+              className="icon-link desktop-header-action"
               type="button"
               aria-label={theme === "dark" ? "Light theme" : "Dark theme"}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
               {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
             </button>
-            <Link
-              className="icon-link"
-              href="/app/account"
-              aria-label={english ? "Account" : "Konto"}
-            >
-              <CircleUserRound size={21} />
-            </Link>
             <button
               aria-expanded={menuOpen}
               aria-label={english ? "Coach menu" : "Coach Menü"}
@@ -968,7 +1293,7 @@ function CoachRuntime({
               <div className="coach-menu-popover">
                 <button
                   onClick={() => {
-                    setActivePanel("video");
+                    setActivePanel("files");
                     setMenuOpen(false);
                   }}
                   type="button"
@@ -978,19 +1303,33 @@ function CoachRuntime({
                 </button>
                 <button
                   onClick={() => {
-                    showStatus(english ? "Pinning follows" : "Anheften folgt");
+                    setChatPinned((pinned) => !pinned);
+                    showStatus(
+                      chatPinned
+                        ? english
+                          ? "Chat unpinned"
+                          : "Chat gelöst"
+                        : english
+                          ? "Chat pinned"
+                          : "Chat angeheftet",
+                    );
                     setMenuOpen(false);
                   }}
                   type="button"
                 >
                   <Pin size={17} />
-                  {english ? "Pin chat" : "Chat anheften"}
+                  {chatPinned
+                    ? english
+                      ? "Unpin chat"
+                      : "Chat lösen"
+                    : english
+                      ? "Pin chat"
+                      : "Chat anheften"}
                 </button>
                 <button
                   onClick={() => {
-                    showStatus(
-                      english ? "Archive follows" : "Archivieren folgt",
-                    );
+                    setChatArchived(true);
+                    showStatus(english ? "Chat archived" : "Chat archiviert");
                     setMenuOpen(false);
                   }}
                   type="button"
@@ -1001,11 +1340,7 @@ function CoachRuntime({
                 <button
                   className="danger"
                   onClick={() => {
-                    showStatus(
-                      english
-                        ? "Deletion requires confirmation"
-                        : "Löschen braucht Bestätigung",
-                    );
+                    setActivePanel("delete");
                     setMenuOpen(false);
                   }}
                   type="button"
@@ -1022,7 +1357,40 @@ function CoachRuntime({
         </header>
 
         <div className="coach-messages" ref={viewport} aria-live="polite">
-          {!hasHistory ? (
+          {chatPinned || chatArchived ? (
+            <div className="chat-state-banner">
+              {chatPinned ? (
+                <span>
+                  <Pin size={14} />
+                  {english ? "Pinned" : "Angeheftet"}
+                </span>
+              ) : null}
+              {chatArchived ? (
+                <span>
+                  <Archive size={14} />
+                  {english ? "Archived" : "Archiviert"}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {chatDeleted ? (
+            <section className="chat-inline-panel">
+              <div className="inline-panel-header">
+                <span>{english ? "Chat deleted" : "Chat gelöscht"}</span>
+              </div>
+              <div className="inline-panel-body">
+                <p>
+                  {english
+                    ? "This local chat view is hidden. Start a new topic or use History to reopen durable records."
+                    : "Diese lokale Chatansicht ist ausgeblendet. Starte ein neues Thema oder öffne dauerhafte Einträge über den Verlauf."}
+                </p>
+                <Link className="button primary" href="/app/coach">
+                  {english ? "New topic" : "Neues Thema"}
+                </Link>
+              </div>
+            </section>
+          ) : null}
+          {!hasHistory && !chatDeleted ? (
             <div className="coach-welcome">
               <span className="coach-avatar">D</span>
               <div className="message-bubble assistant">
@@ -1035,48 +1403,50 @@ function CoachRuntime({
             </div>
           ) : null}
 
-          {messages.map((message) => {
-            const text = textOf(message);
-            if (text.length === 0) return null;
-            const { body, sources } = splitSources(text, locale);
-            return (
-              <article
-                className={`coach-message ${message.role}`}
-                id={`message-${message.id}`}
-                key={message.id}
-              >
-                <div
-                  className={
-                    message.role === "assistant"
-                      ? "assistant-response"
-                      : "message-bubble user"
-                  }
-                >
-                  {body.split("\n").map((line, index) => (
-                    <p key={`${message.id}:${index}`}>{line || "\u00a0"}</p>
-                  ))}
-                  {sources.length === 0 ? null : (
-                    <details className="source-disclosure">
-                      <summary>
-                        {english
-                          ? `${sources.length} references and plan facts`
-                          : `${sources.length} Referenzen und Planfakten`}
-                      </summary>
-                      <ul>
-                        {sources.map((source, sourceIndex) => (
-                          <li key={`${message.id}:source:${sourceIndex}`}>
-                            {source}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                </div>
-              </article>
-            );
-          })}
+          {chatDeleted
+            ? null
+            : messages.map((message) => {
+                const text = textOf(message);
+                if (text.length === 0) return null;
+                const { body, sources } = splitSources(text, locale);
+                return (
+                  <article
+                    className={`coach-message ${message.role}`}
+                    id={`message-${message.id}`}
+                    key={message.id}
+                  >
+                    <div
+                      className={
+                        message.role === "assistant"
+                          ? "assistant-response"
+                          : "message-bubble user"
+                      }
+                    >
+                      {body.split("\n").map((line, index) => (
+                        <p key={`${message.id}:${index}`}>{line || "\u00a0"}</p>
+                      ))}
+                      {sources.length === 0 ? null : (
+                        <details className="source-disclosure">
+                          <summary>
+                            {english
+                              ? `${sources.length} references and plan facts`
+                              : `${sources.length} Referenzen und Planfakten`}
+                          </summary>
+                          <ul>
+                            {sources.map((source, sourceIndex) => (
+                              <li key={`${message.id}:source:${sourceIndex}`}>
+                                {source}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
 
-          {trainingAllowed ? (
+          {!chatDeleted && trainingAllowed ? (
             <section className="inline-training-card">
               <div className="inline-card-heading">
                 <span>
@@ -1114,7 +1484,7 @@ function CoachRuntime({
                 </Link>
               </div>
             </section>
-          ) : (
+          ) : !chatDeleted ? (
             <section className="inline-training-card held">
               <div className="inline-card-heading">
                 <span>{heldCopy.label}</span>
@@ -1123,13 +1493,25 @@ function CoachRuntime({
               </div>
               <p>{heldCopy.body}</p>
             </section>
-          )}
+          ) : null}
 
           {activePanel === null ? null : (
             <InlineWorkspacePanel
+              chatArchived={chatArchived}
               english={english}
               kind={activePanel}
+              onArchive={() => {
+                setChatArchived(true);
+                setActivePanel(null);
+                showStatus(english ? "Chat archived" : "Chat archiviert");
+              }}
               onClose={() => setActivePanel(null)}
+              onDelete={() => {
+                setChatDeleted(true);
+                setActivePanel(null);
+                showStatus(english ? "Chat deleted" : "Chat gelöscht");
+              }}
+              onOpenVideo={() => setActivePanel("video")}
               product={product}
             />
           )}
