@@ -205,4 +205,34 @@ describe("DogOS Coach conversation", () => {
     expect(chunks.join("")).toMatch(/^Streaming answer\./);
     expect(chunks.join("")).toMatch(/Sources: \[1\] Current DogOS plan/);
   });
+
+  it("does not persist unsafe streamed claims as canonical coach output", async () => {
+    const service = new CoachConversationService(
+      new InMemoryCoachConversationStore(),
+      {
+        generate: async () => "unused",
+        stream: async function* () {
+          yield "This is a pain diagnosis.";
+        },
+      },
+    );
+    const chunks = [];
+    for await (const chunk of service.sendStream({
+      channel: "web",
+      clientMessageId: "unsafe-stream",
+      context,
+      links,
+      message: "What do you see?",
+      scope,
+      traceId: "trace-unsafe-stream",
+    })) {
+      chunks.push(chunk);
+    }
+    const conversation = await service.ensure(scope);
+    const assistant = conversation.messages.find(
+      (message) => message.role === "assistant",
+    );
+    expect(assistant?.content).not.toMatch(/pain diagnosis/i);
+    expect(chunks.join("")).not.toMatch(/pain diagnosis/i);
+  });
 });

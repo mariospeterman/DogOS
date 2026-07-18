@@ -1,7 +1,9 @@
 export type CoachChannel = "web";
 export type CoachMessageRole = "user" | "assistant" | "system";
 export type CoachContextKind =
-  "today" | "plan" | "session" | "progress" | "general";
+  "today" | "plan" | "session" | "progress" | "media" | "general";
+export type CoachWorkspace =
+  "setup" | "coach" | "plan" | "train" | "progress" | "media";
 
 export interface CoachAction {
   href: string;
@@ -13,10 +15,16 @@ export interface CoachMessage {
   id: string;
   role: CoachMessageRole;
   channel: CoachChannel | "system";
+  artifactRefs: Array<{ id: string; kind: string; version: number | null }>;
   content: string;
   contextKind: CoachContextKind | null;
   contextSubjectId: string | null;
   createdAt: string;
+  generationStatus:
+    "pending" | "streaming" | "completed" | "failed" | "superseded";
+  secondaryTags: string[];
+  uiParts: unknown[];
+  workspace: CoachWorkspace;
 }
 
 export interface CoachConversation {

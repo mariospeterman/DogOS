@@ -9,6 +9,7 @@ import {
   BillingRepository,
   CapabilityUsageRepository,
   LiveCoachingRepository,
+  MemoryRepository,
   ModelRunRepository,
   OnboardingRepository,
   OnboardingSessionRepository,
@@ -55,6 +56,9 @@ const videos = environment.DATABASE_URL
   : undefined;
 const liveSessions = environment.DATABASE_URL
   ? new LiveCoachingRepository(environment.DATABASE_URL)
+  : undefined;
+const memories = environment.DATABASE_URL
+  ? new MemoryRepository(environment.DATABASE_URL)
   : undefined;
 const privacy = environment.DATABASE_URL
   ? new PrivacyRepository(environment.DATABASE_URL)
@@ -149,11 +153,20 @@ const app = buildApp({
   ...(videos === undefined ? {} : { videos }),
   ...(videoUploads === undefined ? {} : { videoUploads }),
   ...(liveSessions === undefined ? {} : { liveSessions }),
+  ...(memories === undefined ? {} : { memories }),
   ...(privacy === undefined ? {} : { privacy }),
   ...(liveKit === null ? {} : { liveKit }),
   ...(onboardingRepository === undefined
     ? {}
     : { products: onboardingRepository }),
+  readiness: {
+    database: environment.DATABASE_URL !== undefined,
+    liveKit: liveKit !== null,
+    openAI: coachModelConfig !== null,
+    stripe: stripeConfig !== null,
+    supabaseStorage: storageConfig !== null,
+    workers: environment.DATABASE_URL !== undefined,
+  },
   signedActions,
 });
 

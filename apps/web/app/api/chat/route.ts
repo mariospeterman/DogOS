@@ -27,7 +27,8 @@ function latestUserText(messages: UIMessage[]): string | null {
 export async function POST(request: Request) {
   try {
     const raw = (await request.json()) as {
-      contextKind?: "general" | "plan" | "progress" | "session" | "today";
+      contextKind?:
+        "general" | "media" | "plan" | "progress" | "session" | "today";
       dogId?: string;
       messages?: unknown;
     };

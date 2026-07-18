@@ -14,12 +14,14 @@ import {
 } from "@dogos/conversation";
 import {
   InMemoryLiveCoachingStore,
+  InMemoryMemoryStore,
   InMemoryPrivacyStore,
   IdempotencyConflictError,
   InMemoryVideoAnalysisStore,
   type AccountRepository,
   type CapabilityUsageRepository,
   type LiveCoachingStore,
+  type MemoryStore,
   type OnboardingRepository,
   type PostgresRepository,
   type PrivacyStore,
@@ -176,10 +178,19 @@ export interface BuildAppOptions {
   >;
   liveKit?: LiveKitConfig;
   liveSessions?: LiveCoachingStore;
+  memories?: MemoryStore;
   privacy?: PrivacyStore;
   videoUploads?: VideoUploadSigner;
   videos?: VideoAnalysisStore;
   product?: LocalProductFixture;
+  readiness?: {
+    database: boolean;
+    liveKit: boolean;
+    openAI: boolean;
+    stripe: boolean;
+    supabaseStorage: boolean;
+    workers: boolean;
+  };
   signedActions?: SignedActionService;
   webOrigin?: string;
 }
@@ -197,6 +208,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const videoUploads =
     options.videoUploads ?? new DeterministicVideoUploadSigner();
   const liveSessions = options.liveSessions ?? new InMemoryLiveCoachingStore();
+  const memories = options.memories ?? new InMemoryMemoryStore();
   const privacy = options.privacy ?? new InMemoryPrivacyStore();
   const authenticator =
     options.authenticator ?? new LocalRequestAuthenticator("test");
@@ -207,6 +219,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       "local1",
     );
   const configuredWebOrigin = options.webOrigin ?? process.env.WEB_ORIGIN;
+  const readiness = options.readiness ?? {
+    database: options.products !== undefined,
+    liveKit: options.liveKit !== undefined,
+    openAI: options.coach !== undefined,
+    stripe: options.billing !== undefined,
+    supabaseStorage: options.videoUploads !== undefined,
+    workers: options.videos !== undefined,
+  };
   const allowedWebOrigins =
     process.env.NODE_ENV === "production"
       ? (configuredWebOrigin ?? false)
@@ -325,7 +345,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       status: "ok" as const,
     }));
     routes.get("/health/ready", { schema: { hide: true } }, async () => ({
-      checks: { api: "ready" as const },
+      checks: {
+        api: "ready" as const,
+        database: readiness.database ? "configured" : "not_configured",
+        liveKit: readiness.liveKit ? "configured" : "not_configured",
+        openAI: readiness.openAI ? "configured" : "deterministic",
+        stripe: readiness.stripe ? "configured" : "not_configured",
+        supabaseStorage: readiness.supabaseStorage
+          ? "configured"
+          : "deterministic",
+        workers: readiness.workers ? "configured" : "in_process",
+      },
       status: "ready" as const,
     }));
     routes.get("/openapi.json", { schema: { hide: true } }, async () =>
@@ -674,7 +704,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
               message: { type: "string", minLength: 1, maxLength: 2000 },
               contextKind: {
                 type: "string",
-                enum: ["today", "plan", "session", "progress", "general"],
+                enum: [
+                  "today",
+                  "plan",
+                  "session",
+                  "progress",
+                  "media",
+                  "general",
+                ],
               },
               contextSubjectId: { type: "string", format: "uuid" },
             },
@@ -694,7 +731,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         const body = request.body as {
           dogId: string;
           message: string;
-          contextKind?: "today" | "plan" | "session" | "progress" | "general";
+          contextKind?:
+            "today" | "plan" | "session" | "progress" | "media" | "general";
           contextSubjectId?: string;
         };
         const dashboard = await options.products?.dashboardByDog(
@@ -781,12 +819,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             ? {}
             : { contextSubjectId: body.contextSubjectId }),
           links: {
-            plan: "/app/plan",
-            progress: "/app/progress",
+            plan: "/app/coach?space=plan",
+            progress: "/app/coach?space=progress",
             session: dashboard?.todaySessionId
-              ? `/app/session/${dashboard.todaySessionId}`
-              : "/app/today",
-            today: "/app/today",
+              ? `/app/coach?space=train&session=${dashboard.todaySessionId}`
+              : "/app/coach?space=train",
+            today: "/app/coach?space=train",
           },
           message: body.message,
           scope: {
@@ -1255,6 +1293,232 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             actorUserId: actor.actorId,
             householdId: actor.householdId,
             ...(body.reason === undefined ? {} : { reason: body.reason }),
+          }),
+        };
+      },
+    );
+
+    routes.get(
+      "/v1/memory",
+      {
+        schema: {
+          operationId: "listOwnerMemory",
+          tags: ["memory"],
+          headers: authHeaders,
+          querystring: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              dogId: { type: "string", format: "uuid" },
+              query: { type: "string", minLength: 1, maxLength: 200 },
+              relevant: { type: "string", enum: ["1"] },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const query = request.query as {
+          dogId?: string;
+          query?: string;
+          relevant?: "1";
+        };
+        const facts =
+          query.relevant === "1"
+            ? await memories.getRelevantMemory({
+                dogId: query.dogId ?? null,
+                householdId: actor.householdId,
+                ...(query.query === undefined ? {} : { query: query.query }),
+              })
+            : await memories.listOwnerVisibleMemory({
+                householdId: actor.householdId,
+              });
+        return { facts };
+      },
+    );
+
+    routes.post(
+      "/v1/memory/candidates",
+      {
+        schema: {
+          operationId: "createMemoryCandidate",
+          tags: ["memory"],
+          headers: mutationHeaders,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["category", "subject", "value"],
+            properties: {
+              category: {
+                type: "string",
+                enum: [
+                  "stable_profile",
+                  "episodic_event",
+                  "working_state",
+                  "derived_pattern",
+                  "temporary_state",
+                ],
+              },
+              confidence: { type: "number", minimum: 0, maximum: 1 },
+              dogId: { type: "string", format: "uuid" },
+              evidenceRefs: { type: "array", maxItems: 12 },
+              sourceMessageId: { type: "string", format: "uuid" },
+              subject: { type: "string", minLength: 1, maxLength: 120 },
+              value: { type: "string", minLength: 1, maxLength: 1000 },
+            },
+          },
+          response: { 201: stateSchema, ...commonResponses },
+        },
+      },
+      async (request, reply) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const body = request.body as {
+          category:
+            | "stable_profile"
+            | "episodic_event"
+            | "working_state"
+            | "derived_pattern"
+            | "temporary_state";
+          confidence?: number;
+          dogId?: string;
+          evidenceRefs?: unknown[];
+          sourceMessageId?: string;
+          subject: string;
+          value: string;
+        };
+        const fact = await memories.createMemoryCandidate({
+          category: body.category,
+          ...(body.confidence === undefined
+            ? {}
+            : { confidence: body.confidence }),
+          dogId: body.dogId ?? null,
+          ...(body.evidenceRefs === undefined
+            ? {}
+            : { evidenceRefs: body.evidenceRefs }),
+          householdId: actor.householdId,
+          sourceMessageId: body.sourceMessageId ?? null,
+          subject: body.subject.trim(),
+          value: body.value.trim(),
+        });
+        return reply.status(201).send({ fact });
+      },
+    );
+
+    routes.post(
+      "/v1/memory/:id/confirm",
+      {
+        schema: {
+          operationId: "confirmMemoryCandidate",
+          tags: ["memory"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: { type: "object", additionalProperties: false, properties: {} },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        return {
+          fact: await memories.confirmMemoryCandidate({
+            actorUserId: actor.actorId,
+            householdId: actor.householdId,
+            id: (request.params as { id: string }).id,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/memory/:id/correct",
+      {
+        schema: {
+          operationId: "correctMemory",
+          tags: ["memory"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["value"],
+            properties: {
+              value: { type: "string", minLength: 1, maxLength: 1000 },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        return {
+          fact: await memories.correctMemory({
+            actorUserId: actor.actorId,
+            householdId: actor.householdId,
+            id: (request.params as { id: string }).id,
+            value: (request.body as { value: string }).value.trim(),
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/memory/:id/forget",
+      {
+        schema: {
+          operationId: "forgetMemory",
+          tags: ["memory"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: { type: "object", additionalProperties: false, properties: {} },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        return {
+          fact: await memories.forgetMemory({
+            actorUserId: actor.actorId,
+            householdId: actor.householdId,
+            id: (request.params as { id: string }).id,
           }),
         };
       },

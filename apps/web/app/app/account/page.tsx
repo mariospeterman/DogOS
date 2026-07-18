@@ -3,11 +3,13 @@
 import {
   CreditCard,
   Globe2,
+  History,
   LogOut,
   MessageCircle,
   Shield,
   UserRound,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/app-shell";
 import { BillingActions } from "../../../components/billing-actions";
@@ -79,7 +81,9 @@ export default function AccountPage() {
             <CreditCard />
             Tarif
           </span>
-          <strong>{account?.tier ?? "..."}</strong>
+          <Link className="button secondary" href="/app/account/billing">
+            {account?.tier ?? "..."}
+          </Link>
         </div>
         <div>
           <span>
@@ -104,7 +108,21 @@ export default function AccountPage() {
             <Shield />
             Datenschutz
           </span>
-          <strong>Supabase Auth</strong>
+          <Link className="button secondary" href="/app/account/privacy">
+            Öffnen
+          </Link>
+        </div>
+        <div>
+          <span>
+            <History />
+            Memory und Verlauf
+            <small>
+              Gespeicherte Fakten prüfen, korrigieren oder vergessen.
+            </small>
+          </span>
+          <Link className="button secondary" href="/app/account/memory">
+            Memory
+          </Link>
         </div>
       </section>
       {account?.billingAvailable ? (

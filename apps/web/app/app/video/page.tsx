@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Upload, Video } from "lucide-react";
+import { CheckCircle2, Loader2, Upload, Video } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/app-shell";
 import { dogosApiHeaders, dogosApiUrl } from "../../../lib/api-client";
@@ -17,8 +17,15 @@ interface VideoAnalysis {
   completedAt: string | null;
   findings: VideoFinding[];
   id: string;
+  jobId: string | null;
   originalFilename: string;
   status: string;
+}
+
+interface VideoUpload {
+  expiresInSeconds: number;
+  method: "PUT";
+  url: string;
 }
 
 export default function VideoPage() {
@@ -71,7 +78,20 @@ export default function VideoPage() {
       }
       const created = (await createResponse.json()) as {
         analysis: VideoAnalysis;
+        upload: VideoUpload;
       };
+      const uploadResponse = await fetch(created.upload.url, {
+        body: file,
+        headers: { "content-type": file.type },
+        method: created.upload.method,
+      });
+      if (!uploadResponse.ok) {
+        setMessage(
+          "Der private Upload ist fehlgeschlagen. Bitte erneut versuchen.",
+        );
+        setAnalyses((current) => [created.analysis, ...current]);
+        return;
+      }
       const completeResponse = await fetch(
         dogosApiUrl(
           `/v1/video-analyses/${created.analysis.id}/complete-upload`,
@@ -83,17 +103,19 @@ export default function VideoPage() {
         },
       );
       if (!completeResponse.ok) {
-        setMessage("Der Upload wurde vorbereitet, aber noch nicht analysiert.");
+        setMessage(
+          "Der Upload ist gespeichert, konnte aber noch nicht eingereiht werden.",
+        );
         setAnalyses((current) => [created.analysis, ...current]);
         return;
       }
-      const completed = (await completeResponse.json()) as {
+      const queued = (await completeResponse.json()) as {
         analysis: VideoAnalysis;
       };
-      setAnalyses((current) => [completed.analysis, ...current]);
+      setAnalyses((current) => [queued.analysis, ...current]);
       setFile(null);
       setMessage(
-        "Analyse abgeschlossen. DogOS zeigt nur überprüfbare Hinweise.",
+        "Upload gespeichert. DogOS analysiert den Clip asynchron und zeigt erst geprüfte Hinweise.",
       );
     } finally {
       setWorking(false);
@@ -133,8 +155,7 @@ export default function VideoPage() {
           disabled={file === null || working}
           onClick={submit}
         >
-          <Upload size={18} />{" "}
-          {working ? "Analyse läuft..." : "Video analysieren"}
+          <Upload size={18} /> {working ? "Upload läuft..." : "Video hochladen"}
         </button>
         {message === null ? null : <p className="helper">{message}</p>}
       </section>
@@ -146,7 +167,8 @@ export default function VideoPage() {
               <Video />
               Noch keine Analyse
               <small>
-                Clips werden als Hinweise behandelt, nicht als Diagnose.
+                Clips werden privat hochgeladen und erst nach Prüfung als
+                Hinweise angezeigt.
               </small>
             </span>
             <strong>Bereit</strong>
@@ -155,11 +177,25 @@ export default function VideoPage() {
           analyses.map((analysis) => (
             <div key={analysis.id}>
               <span>
-                <CheckCircle2 />
+                {analysis.status === "completed" ? (
+                  <CheckCircle2 />
+                ) : (
+                  <Loader2 />
+                )}
                 {analysis.originalFilename}
-                <small>{analysis.status}</small>
+                <small>
+                  {analysis.status === "uploaded"
+                    ? "In der Warteschlange"
+                    : analysis.status === "processing"
+                      ? "Analyse läuft"
+                      : analysis.status}
+                </small>
               </span>
-              <strong>{analysis.findings.length} Hinweise</strong>
+              <strong>
+                {analysis.findings.length === 0
+                  ? "Noch keine Hinweise"
+                  : `${analysis.findings.length} Hinweise`}
+              </strong>
             </div>
           ))
         )}

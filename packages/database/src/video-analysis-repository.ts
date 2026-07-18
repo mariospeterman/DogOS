@@ -19,6 +19,7 @@ export interface VideoAnalysisRecord {
   findings: VideoFinding[];
   householdId: string;
   id: string;
+  jobId: string | null;
   originalFilename: string;
   sizeBytes: number;
   status: VideoAnalysisStatus;
@@ -35,6 +36,7 @@ interface VideoAnalysisRow {
   findings: unknown;
   household_id: string;
   id: string;
+  job_id?: string | null;
   original_filename: string;
   size_bytes: string;
   status: VideoAnalysisStatus;
@@ -66,6 +68,7 @@ function mapRow(row: VideoAnalysisRow): VideoAnalysisRecord {
     findings: findings(row.findings),
     householdId: row.household_id,
     id: row.id,
+    jobId: row.job_id ?? null,
     originalFilename: row.original_filename,
     sizeBytes: Number(row.size_bytes),
     status: row.status,
@@ -77,6 +80,10 @@ function mapRow(row: VideoAnalysisRow): VideoAnalysisRecord {
 export interface VideoAnalysisStore {
   completeUpload(input: {
     actorUserId: string;
+    householdId: string;
+    id: string;
+  }): Promise<VideoAnalysisRecord>;
+  markProcessing?(input: {
     householdId: string;
     id: string;
   }): Promise<VideoAnalysisRecord>;
@@ -98,26 +105,6 @@ export interface VideoAnalysisStore {
   }): Promise<VideoAnalysisRecord[]>;
 }
 
-function deterministicFindings(): VideoFinding[] {
-  return [
-    {
-      confidence: 0.72,
-      evidence: "Owner-submitted clip queued through DogOS video workflow",
-      label: "Handler timing review",
-      recommendation:
-        "Mark the desired response once, then pause before repeating the cue.",
-    },
-    {
-      confidence: 0.64,
-      evidence:
-        "Clip requires owner confirmation before becoming training evidence",
-      label: "Observation quality",
-      recommendation:
-        "Use the next session check-in to confirm success rate and food acceptance.",
-    },
-  ];
-}
-
 export class InMemoryVideoAnalysisStore implements VideoAnalysisStore {
   readonly #records = new Map<string, VideoAnalysisRecord>();
 
@@ -134,6 +121,7 @@ export class InMemoryVideoAnalysisStore implements VideoAnalysisStore {
       findings: [],
       householdId: input.householdId,
       id,
+      jobId: null,
       originalFilename: input.originalFilename,
       sizeBytes: input.sizeBytes,
       status: "upload_requested",
@@ -153,10 +141,25 @@ export class InMemoryVideoAnalysisStore implements VideoAnalysisStore {
     }
     const updated: VideoAnalysisRecord = {
       ...record,
-      completedAt: new Date().toISOString(),
-      findings: deterministicFindings(),
-      status: "completed",
+      jobId: record.jobId ?? crypto.randomUUID(),
+      status: "uploaded",
       uploadedAt: record.uploadedAt ?? new Date().toISOString(),
+    };
+    this.#records.set(input.id, updated);
+    return structuredClone(updated);
+  }
+
+  async markProcessing(input: {
+    householdId: string;
+    id: string;
+  }): Promise<VideoAnalysisRecord> {
+    const record = this.#records.get(input.id);
+    if (record === undefined || record.householdId !== input.householdId) {
+      throw new Error("RESOURCE_NOT_FOUND");
+    }
+    const updated: VideoAnalysisRecord = {
+      ...record,
+      status: "processing",
     };
     this.#records.set(input.id, updated);
     return structuredClone(updated);
@@ -223,13 +226,48 @@ export class VideoAnalysisRepository implements VideoAnalysisStore {
     input: Parameters<VideoAnalysisStore["completeUpload"]>[0],
   ): Promise<VideoAnalysisRecord> {
     const [row] = await this.#sql<VideoAnalysisRow[]>`
+      with updated as (
+        update api.video_analyses
+        set status = 'uploaded',
+          uploaded_at = coalesce(uploaded_at, now())
+        where id = ${input.id}::uuid
+          and household_id = ${input.householdId}::uuid
+          and status in ('upload_requested', 'uploaded')
+        returning *
+      ),
+      job as (
+        insert into private.video_analysis_jobs (
+          analysis_id, household_id, status
+        )
+        select id, household_id, 'queued'
+        from updated
+        on conflict (analysis_id) do update
+          set status = case
+              when private.video_analysis_jobs.status in ('completed', 'processing')
+                then private.video_analysis_jobs.status
+              else 'queued'
+            end,
+            updated_at = now()
+        returning id, analysis_id
+      )
+      select updated.*, job.id::text as job_id
+      from updated
+      left join job on job.analysis_id = updated.id
+    `;
+    if (row === undefined) throw new Error("RESOURCE_NOT_FOUND");
+    return mapRow(row);
+  }
+
+  async markProcessing(input: {
+    householdId: string;
+    id: string;
+  }): Promise<VideoAnalysisRecord> {
+    const [row] = await this.#sql<VideoAnalysisRow[]>`
       update api.video_analyses
-      set status = 'completed',
-        uploaded_at = coalesce(uploaded_at, now()),
-        completed_at = now(),
-        findings = ${JSON.stringify(deterministicFindings())}::jsonb
+      set status = 'processing'
       where id = ${input.id}::uuid
         and household_id = ${input.householdId}::uuid
+        and status = 'uploaded'
       returning *
     `;
     if (row === undefined) throw new Error("RESOURCE_NOT_FOUND");

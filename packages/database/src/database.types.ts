@@ -1540,6 +1540,44 @@ export type Database = {
           },
         ];
       };
+      notification_preferences: {
+        Row: {
+          created_at: string;
+          household_id: string;
+          quiet_hours_end: string | null;
+          quiet_hours_start: string | null;
+          timezone: string;
+          updated_at: string;
+          web_push_enabled: boolean;
+        };
+        Insert: {
+          created_at?: string;
+          household_id: string;
+          quiet_hours_end?: string | null;
+          quiet_hours_start?: string | null;
+          timezone?: string;
+          updated_at?: string;
+          web_push_enabled?: boolean;
+        };
+        Update: {
+          created_at?: string;
+          household_id?: string;
+          quiet_hours_end?: string | null;
+          quiet_hours_start?: string | null;
+          timezone?: string;
+          updated_at?: string;
+          web_push_enabled?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: true;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       observations: {
         Row: {
           confidence: number | null;

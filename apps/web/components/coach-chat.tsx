@@ -6,18 +6,21 @@ import {
   CalendarDays,
   CircleUserRound,
   Clock3,
+  History,
+  Search,
   Route,
   Sparkles,
   Target,
+  Video,
 } from "lucide-react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { dogosApiHeaders, dogosApiUrl } from "../lib/api-client";
 import type { ProductDashboard } from "../lib/product";
 import { trainingPresentation } from "../lib/training-presentation";
-import { AppNavigation } from "./app-navigation";
 
 interface PersistedConversation {
   id: string;
@@ -103,17 +106,29 @@ function CoachRuntime({
   locale: "de-CH" | "en";
   product: ProductDashboard;
 }) {
+  const searchParams = useSearchParams();
   const [input, setInput] = useState("");
   const viewport = useRef<HTMLDivElement>(null);
   const deepLinkSent = useRef(false);
+  const activeSpace = searchParams.get("space") ?? "coach";
+  const contextKind =
+    activeSpace === "plan"
+      ? "plan"
+      : activeSpace === "progress"
+        ? "progress"
+        : activeSpace === "train"
+          ? "session"
+          : activeSpace === "media"
+            ? "media"
+            : "general";
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
-        body: { dogId: product.dogId },
+        body: { contextKind, dogId: product.dogId },
         headers: () => dogosApiHeaders(true),
       }),
-    [product.dogId],
+    [contextKind, product.dogId],
   );
   const { error, messages, sendMessage, status, stop } = useChat({
     id: `dog:${product.dogId}`,
@@ -154,6 +169,33 @@ function CoachRuntime({
   }
 
   const hasHistory = messages.length > 0;
+  const spaces = [
+    {
+      href: "/app/coach?space=coach",
+      id: "coach",
+      label: "Coach",
+      icon: Sparkles,
+    },
+    { href: "/app/coach?space=plan", id: "plan", label: "Plan", icon: Route },
+    {
+      href: "/app/coach?space=train",
+      id: "train",
+      label: english ? "Train" : "Training",
+      icon: Clock3,
+    },
+    {
+      href: "/app/coach?space=progress",
+      id: "progress",
+      label: english ? "Progress" : "Fortschritt",
+      icon: Target,
+    },
+    {
+      href: "/app/coach?space=media",
+      id: "media",
+      label: "Video",
+      icon: Video,
+    },
+  ] as const;
   return (
     <div className="coach-shell">
       <header className="coach-header">
@@ -171,6 +213,13 @@ function CoachRuntime({
         </div>
         <Link
           className="icon-link"
+          href="/app/account/history"
+          aria-label={english ? "History" : "Verlauf"}
+        >
+          <History size={20} />
+        </Link>
+        <Link
+          className="icon-link"
           href="/app/account"
           aria-label={english ? "Account" : "Konto"}
         >
@@ -179,14 +228,14 @@ function CoachRuntime({
       </header>
 
       <div className="coach-context-bar">
-        <Link href="/app/plan">
+        <Link href="/app/coach?space=plan">
           <Route size={16} />
           <span>
             <small>{english ? "Active goal" : "Aktives Ziel"}</small>
             {product.goalText}
           </span>
         </Link>
-        <Link href="/app/progress">
+        <Link href="/app/coach?space=progress">
           <Target size={16} />
           <span>
             <small>{english ? "Milestone" : "Etappe"}</small>
@@ -194,6 +243,27 @@ function CoachRuntime({
           </span>
         </Link>
       </div>
+
+      <nav className="workspace-tabs" aria-label="Produktnavigation">
+        {spaces.map(({ href, icon: Icon, id, label }) => (
+          <Link
+            aria-current={activeSpace === id ? "page" : undefined}
+            href={href}
+            key={id}
+          >
+            <Icon size={17} />
+            <span>{label}</span>
+          </Link>
+        ))}
+        <Link
+          href="/app/account/history"
+          title={english ? "Search history" : "Verlauf suchen"}
+        >
+          <Search size={17} />
+          <span>{english ? "Search" : "Suche"}</span>
+        </Link>
+        <Link href="/app/account">{english ? "Account" : "Konto"}</Link>
+      </nav>
 
       <div className="coach-messages" ref={viewport} aria-live="polite">
         {!hasHistory ? (
@@ -253,13 +323,13 @@ function CoachRuntime({
               className="button primary"
               href={
                 product.todaySessionId
-                  ? `/app/session/${product.todaySessionId}`
-                  : "/app/plan"
+                  ? `/app/coach?space=train&session=${product.todaySessionId}`
+                  : "/app/coach?space=plan"
               }
             >
               {english ? "Start training" : "Training starten"}
             </Link>
-            <Link className="button secondary" href="/app/calendar">
+            <Link className="button secondary" href="/app/coach?space=train">
               <CalendarDays size={17} />
               {english ? "Calendar" : "Kalender"}
             </Link>
@@ -356,7 +426,6 @@ function CoachRuntime({
           ? "AI-assisted · not diagnosis or emergency care"
           : "KI-gestützt · keine Diagnose oder Notfallhilfe"}
       </div>
-      <AppNavigation locale={locale} />
     </div>
   );
 }

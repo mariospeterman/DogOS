@@ -19,6 +19,36 @@ describe("health routes", () => {
     expect(response.json()).toEqual({ status: "ok" });
   }, 10_000);
 
+  it("reports configured provider readiness separately from liveness", async () => {
+    const app = buildApp({
+      readiness: {
+        database: true,
+        liveKit: false,
+        openAI: true,
+        stripe: false,
+        supabaseStorage: true,
+        workers: true,
+      },
+    });
+    apps.push(app);
+
+    const response = await app.inject({ method: "GET", url: "/health/ready" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      checks: {
+        api: "ready",
+        database: "configured",
+        liveKit: "not_configured",
+        openAI: "configured",
+        stripe: "not_configured",
+        supabaseStorage: "configured",
+        workers: "configured",
+      },
+      status: "ready",
+    });
+  });
+
   it("allows browser API calls only from the configured web origin", async () => {
     const app = buildApp({ webOrigin: "https://mobile.dogos.test" });
     apps.push(app);
@@ -131,7 +161,7 @@ describe("product API", () => {
     expect(response.body).toContain("Heute:");
   });
 
-  it("creates and completes asynchronous video analysis jobs", async () => {
+  it("creates and queues asynchronous video analysis jobs after upload", async () => {
     const app = buildApp({
       videoUploads: {
         createUpload: async (input) => ({
@@ -169,17 +199,18 @@ describe("product API", () => {
       `https://storage.test/signed/${body.analysis.storageObjectKey}`,
     );
 
-    const completed = await app.inject({
+    const queued = await app.inject({
       method: "POST",
       url: `/v1/video-analyses/${body.analysis.id}/complete-upload`,
       headers: mutationHeaders("owner", "video-complete-1"),
       payload: {},
     });
-    expect(completed.statusCode).toBe(200);
-    expect(completed.json().analysis).toMatchObject({
-      status: "completed",
+    expect(queued.statusCode).toBe(200);
+    expect(queued.json().analysis).toMatchObject({
+      status: "uploaded",
     });
-    expect(completed.json().analysis.findings).toHaveLength(2);
+    expect(queued.json().analysis.findings).toHaveLength(0);
+    expect(queued.json().analysis.jobId).toEqual(expect.any(String));
 
     const list = await app.inject({
       method: "GET",
@@ -271,6 +302,59 @@ describe("product API", () => {
       headers: { "x-dogos-user": "viewer" },
     });
     expect(viewer.statusCode).toBe(403);
+  });
+
+  it("lets owners inspect, confirm, correct, and forget bounded memory", async () => {
+    const app = buildApp();
+    apps.push(app);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/memory/candidates",
+      headers: mutationHeaders("owner", "memory-create-1"),
+      payload: {
+        category: "stable_profile",
+        subject: "reward preference",
+        value: "Mika works best for chicken outside.",
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const id = created.json().fact.id as string;
+
+    const confirmed = await app.inject({
+      method: "POST",
+      url: `/v1/memory/${id}/confirm`,
+      headers: mutationHeaders("owner", "memory-confirm-1"),
+      payload: {},
+    });
+    expect(confirmed.statusCode).toBe(200);
+    expect(confirmed.json().fact.status).toBe("confirmed");
+
+    const relevant = await app.inject({
+      method: "GET",
+      url: "/v1/memory?relevant=1&query=chicken",
+      headers: { "x-dogos-user": "owner" },
+    });
+    expect(relevant.statusCode).toBe(200);
+    expect(relevant.json().facts).toHaveLength(1);
+
+    const corrected = await app.inject({
+      method: "POST",
+      url: `/v1/memory/${id}/correct`,
+      headers: mutationHeaders("owner", "memory-correct-1"),
+      payload: { value: "Mika works best for cheese outside." },
+    });
+    expect(corrected.statusCode).toBe(200);
+    expect(corrected.json().fact.value).toContain("cheese");
+
+    const forgotten = await app.inject({
+      method: "POST",
+      url: `/v1/memory/${corrected.json().fact.id}/forget`,
+      headers: mutationHeaders("owner", "memory-forget-1"),
+      payload: {},
+    });
+    expect(forgotten.statusCode).toBe(200);
+    expect(forgotten.json().fact.status).toBe("forgotten");
   });
 
   it("enforces local roles without weakening authentication", async () => {
@@ -380,6 +464,11 @@ describe("product API", () => {
       "/v1/live-sessions/{id}/complete",
       "/v1/local/reset",
       "/v1/me",
+      "/v1/memory",
+      "/v1/memory/{id}/confirm",
+      "/v1/memory/{id}/correct",
+      "/v1/memory/{id}/forget",
+      "/v1/memory/candidates",
       "/v1/onboarding",
       "/v1/onboarding/messages",
       "/v1/plans/{id}/adjust",
@@ -406,6 +495,7 @@ describe("product API", () => {
 
     const serialized = JSON.stringify(document);
     expect(serialized).not.toMatch(/whatsapp|stripe|cal\.com|access_token/i);
+    expect(serialized).not.toContain("secret");
     expect(serialized).toContain("VALIDATION_FAILED");
   });
 });

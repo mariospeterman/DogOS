@@ -11,6 +11,8 @@ import type { CoachConversationStore } from "./store.js";
 
 export type CoachServiceTier = "freemium" | "plus" | "pro" | "ultra";
 export const maxCoachReplyCharacters = 3_600;
+const forbiddenOwnerVisibleClaim =
+  /\b(diagnos(?:e|is)|anxiety disorder|trauma|pain|aggression|biometric|face recognition|medical emergency|medizinische diagnose|schmerzdiagnose|aggressionsdiagnose)\b/i;
 
 function withCitations(input: {
   context: CoachTrainingContext;
@@ -20,6 +22,43 @@ function withCitations(input: {
 }): string {
   if (/\n\n(Quellen|Sources): \[1\]/.test(input.text)) return input.text;
   return `${input.text}${citationBlock(input)}`;
+}
+
+function validateOwnerVisibleReply(input: {
+  context: CoachTrainingContext;
+  deterministicReply: string;
+  text: string;
+}): string {
+  const text = input.text.trim();
+  if (text.length === 0 || text.length > maxCoachReplyCharacters) {
+    throw new Error("COACH_REPLY_INVALID");
+  }
+  if (forbiddenOwnerVisibleClaim.test(text)) {
+    throw new Error("COACH_REPLY_FORBIDDEN_CLAIM");
+  }
+  const unsupportedProtocolChange =
+    /\b(increase|raise|erhöhe|steigere).{0,40}\b(duration|minutes|minuten|repetitions|wiederholungen|threshold|schwelle)\b/i;
+  const draftMentionsChange =
+    /\b(increase|raise|erhöhe|steigere).{0,40}\b(duration|minutes|minuten|repetitions|wiederholungen|threshold|schwelle)\b/i.test(
+      input.deterministicReply,
+    );
+  if (unsupportedProtocolChange.test(text) && !draftMentionsChange) {
+    throw new Error("COACH_REPLY_UNSUPPORTED_PROTOCOL_CHANGE");
+  }
+  const currentStep = input.context.currentStep;
+  if (currentStep !== null && currentStep !== undefined) {
+    const duration = String(input.context.durationMinutes);
+    const repetitions = String(currentStep.repetitions);
+    const planLike =
+      /\b(plan|training|trainingsplan|session|übung|exercise)\b/i;
+    if (
+      planLike.test(text) &&
+      (!text.includes(duration) || !text.includes(repetitions))
+    ) {
+      throw new Error("COACH_REPLY_CANONICAL_FACT_MISSING");
+    }
+  }
+  return text;
 }
 
 export interface CoachReplyGenerator {
@@ -163,13 +202,18 @@ export class CoachConversationService {
           generated.trim().length > 0 &&
           generated.length <= maxCoachReplyCharacters
         ) {
+          const validated = validateOwnerVisibleReply({
+            context: input.context,
+            deterministicReply: deterministicReply.text,
+            text: generated,
+          });
           reply = {
             ...deterministicReply,
             text: withCitations({
               context: input.context,
               locale: deterministicReply.locale,
               message: input.message,
-              text: generated.trim(),
+              text: validated,
             }),
           };
         }
@@ -267,10 +311,14 @@ export class CoachConversationService {
           tier: input.tier ?? "freemium",
           traceId: input.traceId,
         })) {
-          text += delta;
-          if (text.length > maxCoachReplyCharacters) {
+          const next = text + delta;
+          if (
+            next.length > maxCoachReplyCharacters ||
+            forbiddenOwnerVisibleClaim.test(next)
+          ) {
             throw new Error("COACH_REPLY_TOO_LONG");
           }
+          text = next;
           yield delta;
         }
       } catch {
@@ -282,14 +330,25 @@ export class CoachConversationService {
       yield text;
     }
 
+    try {
+      text = validateOwnerVisibleReply({
+        context: input.context,
+        deterministicReply: deterministicReply.text,
+        text,
+      });
+    } catch {
+      text = deterministicReply.text;
+      yield text;
+    }
+
     const citedText = withCitations({
       context: input.context,
       locale: deterministicReply.locale,
       message: input.message,
-      text: text.trim(),
+      text,
     });
-    if (citedText.length > text.trim().length) {
-      yield citedText.slice(text.trim().length);
+    if (citedText.length > text.length) {
+      yield citedText.slice(text.length);
     }
     const reply = { ...deterministicReply, text: citedText };
     await this.store.setLocale(conversation.id, reply.locale);

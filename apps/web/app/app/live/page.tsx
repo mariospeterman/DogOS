@@ -1,6 +1,12 @@
 "use client";
 
-import { PhoneOff, Radio, Video } from "lucide-react";
+import {
+  CheckCircle2,
+  PhoneOff,
+  Radio,
+  ShieldCheck,
+  Video,
+} from "lucide-react";
 import { useState } from "react";
 import { AppShell } from "../../../components/app-shell";
 import { dogosApiHeaders, dogosApiUrl } from "../../../lib/api-client";
@@ -18,6 +24,7 @@ interface LiveSession {
 export default function LivePage() {
   const { error, loading, product } = useProductDashboard();
   const [plannedMinutes, setPlannedMinutes] = useState(10);
+  const [consent, setConsent] = useState(false);
   const [session, setSession] = useState<LiveSession | null>(null);
   const [liveKit, setLiveKit] = useState<{ token: string; url: string } | null>(
     null,
@@ -53,6 +60,9 @@ export default function LivePage() {
       };
       setLiveKit(body.liveKit);
       setSession(body.session);
+      setMessage(
+        "Live Raum bereit. Deine Zugangsdaten werden nicht angezeigt oder protokolliert.",
+      );
     } finally {
       setWorking(false);
     }
@@ -116,9 +126,19 @@ export default function LivePage() {
             value={plannedMinutes}
           />
         </label>
+        <label className="checkbox-row">
+          <input
+            checked={consent}
+            onChange={(event) => setConsent(event.target.checked)}
+            type="checkbox"
+          />
+          <span>
+            Ich stimme der Live-Übertragung für diese Trainingssession zu.
+          </span>
+        </label>
         <button
           className="button primary wide"
-          disabled={working}
+          disabled={working || !consent}
           onClick={start}
         >
           <Video size={18} /> {working ? "Startet..." : "Live Session starten"}
@@ -131,18 +151,29 @@ export default function LivePage() {
           <div>
             <span>
               <Radio />
-              LiveKit Raum
-              <small>{liveKit.url}</small>
+              Live Verbindung
+              <small>
+                Transport über LiveKit, DogOS bleibt für Daten und Coaching
+                verantwortlich.
+              </small>
             </span>
-            <strong>{session.roomName}</strong>
+            <strong>{session.status}</strong>
           </div>
           <div>
             <span>
-              <Video />
-              Token
-              <small>{liveKit.token.slice(0, 32)}...</small>
+              <ShieldCheck />
+              Zugang geschützt
+              <small>Raumdaten werden nur für die Verbindung verwendet.</small>
             </span>
-            <strong>{session.status}</strong>
+            <strong>Privat</strong>
+          </div>
+          <div>
+            <span>
+              <CheckCircle2 />
+              Sitzungsstatus
+              <small>{session.roomName}</small>
+            </span>
+            <strong>{session.plannedMinutes} Min.</strong>
           </div>
         </section>
       )}

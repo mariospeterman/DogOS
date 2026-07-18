@@ -6,6 +6,7 @@ import type {
   CoachContextKind,
   CoachConversation,
   CoachMessage,
+  CoachWorkspace,
 } from "./types.js";
 
 interface TransactionQuery {
@@ -17,15 +18,20 @@ interface TransactionQuery {
 
 export interface AppendCoachMessageInput {
   actorUserId: string | null;
+  artifactRefs?: Array<{ id: string; kind: string; version: number | null }>;
   channel: CoachChannel;
   clientMessageId?: string;
   content: string;
   contextKind?: CoachContextKind;
   contextSubjectId?: string;
   conversationId: string;
+  generationStatus?: CoachMessage["generationStatus"];
   providerMessageId?: string;
   role: "user" | "assistant";
+  secondaryTags?: string[];
   traceId: string;
+  uiParts?: unknown[];
+  workspace?: CoachWorkspace;
 }
 
 export interface CoachConversationStore {
@@ -91,10 +97,15 @@ export class InMemoryCoachConversationStore implements CoachConversationStore {
             : randomUUID(),
       role: input.role,
       channel: input.channel,
+      artifactRefs: input.artifactRefs ?? [],
       content: input.content,
       contextKind: input.contextKind ?? null,
       contextSubjectId: input.contextSubjectId ?? null,
       createdAt: new Date().toISOString(),
+      generationStatus: input.generationStatus ?? "completed",
+      secondaryTags: input.secondaryTags ?? [],
+      uiParts: input.uiParts ?? [],
+      workspace: input.workspace ?? workspaceFromContext(input.contextKind),
     };
     conversation.messages.push(message);
     return Promise.resolve(structuredClone(message));
@@ -131,6 +142,11 @@ interface MessageRow {
   context_kind: CoachContextKind | null;
   context_subject_id: string | null;
   created_at: string;
+  artifact_refs: unknown;
+  generation_status: CoachMessage["generationStatus"];
+  secondary_tags: string[];
+  ui_parts: unknown;
+  workspace: CoachWorkspace;
 }
 
 export class PostgresCoachConversationStore implements CoachConversationStore {
@@ -185,7 +201,8 @@ export class PostgresCoachConversationStore implements CoachConversationStore {
       insert into private.coach_messages (
         conversation_id, role, channel, content, actor_user_id,
         client_message_id, provider_message_id, context_kind,
-        context_subject_id, trace_id
+        context_subject_id, trace_id, workspace, secondary_tags,
+        artifact_refs, ui_parts, generation_status, immutable_metadata
       ) values (
         ${input.conversationId}::uuid,
         ${input.role},
@@ -196,17 +213,25 @@ export class PostgresCoachConversationStore implements CoachConversationStore {
         ${input.providerMessageId ?? null},
         ${input.contextKind ?? null},
         ${input.contextSubjectId ?? null}::uuid,
-        ${input.traceId}
+        ${input.traceId},
+        ${input.workspace ?? workspaceFromContext(input.contextKind)},
+        ${input.secondaryTags ?? []},
+        ${JSON.stringify(input.artifactRefs ?? [])}::jsonb,
+        ${JSON.stringify(input.uiParts ?? [])}::jsonb,
+        ${input.generationStatus ?? "completed"},
+        ${JSON.stringify({ traceId: input.traceId })}::jsonb
       )
       on conflict do nothing
       returning id::text, role, channel, content, context_kind,
-        context_subject_id::text, created_at::text
+        context_subject_id::text, created_at::text, workspace, secondary_tags,
+        artifact_refs, ui_parts, generation_status
     `;
     let row = rows[0];
     if (row === undefined) {
       const existing = await this.#sql<Array<MessageRow>>`
         select id::text, role, channel, content, context_kind,
-          context_subject_id::text, created_at::text
+          context_subject_id::text, created_at::text, workspace, secondary_tags,
+          artifact_refs, ui_parts, generation_status
         from private.coach_messages
         where conversation_id = ${input.conversationId}::uuid
           and channel = ${input.channel}
@@ -252,7 +277,8 @@ export class PostgresCoachConversationStore implements CoachConversationStore {
   private async load(row: ConversationRow): Promise<CoachConversation> {
     const messages = await this.#sql<Array<MessageRow>>`
       select id::text, role, channel, content, context_kind,
-        context_subject_id::text, created_at::text
+        context_subject_id::text, created_at::text, workspace, secondary_tags,
+        artifact_refs, ui_parts, generation_status
       from private.coach_messages
       where conversation_id = ${row.id}::uuid
       order by created_at, id
@@ -273,9 +299,26 @@ function mapMessage(row: MessageRow): CoachMessage {
     id: row.id,
     role: row.role,
     channel: row.channel,
+    artifactRefs: parseArray(row.artifact_refs),
     content: row.content,
     contextKind: row.context_kind,
     contextSubjectId: row.context_subject_id,
     createdAt: new Date(row.created_at).toISOString(),
+    generationStatus: row.generation_status,
+    secondaryTags: row.secondary_tags ?? [],
+    uiParts: parseArray(row.ui_parts),
+    workspace: row.workspace,
   };
+}
+
+function workspaceFromContext(contextKind?: CoachContextKind): CoachWorkspace {
+  if (contextKind === "plan") return "plan";
+  if (contextKind === "session" || contextKind === "today") return "train";
+  if (contextKind === "progress") return "progress";
+  if (contextKind === "media") return "media";
+  return "coach";
+}
+
+function parseArray<T = unknown>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
 }

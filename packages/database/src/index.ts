@@ -4,6 +4,7 @@ export * from "./billing-repository.js";
 export * from "./capability-usage-repository.js";
 export * from "./live-coaching-repository.js";
 export * from "./mappers.js";
+export * from "./memory-repository.js";
 export * from "./model-run-repository.js";
 export * from "./onboarding-repository.js";
 export * from "./onboarding-session-repository.js";
