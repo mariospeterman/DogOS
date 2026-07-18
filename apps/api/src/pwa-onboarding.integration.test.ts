@@ -7,7 +7,9 @@ import {
 } from "@dogos/database";
 import { OnboardingService } from "./onboarding-service.js";
 
-const connection = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const connection =
+  process.env.DOGOS_TEST_DATABASE_URL ??
+  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const sql = postgres(connection, { prepare: false });
 const repository = new OnboardingRepository(connection);
 const sessions = new OnboardingSessionRepository(connection);
