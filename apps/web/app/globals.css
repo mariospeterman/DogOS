@@ -4,6 +4,10 @@
   --paper: #f4f6f9;
   --surface: #fff;
   --line: #d8dee8;
+  --line-soft: #e8edf5;
+  --composer: #fff;
+  --assistant-surface: transparent;
+  --user-bubble: #163b70;
   --green: #0b1f3a;
   --green-2: #1d4ed8;
   --mint: #e8eef8;
@@ -13,6 +17,22 @@
   --coral-soft: #fff1f2;
   --blue: #1d4ed8;
   --shadow: 0 10px 28px rgba(11, 31, 58, 0.08);
+}
+[data-theme="dark"] {
+  --ink: #e9eef7;
+  --muted: #9aa8bb;
+  --paper: #0b1018;
+  --surface: #101722;
+  --line: #263241;
+  --line-soft: #1a2532;
+  --composer: #111a26;
+  --assistant-surface: transparent;
+  --user-bubble: #2458a6;
+  --green: #e9eef7;
+  --green-2: #72a7ff;
+  --mint: #182331;
+  --blue: #5d91ff;
+  --shadow: none;
 }
 * {
   box-sizing: border-box;
@@ -83,11 +103,11 @@ body {
   padding: 52px 0 30px;
 }
 .public-chat-copy h1 {
-  font-size: clamp(2.2rem, 5.2vw, 3.8rem);
-  line-height: 1.01;
+  font-size: clamp(2.25rem, 4.2vw, 3.35rem);
+  line-height: 1.04;
   margin: 0;
-  max-width: 560px;
-  overflow-wrap: anywhere;
+  max-width: 620px;
+  overflow-wrap: normal;
 }
 .public-chat-copy > p:not(.eyebrow) {
   color: var(--muted);
@@ -524,56 +544,71 @@ a {
 
 /* Chat-first product shell */
 .coach-shell {
-  background: #f5f7fa;
+  background: var(--paper);
   display: grid;
-  grid-template-rows: 64px auto auto 1fr auto auto;
+  grid-template-rows: 64px auto 1fr auto auto;
   height: 100dvh;
   margin: 0 auto;
-  max-width: 840px;
+  max-width: 1180px;
   overflow: hidden;
   position: relative;
 }
 .workspace-tabs {
-  background: #fff;
-  border-bottom: 1px solid var(--line);
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(74px, 1fr);
-  gap: 0;
+  align-items: center;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  display: flex;
+  gap: 3px;
+  justify-self: center;
+  margin: 8px 12px 0;
+  max-width: calc(100% - 24px);
   overflow-x: auto;
-  padding: 5px 8px;
+  padding: 4px;
+  scrollbar-width: none;
+}
+.workspace-tabs::-webkit-scrollbar {
+  display: none;
 }
 .workspace-tabs a {
   align-items: center;
-  border-radius: 6px;
+  border-radius: 999px;
   color: var(--muted);
   display: flex;
   font-size: 0.72rem;
   font-weight: 800;
   gap: 6px;
   justify-content: center;
-  min-height: 38px;
-  padding: 0 8px;
+  min-height: 34px;
+  padding: 0 11px;
   text-decoration: none;
   white-space: nowrap;
 }
 .workspace-tabs a[aria-current="page"] {
-  background: #eaf2ff;
+  background: color-mix(in srgb, var(--blue) 12%, var(--surface));
   color: var(--blue);
 }
 .coach-header {
   align-items: center;
-  background: #fff;
-  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  border-bottom: 1px solid var(--line-soft);
   display: flex;
+  gap: 8px;
   justify-content: space-between;
   padding: 0 16px;
   z-index: 2;
+}
+.coach-header-actions {
+  align-items: center;
+  display: flex;
+  flex: none;
+  gap: 8px;
 }
 .coach-identity {
   align-items: center;
   display: flex;
   gap: 11px;
+  min-width: 0;
 }
 .coach-mark,
 .coach-avatar {
@@ -582,8 +617,10 @@ a {
   color: #fff;
   display: flex;
   flex: none;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 800;
   justify-content: center;
+  line-height: 1;
 }
 .coach-mark {
   border-radius: 7px;
@@ -601,29 +638,18 @@ a {
 .coach-identity > div {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 .coach-identity strong {
   font-size: 0.94rem;
 }
-.coach-identity span {
-  align-items: center;
+.coach-identity > div > span {
   color: var(--muted);
-  display: flex;
+  display: block;
   font-size: 0.7rem;
-  gap: 5px;
-}
-.coach-identity i {
-  background: #16845b;
-  border-radius: 50%;
-  height: 6px;
-  width: 6px;
-}
-.coach-context-bar {
-  background: #fff;
-  border-bottom: 1px solid var(--line);
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  padding: 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .onboarding-progress {
@@ -655,44 +681,12 @@ a {
 .onboarding-shell .coach-messages {
   padding-top: 22px;
 }
-.coach-context-bar a {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  min-width: 0;
-  padding: 10px 6px;
-  text-decoration: none;
-}
-.coach-context-bar a + a {
-  border-left: 1px solid var(--line);
-  padding-left: 12px;
-}
-.coach-context-bar svg {
-  color: var(--blue);
-  flex: none;
-}
-.coach-context-bar span {
-  display: block;
-  font-size: 0.73rem;
-  font-weight: 700;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.coach-context-bar small {
-  color: var(--muted);
-  display: block;
-  font-size: 0.61rem;
-  font-weight: 500;
-  margin-bottom: 2px;
-}
 .coach-messages {
   display: flex;
   flex-direction: column;
   gap: 14px;
   overflow-y: auto;
-  padding: 22px 14px 26px;
+  padding: 22px max(14px, calc((100% - 760px) / 2)) 26px;
   scroll-behavior: smooth;
 }
 .coach-message,
@@ -707,51 +701,91 @@ a {
   justify-content: flex-end;
 }
 .message-bubble {
-  border-radius: 4px 14px 14px 14px;
-  font-size: 0.93rem;
-  line-height: 1.48;
+  border-radius: 18px;
+  font-size: 0.95rem;
+  line-height: 1.55;
   padding: 11px 13px;
 }
 .message-bubble.assistant {
-  background: #fff;
-  border: 1px solid #dce2eb;
-  box-shadow: 0 3px 10px rgba(11, 31, 58, 0.04);
+  background: var(--assistant-surface);
+  border: 0;
+  box-shadow: none;
 }
 .message-bubble.user {
-  background: #163b70;
-  border-radius: 14px 4px 14px 14px;
+  background: var(--user-bubble);
   color: #fff;
+  max-width: min(75vw, 560px);
+}
+.assistant-response {
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.62;
+  max-width: min(100%, 720px);
+  padding: 2px 0 4px;
 }
 .message-bubble p {
   margin: 0;
   white-space: pre-wrap;
 }
-.message-bubble p + p {
+.message-bubble p + p,
+.assistant-response p + p {
   margin-top: 8px;
+}
+.assistant-response p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.source-disclosure {
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-top: 12px;
+  padding-top: 9px;
+}
+.source-disclosure summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.source-disclosure ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 18px;
 }
 .inline-training-card {
   align-self: flex-start;
-  background: #fff;
-  border: 1px solid #ccd5e2;
-  border-left: 3px solid var(--coral);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
   display: grid;
   gap: 12px;
   margin-left: 35px;
   max-width: min(88%, 610px);
-  padding: 15px;
+  padding: 16px;
+}
+.inline-training-card.held {
+  border-color: color-mix(in srgb, var(--yellow) 45%, var(--line));
 }
 .inline-card-heading {
   display: grid;
   gap: 3px;
+  grid-template-columns: 1fr auto;
 }
 .inline-card-heading span {
-  color: var(--coral);
+  color: var(--blue);
   font-size: 0.64rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 .inline-card-heading strong {
   font-size: 1rem;
+  grid-column: 1 / -1;
+}
+.inline-card-heading em {
+  color: #16845b;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
 }
 .inline-card-meta {
   display: flex;
@@ -766,17 +800,27 @@ a {
   gap: 5px;
 }
 .inline-training-card > p {
-  color: #394455;
+  color: var(--ink);
   font-size: 0.82rem;
   line-height: 1.5;
   margin: 0;
+  max-height: 3.95em;
+  overflow: hidden;
+}
+.inline-training-card > small {
+  color: var(--muted);
+  font-size: 0.74rem;
 }
 .inline-card-actions {
-  display: grid;
+  align-items: center;
+  display: flex;
   gap: 8px;
-  grid-template-columns: 1fr auto;
 }
 .inline-card-actions .button {
+  min-height: 42px;
+}
+.text-link.inline {
+  margin: 0;
   min-height: 42px;
 }
 .typing-indicator {
@@ -819,7 +863,7 @@ a {
   padding: 0 12px 8px;
 }
 .coach-suggestions button {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid #bdc8d8;
   border-radius: 999px;
   color: #18345c;
@@ -831,14 +875,14 @@ a {
 }
 .coach-composer {
   align-items: flex-end;
-  background: #fff;
-  border: 1px solid #c8d1df;
-  border-radius: 7px;
+  background: var(--composer);
+  border: 1px solid var(--line);
+  border-radius: 18px;
   display: flex;
   gap: 8px;
-  margin: 0 12px 5px;
+  margin: 0 max(12px, calc((100% - 780px) / 2)) 5px;
   min-height: 52px;
-  padding: 7px 7px 7px 13px;
+  padding: 7px;
 }
 .coach-composer textarea {
   background: transparent;
@@ -856,7 +900,7 @@ a {
   align-items: center;
   background: var(--blue);
   border: 0;
-  border-radius: 6px;
+  border-radius: 14px;
   color: #fff;
   cursor: pointer;
   display: flex;
@@ -864,6 +908,14 @@ a {
   height: 38px;
   justify-content: center;
   width: 38px;
+}
+.coach-composer .composer-tool {
+  background: transparent;
+  color: var(--muted);
+}
+.coach-composer .composer-tool:hover {
+  background: color-mix(in srgb, var(--blue) 9%, transparent);
+  color: var(--blue);
 }
 .coach-composer button:disabled {
   background: #aab3c0;
@@ -923,8 +975,8 @@ a {
 }
 @media (min-width: 841px) {
   .coach-shell {
-    border-left: 1px solid var(--line);
-    border-right: 1px solid var(--line);
+    border-left: 1px solid var(--line-soft);
+    border-right: 1px solid var(--line-soft);
   }
   .coach-shell .bottom-nav {
     left: 50%;
@@ -933,9 +985,6 @@ a {
   }
 }
 @media (max-width: 440px) {
-  .coach-context-bar {
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr);
-  }
   .coach-message,
   .coach-welcome,
   .inline-training-card {
@@ -946,6 +995,9 @@ a {
   }
   .message-bubble {
     font-size: 0.9rem;
+  }
+  .coach-composer .optional {
+    display: none;
   }
 }
 .bottom-nav a {
@@ -2040,6 +2092,31 @@ a {
   opacity: 0.45;
 }
 @media (max-width: 420px) {
+  .coach-header {
+    padding: 0 12px;
+  }
+  .coach-header-actions {
+    gap: 5px;
+  }
+  .coach-header-actions .icon-link {
+    min-height: 34px;
+    width: 34px;
+  }
+  .coach-identity {
+    gap: 9px;
+  }
+  .coach-mark {
+    height: 36px;
+    width: 36px;
+  }
+  .workspace-tabs {
+    justify-self: stretch;
+    margin-inline: 12px;
+  }
+  .workspace-tabs a {
+    flex: 0 0 auto;
+    padding: 0 10px;
+  }
   .action-grid {
     grid-template-columns: 1fr;
   }

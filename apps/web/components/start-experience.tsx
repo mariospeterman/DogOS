@@ -2,10 +2,10 @@
 
 import {
   ArrowRight,
-  Bot,
   Check,
   LockKeyhole,
   MessageCircle,
+  Target,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -37,11 +37,11 @@ export function StartExperience() {
 
       <section className="public-chat-main">
         <div className="public-chat-copy">
-          <p className="eyebrow">Chat-first Training</p>
-          <h1>DogOS Training Chat</h1>
+          <p className="eyebrow">DogOS Coach</p>
+          <h1>Ein Trainingscoach, der deinen Hund wirklich kennt.</h1>
           <p>
-            Der einfache Workspace für Onboarding, Plan, Training, Fortschritt,
-            Video-Hinweise und Live Coaching.
+            DogOS merkt sich jede Einheit, passt euren Plan an den Fortschritt
+            an und wertet Trainingsvideos im Kontext aus.
           </p>
         </div>
 
@@ -49,32 +49,25 @@ export function StartExperience() {
           <div className="public-message assistant">
             <span className="coach-avatar">D</span>
             <div className="message-bubble assistant">
-              <p>
-                Erzähl mir kurz von deinem Hund und was ihr verbessern wollt.
-              </p>
+              <p>Wann klappt Echos Rückruf nicht zuverlässig?</p>
             </div>
           </div>
           <div className="public-message user">
             <div className="message-bubble user">
-              <p>Echo kommt draussen nicht zuverlässig zurück.</p>
+              <p>Echo kommt gut zurück, bis ein anderer Hund auftaucht.</p>
             </div>
           </div>
           <div className="public-message assistant">
             <span className="coach-avatar">D</span>
             <div className="message-bubble assistant">
-              <p>
-                Ich starte mit einem sicheren Rückruf-Plan, kurzen Einheiten und
-                messbaren Fortschritten.
-              </p>
+              <p>Bei welcher Entfernung reagiert Echo ungefähr nicht mehr?</p>
             </div>
           </div>
           <div className="public-chat-card">
-            <Bot size={17} />
+            <Target size={17} />
             <span>
-              <strong>Plan, Memory, Video und Live</strong>
-              <small>
-                Alles bleibt im Coach-Kontext statt in getrennten Tools.
-              </small>
+              <strong>Zuverlässiger Rückruf bei Hundebegegnungen</strong>
+              <small>Basis: etwa 12 m · Ziel: 7 m · 4 von 5 Rückrufen</small>
             </span>
           </div>
         </div>
@@ -83,7 +76,7 @@ export function StartExperience() {
       <section className="public-prompt-panel">
         <div>
           <MessageCircle size={18} />
-          <span>Starte mit dem ersten Satz über deinen Hund.</span>
+          <span>Erzähl DogOS vom ersten echten Trainingsziel.</span>
         </div>
         <Link className="button primary" href={startUrl}>
           Gespräch starten
@@ -94,13 +87,13 @@ export function StartExperience() {
       <section className="public-proof-row">
         <ul>
           <li>
-            <Check size={16} /> Supabase Auth mit Referral-Erhalt
+            <Check size={16} /> Persönlicher Plan, der sich anpasst
           </li>
           <li>
-            <Check size={16} /> Chat UI mit Training Cards
+            <Check size={16} /> Trainingsvideo-Feedback im Kontext
           </li>
           <li>
-            <LockKeyhole size={16} /> Keine Diagnose oder Notfallhilfe
+            <LockKeyhole size={16} /> Private Erinnerung, die du kontrollierst
           </li>
         </ul>
       </section>

@@ -21,20 +21,72 @@ interface CoachCitation {
   detail: string;
 }
 
+function presentDecision(value: string | undefined, de: boolean): string {
+  if (value === "repeat_step") {
+    return de ? "Wir wiederholen diese Stufe" : "Repeat the current level";
+  }
+  if (value === "increase_difficulty") {
+    return de ? "Die nächste Stufe ist möglich" : "Next level is possible";
+  }
+  if (value === "decrease_difficulty") {
+    return de ? "Wir vereinfachen die Übung" : "Make the exercise easier";
+  }
+  return de ? "Aktuelle Trainingsentscheidung" : "Current training decision";
+}
+
+function presentStep(value: string | undefined, de: boolean): string {
+  if (value === "step.recall_short_distance") {
+    return de
+      ? "Kurzer Rückruf bei wenig Ablenkung"
+      : "Short recall under low distraction";
+  }
+  if (value === "step.loose_leash_low_distraction") {
+    return de
+      ? "Lockere Leine im ruhigen Abschnitt"
+      : "Loose lead in a quiet area";
+  }
+  if (value === "step.calm_engagement_low_distraction") {
+    return de
+      ? "Ruhige Orientierung bei Begegnungen"
+      : "Calm orientation around encounters";
+  }
+  return de ? "Aktueller Trainingsschritt" : "Current training step";
+}
+
+function presentRisk(value: string | undefined, de: boolean): string {
+  if (value === "continue_low_risk_training") {
+    return de
+      ? "Training bleibt im niedrigen Risikobereich"
+      : "Training remains low risk";
+  }
+  if (value === "professional_review_required") {
+    return de
+      ? "Fachliche Abklärung vor autonomem Training"
+      : "Professional review before autonomous training";
+  }
+  return de
+    ? "Akute Veränderungen bleiben ausserhalb einer Diagnose"
+    : "Acute changes stay outside diagnosis";
+}
+
 function citationsFor(input: {
   context: CoachTrainingContext;
+  locale: "de-CH" | "en";
   message: string;
 }): CoachCitation[] {
+  const de = input.locale === "de-CH";
   const citations: CoachCitation[] = [
     {
       id: "plan",
-      label: "Current DogOS plan",
-      detail: `${input.context.stage}; decision ${input.context.latestDecision}`,
+      label: de ? "DogOS Daten: aktueller Plan" : "DogOS data: current plan",
+      detail: `${input.context.stage}; ${presentDecision(input.context.latestDecision, de)}.`,
     },
     {
       id: "evidence",
-      label: "Session evidence",
-      detail: `${input.context.evidenceCount} comparable session records`,
+      label: de ? "DogOS Daten: Sitzungen" : "DogOS data: sessions",
+      detail: de
+        ? `${input.context.evidenceCount} vergleichbare abgeschlossene Einheiten.`
+        : `${input.context.evidenceCount} comparable completed sessions.`,
     },
   ];
   if (
@@ -43,8 +95,10 @@ function citationsFor(input: {
   ) {
     citations.push({
       id: "protocol",
-      label: "Protocol step",
-      detail: `${input.context.currentStep.stepCode}; ${input.context.currentStep.repetitions} reps; ${input.context.currentStep.durationSeconds}s`,
+      label: de ? "Trainingsprotokoll" : "Training protocol",
+      detail: de
+        ? `${presentStep(input.context.currentStep.stepCode, de)}; ${input.context.currentStep.repetitions} Wiederholungen; ${Math.round(input.context.currentStep.durationSeconds / 60)} Minuten.`
+        : `${presentStep(input.context.currentStep.stepCode, de)}; ${input.context.currentStep.repetitions} repetitions; ${Math.round(input.context.currentStep.durationSeconds / 60)} minutes.`,
     });
   }
   if (
@@ -53,9 +107,8 @@ function citationsFor(input: {
   ) {
     citations.push({
       id: "safety",
-      label: "DogOS safety boundary",
-      detail:
-        input.context.riskDisposition ?? "acute changes stay outside diagnosis",
+      label: de ? "DogOS Sicherheitsgrenze" : "DogOS safety boundary",
+      detail: presentRisk(input.context.riskDisposition, de),
     });
   }
   return citations;

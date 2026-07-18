@@ -40,8 +40,8 @@ describe("DogOS Coach conversation", () => {
     });
     expect(reply.text).toMatch(/nicht medizinisch beurteilen/);
     expect(reply.text).toMatch(/Coach bleiben verfügbar/);
-    expect(reply.text).toMatch(/Quellen: \[1\] Current DogOS plan/);
-    expect(reply.text).toMatch(/\[3\] DogOS safety boundary/);
+    expect(reply.text).toMatch(/Quellen: \[1\] DogOS Daten: aktueller Plan/);
+    expect(reply.text).toMatch(/\[3\] DogOS Sicherheitsgrenze/);
     expect(reply.actions).toHaveLength(1);
   });
 
@@ -203,7 +203,7 @@ describe("DogOS Coach conversation", () => {
       chunks.push(chunk);
     }
     expect(chunks.join("")).toMatch(/^Streaming answer\./);
-    expect(chunks.join("")).toMatch(/Sources: \[1\] Current DogOS plan/);
+    expect(chunks.join("")).toMatch(/Sources: \[1\] DogOS data: current plan/);
   });
 
   it("does not persist unsafe streamed claims as canonical coach output", async () => {

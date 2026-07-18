@@ -2,14 +2,17 @@
 
 import { useChat } from "@ai-sdk/react";
 import {
-  ArrowUp,
-  CalendarDays,
+  Camera,
   CircleUserRound,
   Clock3,
   History,
-  Search,
+  Mic,
+  Moon,
+  Plus,
   Route,
+  Send,
   Sparkles,
+  Sun,
   Target,
   Video,
 } from "lucide-react";
@@ -47,6 +50,59 @@ function textOf(message: UIMessage): string {
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("\n");
+}
+
+function presentLegacyText(text: string, locale: "de-CH" | "en"): string {
+  const trainingLink =
+    locale === "en" ? "Open today's training" : "Heutiges Training öffnen";
+  return text
+    .replace(/https?:\/\/\S+\?action=\S+/g, trainingLink)
+    .replace(
+      /\b(?:[a-z_]+\.)?choice\.\d+\b/g,
+      locale === "en" ? "Selection saved." : "Auswahl gespeichert.",
+    )
+    .replace(
+      /\brepeat_step\b/g,
+      locale === "en"
+        ? "repeat the current level"
+        : "aktuelle Stufe wiederholen",
+    )
+    .replace(
+      /\bstep\.recall_short_distance\b/g,
+      locale === "en"
+        ? "short recall under low distraction"
+        : "kurzer Rückruf bei wenig Ablenkung",
+    )
+    .replace(
+      /\bcontinue_low_risk_training\b/g,
+      locale === "en" ? "low-risk training" : "Training mit niedrigem Risiko",
+    );
+}
+
+function splitSources(text: string, locale: "de-CH" | "en") {
+  const match = text.match(/\n\n(Quellen|Sources):\s*(.+)$/s);
+  const body = presentLegacyText(
+    match === null ? text : text.slice(0, match.index),
+    locale,
+  ).trim();
+  const sources =
+    match === null
+      ? []
+      : (match[2] ?? "")
+          .split(/;\s*/)
+          .map((item) =>
+            presentLegacyText(item.replace(/^\[\d+\]\s*/, ""), locale).trim(),
+          )
+          .filter(Boolean);
+  return { body, sources };
+}
+
+function canRenderTrainingAction(product: ProductDashboard): boolean {
+  return (
+    product.planStatus === "active" &&
+    product.todaySessionId !== null &&
+    !/review|professional|blocked|safety/i.test(product.riskDisposition)
+  );
 }
 
 export function CoachChat({ product }: { product: ProductDashboard }) {
@@ -108,6 +164,12 @@ function CoachRuntime({
 }) {
   const searchParams = useSearchParams();
   const [input, setInput] = useState("");
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window === "undefined") return "light";
+    return window.localStorage.getItem("dogos-theme") === "dark"
+      ? "dark"
+      : "light";
+  });
   const viewport = useRef<HTMLDivElement>(null);
   const deepLinkSent = useRef(false);
   const activeSpace = searchParams.get("space") ?? "coach";
@@ -142,6 +204,27 @@ function CoachRuntime({
     1,
     Math.ceil((product.currentStep?.durationSeconds ?? 180) / 60),
   );
+  const trainingAllowed = canRenderTrainingAction(product);
+  const placeholder =
+    activeSpace === "plan"
+      ? english
+        ? `Ask about ${product.dogName}'s plan...`
+        : `Frag nach ${product.dogName}s Plan...`
+      : activeSpace === "train"
+        ? english
+          ? "Record what happened during the session..."
+          : "Halte fest, was in der Einheit passiert ist..."
+        : activeSpace === "progress"
+          ? english
+            ? "Ask about a trend or improvement..."
+            : "Frag nach einem Trend oder Fortschritt..."
+          : activeSpace === "media"
+            ? english
+              ? "Describe what was difficult in the video..."
+              : "Beschreibe, was im Video schwierig war..."
+            : english
+              ? `Tell DogOS what happened with ${product.dogName}...`
+              : `Erzähl DogOS, was mit ${product.dogName} passiert ist...`;
 
   useEffect(() => {
     viewport.current?.scrollTo({
@@ -149,6 +232,11 @@ function CoachRuntime({
       top: viewport.current.scrollHeight,
     });
   }, [messages, status]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("dogos-theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     if (deepLinkSent.current) return;
@@ -197,52 +285,48 @@ function CoachRuntime({
     },
   ] as const;
   return (
-    <div className="coach-shell">
+    <div className="coach-shell" data-theme={theme}>
       <header className="coach-header">
         <div className="coach-identity">
           <span className="coach-mark">D</span>
           <div>
-            <strong>DogOS</strong>
-            <span>
-              <i />{" "}
+            <strong>
               {english
                 ? `${product.dogName}'s Coach`
                 : `${product.dogName}s Coach`}
+            </strong>
+            <span>
+              {product.goalText} · {presentation.stage} ·{" "}
+              {product.baselineSuccessRate}% → {product.targetSuccessRate ?? 80}
+              %
             </span>
           </div>
         </div>
-        <Link
-          className="icon-link"
-          href="/app/account/history"
-          aria-label={english ? "History" : "Verlauf"}
-        >
-          <History size={20} />
-        </Link>
-        <Link
-          className="icon-link"
-          href="/app/account"
-          aria-label={english ? "Account" : "Konto"}
-        >
-          <CircleUserRound size={21} />
-        </Link>
+        <div className="coach-header-actions">
+          <Link
+            className="icon-link"
+            href="/app/account/history"
+            aria-label={english ? "History" : "Verlauf"}
+          >
+            <History size={20} />
+          </Link>
+          <button
+            className="icon-link"
+            type="button"
+            aria-label={theme === "dark" ? "Light theme" : "Dark theme"}
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
+          </button>
+          <Link
+            className="icon-link"
+            href="/app/account"
+            aria-label={english ? "Account" : "Konto"}
+          >
+            <CircleUserRound size={21} />
+          </Link>
+        </div>
       </header>
-
-      <div className="coach-context-bar">
-        <Link href="/app/coach?space=plan">
-          <Route size={16} />
-          <span>
-            <small>{english ? "Active goal" : "Aktives Ziel"}</small>
-            {product.goalText}
-          </span>
-        </Link>
-        <Link href="/app/coach?space=progress">
-          <Target size={16} />
-          <span>
-            <small>{english ? "Milestone" : "Etappe"}</small>
-            {product.baselineSuccessRate}% → {product.targetSuccessRate ?? 80}%
-          </span>
-        </Link>
-      </div>
 
       <nav className="workspace-tabs" aria-label="Produktnavigation">
         {spaces.map(({ href, icon: Icon, id, label }) => (
@@ -255,14 +339,6 @@ function CoachRuntime({
             <span>{label}</span>
           </Link>
         ))}
-        <Link
-          href="/app/account/history"
-          title={english ? "Search history" : "Verlauf suchen"}
-        >
-          <Search size={17} />
-          <span>{english ? "Search" : "Suche"}</span>
-        </Link>
-        <Link href="/app/account">{english ? "Account" : "Konto"}</Link>
       </nav>
 
       <div className="coach-messages" ref={viewport} aria-live="polite">
@@ -279,62 +355,106 @@ function CoachRuntime({
           </div>
         ) : null}
 
-        {messages.map((message) => {
+        {messages.map((message, index) => {
           const text = textOf(message);
           if (text.length === 0) return null;
+          const { body, sources } = splitSources(text, locale);
+          const showAvatar =
+            message.role === "assistant" &&
+            messages[index - 1]?.role !== "assistant";
           return (
             <article
               className={`coach-message ${message.role}`}
               key={message.id}
             >
-              {message.role === "assistant" ? (
-                <span className="coach-avatar">D</span>
-              ) : null}
-              <div className={`message-bubble ${message.role}`}>
-                {text.split("\n").map((line, index) => (
+              {showAvatar ? <span className="coach-avatar">D</span> : null}
+              <div
+                className={
+                  message.role === "assistant"
+                    ? "assistant-response"
+                    : "message-bubble user"
+                }
+              >
+                {body.split("\n").map((line, index) => (
                   <p key={`${message.id}:${index}`}>{line || "\u00a0"}</p>
                 ))}
+                {sources.length === 0 ? null : (
+                  <details className="source-disclosure">
+                    <summary>
+                      {english
+                        ? `${sources.length} references and plan facts`
+                        : `${sources.length} Referenzen und Planfakten`}
+                    </summary>
+                    <ul>
+                      {sources.map((source, sourceIndex) => (
+                        <li key={`${message.id}:source:${sourceIndex}`}>
+                          {source}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
             </article>
           );
         })}
 
-        <section className="inline-training-card">
-          <div className="inline-card-heading">
-            <span>
+        {trainingAllowed ? (
+          <section className="inline-training-card">
+            <div className="inline-card-heading">
+              <span>
+                {english
+                  ? `Today with ${product.dogName}`
+                  : `Heute mit ${product.dogName}`}
+              </span>
+              <em>{english ? "Ready" : "Bereit"}</em>
+              <strong>{presentation.title}</strong>
+            </div>
+            <div className="inline-card-meta">
+              <span>
+                <Clock3 size={15} /> {duration} Min.
+              </span>
+              <span>
+                <Target size={15} /> {product.currentStep?.repetitions ?? 6}{" "}
+                {presentation.unit}
+              </span>
+            </div>
+            <p>{presentation.instruction(product.dogName)}</p>
+            <small>
               {english
-                ? `Today with ${product.dogName}`
-                : `Heute mit ${product.dogName}`}
-            </span>
-            <strong>{presentation.title}</strong>
-          </div>
-          <div className="inline-card-meta">
-            <span>
-              <Clock3 size={15} /> {duration} Min.
-            </span>
-            <span>
-              <Target size={15} /> {product.currentStep?.repetitions ?? 6}{" "}
-              {presentation.unit}
-            </span>
-          </div>
-          <p>{presentation.instruction(product.dogName)}</p>
-          <div className="inline-card-actions">
-            <Link
-              className="button primary"
-              href={
-                product.todaySessionId
-                  ? `/app/coach?space=train&session=${product.todaySessionId}`
-                  : "/app/coach?space=plan"
-              }
-            >
-              {english ? "Start training" : "Training starten"}
-            </Link>
-            <Link className="button secondary" href="/app/coach?space=train">
-              <CalendarDays size={17} />
-              {english ? "Calendar" : "Kalender"}
-            </Link>
-          </div>
-        </section>
+                ? `Why this: ${product.sessionCount} comparable sessions; repeat the current level.`
+                : `Warum: ${product.sessionCount} vergleichbare Einheiten; aktuelle Stufe wiederholen.`}
+            </small>
+            <div className="inline-card-actions">
+              <Link
+                className="button primary"
+                href={`/app/coach?space=train&session=${product.todaySessionId}`}
+              >
+                {english ? "Start training" : "Training starten"}
+              </Link>
+              <Link className="text-link inline" href="/app/coach?space=plan">
+                {english ? "View plan" : "Plan ansehen"}
+              </Link>
+            </div>
+          </section>
+        ) : (
+          <section className="inline-training-card held">
+            <div className="inline-card-heading">
+              <span>{english ? "Training held" : "Training pausiert"}</span>
+              <em>{english ? "Review" : "Prüfung"}</em>
+              <strong>
+                {english
+                  ? "Professional handoff first"
+                  : "Zuerst fachlich abklären"}
+              </strong>
+            </div>
+            <p>
+              {english
+                ? "DogOS keeps the plan visible, but does not show a session start action while autonomous training is blocked."
+                : "DogOS zeigt den Plan weiter, aber keine Startaktion, solange autonomes Training blockiert ist."}
+            </p>
+          </section>
+        )}
 
         {busy ? (
           <div className="coach-message assistant">
@@ -388,6 +508,13 @@ function CoachRuntime({
           void submit();
         }}
       >
+        <button
+          aria-label={english ? "Add attachment" : "Anhang hinzufügen"}
+          className="composer-tool"
+          type="button"
+        >
+          <Plus size={19} />
+        </button>
         <textarea
           aria-label={english ? "Message DogOS" : "Nachricht an DogOS"}
           maxLength={2_000}
@@ -398,14 +525,24 @@ function CoachRuntime({
               void submit();
             }
           }}
-          placeholder={
-            english
-              ? `Write about ${product.dogName} ...`
-              : `Schreib über ${product.dogName} ...`
-          }
+          placeholder={placeholder}
           rows={1}
           value={input}
         />
+        <button
+          aria-label={english ? "Voice note" : "Sprachnotiz"}
+          className="composer-tool optional"
+          type="button"
+        >
+          <Mic size={18} />
+        </button>
+        <button
+          aria-label={english ? "Camera" : "Kamera"}
+          className="composer-tool optional"
+          type="button"
+        >
+          <Camera size={18} />
+        </button>
         {busy ? (
           <button aria-label="Antwort stoppen" onClick={stop} type="button">
             <span className="stop-square" />
@@ -416,7 +553,7 @@ function CoachRuntime({
             disabled={input.trim().length === 0}
             type="submit"
           >
-            <ArrowUp size={20} />
+            <Send size={19} />
           </button>
         )}
       </form>

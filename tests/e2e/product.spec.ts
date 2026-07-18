@@ -32,7 +32,9 @@ test("scenario 1: German low-risk owner reaches the chat-first coach", async ({
   await reset(request);
   await page.goto("/app/coach", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Rexs Coach")).toBeVisible();
-  await expect(page.getByText("Lockere Leine", { exact: false })).toBeVisible();
+  await expect(
+    page.getByText("Lockere Leine im ruhigen Abschnitt"),
+  ).toBeVisible();
   await page.getByLabel("Nachricht an DogOS").fill("Warum dieser Block?");
   await page.getByLabel("Nachricht an DogOS").press("Enter");
   await expect(
@@ -305,11 +307,13 @@ test("chat-first Coach and management views remain one PWA", async ({
   const navigation = page.getByRole("navigation", {
     name: "Produktnavigation",
   });
-  for (const name of ["Coach", "Plan", "Fortschritt", "Konto"]) {
+  for (const name of ["Coach", "Plan", "Training", "Fortschritt", "Video"]) {
     await expect(
       navigation.getByRole("link", { name, exact: true }),
     ).toBeVisible();
   }
+  await expect(page.getByLabel("Verlauf")).toBeVisible();
+  await expect(page.getByLabel("Konto")).toBeVisible();
   await page.goto("/app/plan");
   await expect(page).toHaveURL(/\/app\/coach\?space=plan/);
   await expect(navigation.getByRole("link", { name: "Plan" })).toHaveAttribute(
@@ -357,7 +361,7 @@ test("public start opens account creation and preserves referral attribution", a
   await page.goto("/?ref=DOGOS26");
   await expect(
     page.getByRole("heading", {
-      name: "DogOS Training Chat",
+      name: "Ein Trainingscoach, der deinen Hund wirklich kennt.",
     }),
   ).toBeVisible();
   const start = page.getByRole("link", { name: /Gespräch starten/ });
