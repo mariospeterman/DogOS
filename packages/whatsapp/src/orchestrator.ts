@@ -120,6 +120,7 @@ export interface ConversationProductContext {
   latestDecision: string;
   planId: string | null;
   planStatus: "active" | "blocked" | "setup_required";
+  riskDisposition?: string;
   sessionCount: number;
   stage?: string;
   todaySessionId: string | null;
@@ -148,7 +149,7 @@ export interface WhatsAppConversationDependencies {
   rewriteCoachReply?: (input: {
     contact: ProviderContact;
     context: CoachTrainingContext;
-    contextKind: "plan";
+    contextKind?: "plan";
     draft: CoachReply;
     message: string;
   }) => Promise<string>;
@@ -431,6 +432,9 @@ export class WhatsAppConversationOrchestrator {
       evidenceCount: context?.sessionCount ?? 0,
       goal: context?.goalText ?? context?.goal ?? "current training goal",
       latestDecision: context?.latestDecision ?? "repeat_step",
+      ...(context?.riskDisposition === undefined
+        ? {}
+        : { riskDisposition: context.riskDisposition }),
       stage:
         context?.stage ??
         (locale === "de-CH"
@@ -451,7 +455,7 @@ export class WhatsAppConversationOrchestrator {
         const generated = await this.dependencies.rewriteCoachReply({
           contact,
           context: trainingContext,
-          contextKind: "plan",
+          ...(offerUpgrade ? { contextKind: "plan" as const } : {}),
           draft: reply,
           message: text,
         });

@@ -201,7 +201,7 @@ const conversation = new WhatsAppConversationOrchestrator({
           if (account === null) return draft.text;
           return coachGenerator.generate({
             context,
-            contextKind,
+            ...(contextKind === undefined ? {} : { contextKind }),
             draft,
             message,
             tier: account.tier,

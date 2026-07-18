@@ -45,6 +45,7 @@ export interface CoachTrainingContext {
   durationMinutes: number;
   evidenceCount: number;
   latestDecision: string;
+  riskDisposition?: string;
   schedule?: Array<{
     durationSeconds: number;
     isRecovery: boolean;

@@ -3,7 +3,9 @@ import {
   canonicalOnboardingInterpretation,
   coachGenerationPurpose,
   loadCoachModelConfig,
+  parseCoachPresentation,
   parseOnboardingExtraction,
+  validateCoachPresentation,
 } from "./llm.js";
 
 describe("coach model configuration", () => {
@@ -107,5 +109,96 @@ describe("coach model configuration", () => {
         message: "Prepare this for my trainer",
       }),
     ).toBe("professional_summary");
+  });
+
+  it("accepts only presentation output that preserves canonical plan facts", () => {
+    const context = {
+      currentStep: {
+        difficulty: 1,
+        durationSeconds: 180,
+        repetitions: 6,
+        stepCode: "step.recall_short_distance",
+      },
+      dogName: "Echo",
+      durationMinutes: 3,
+      evidenceCount: 0,
+      goal: "Return on one cue around moderate distraction",
+      latestDecision: "repeat_step",
+      requiredConsecutiveSessions: 3,
+      riskDisposition: "continue_low_risk_training",
+      stage: "short-distance recall",
+      targetSuccessRate: 80,
+    };
+    const valid = parseCoachPresentation(
+      JSON.stringify({
+        addedProtocolStepCodes: [],
+        canonicalDecision: "repeat_step",
+        durationMinutes: 3,
+        message:
+          "Echo starts with a 3-minute recall block. Progress after 3 comparable sessions at 80%.",
+        protocolStepCode: "step.recall_short_distance",
+        requiredConsecutiveSessions: 3,
+        riskDisposition: "continue_low_risk_training",
+        targetSuccessRate: 80,
+      }),
+    );
+    expect(
+      validateCoachPresentation({
+        context,
+        deterministicDraft: "Echo's plan starts with short recall.",
+        presentation: valid,
+        purpose: "plan",
+      }),
+    ).toMatch(/3-minute recall/);
+
+    expect(() =>
+      validateCoachPresentation({
+        context,
+        deterministicDraft: "Echo's plan starts with short recall.",
+        presentation: { ...valid, durationMinutes: 5 },
+        purpose: "plan",
+      }),
+    ).toThrow("COACH_PRESENTATION_CANONICAL_MISMATCH");
+    expect(() =>
+      validateCoachPresentation({
+        context,
+        deterministicDraft: "Echo's plan starts with short recall.",
+        presentation: {
+          ...valid,
+          message: `${valid.message} Ask a professional trainer before starting.`,
+        },
+        purpose: "plan",
+      }),
+    ).toThrow("COACH_PRESENTATION_UNSUPPORTED_REFERRAL");
+  });
+
+  it("rejects removal of a required medical boundary", () => {
+    const presentation = parseCoachPresentation(
+      JSON.stringify({
+        addedProtocolStepCodes: [],
+        canonicalDecision: "repeat_step",
+        durationMinutes: 3,
+        message: "Continue with the normal session tomorrow.",
+        protocolStepCode: null,
+        requiredConsecutiveSessions: null,
+        riskDisposition: null,
+        targetSuccessRate: null,
+      }),
+    );
+    expect(() =>
+      validateCoachPresentation({
+        context: {
+          dogName: "Echo",
+          durationMinutes: 3,
+          evidenceCount: 0,
+          goal: "current goal",
+          latestDecision: "repeat_step",
+          stage: "current step",
+        },
+        deterministicDraft: "This is not a diagnosis.",
+        presentation,
+        purpose: "chat",
+      }),
+    ).toThrow("COACH_PRESENTATION_SAFETY_BOUNDARY_MISSING");
   });
 });
