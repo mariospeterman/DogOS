@@ -10,9 +10,15 @@ const apiOrigin = `http://127.0.0.1:${apiPort}`;
 const webOrigin = `http://127.0.0.1:${webPort}`;
 const localDatabaseUrl =
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const supabaseCli = resolve(root, "node_modules/supabase/dist/supabase.js");
+const tsxCli = resolve(root, "node_modules/tsx/dist/cli.mjs");
+const nextCli = resolve(root, "apps/web/node_modules/next/dist/bin/next");
 
-function run(command, args) {
-  const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
+function runNode(script, args) {
+  const result = spawnSync(process.execPath, [script, ...args], {
+    cwd: root,
+    stdio: "inherit",
+  });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
@@ -32,14 +38,14 @@ async function waitFor(url) {
   throw new Error(`Local service did not become ready: ${url}`);
 }
 
-function start(args, environment) {
-  const child = spawn("pnpm", args, {
-    cwd: root,
+function startNode(script, args, environment, cwd = root) {
+  const child = spawn(process.execPath, [script, ...args], {
+    cwd,
     env: { ...process.env, ...environment },
     stdio: checkOnly ? "ignore" : "inherit",
   });
   child.on("error", (error) => {
-    console.error(`Unable to start ${args.join(" ")}:`, error);
+    console.error(`Unable to start ${script}:`, error);
   });
   children.push(child);
 }
@@ -58,23 +64,23 @@ process.on("SIGTERM", () => {
 });
 
 if (
-  spawnSync("pnpm", ["exec", "supabase", "status"], {
+  spawnSync(process.execPath, [supabaseCli, "status"], {
     cwd: root,
     stdio: "ignore",
   }).status !== 0
 )
-  run("pnpm", ["dev:services"]);
+  runNode(supabaseCli, ["start", "--exclude", "storage-api"]);
 
-run("pnpm", ["db:reset"]);
+runNode(supabaseCli, ["db", "reset"]);
 
 if (await available(`${apiOrigin}/health/ready`)) {
   throw new Error(`Review API port is already in use: ${apiOrigin}`);
 }
-if (await available(`${webOrigin}/app/today`)) {
+if (await available(`${webOrigin}/app/coach`)) {
   throw new Error(`Review web port is already in use: ${webOrigin}`);
 }
 
-start(["--filter", "@dogos/api", "exec", "tsx", "src/server.ts"], {
+startNode(tsxCli, ["apps/api/src/server.ts"], {
   API_PORT: String(apiPort),
   DATABASE_URL: localDatabaseUrl,
   DOGOS_AUTH_MODE: "local",
@@ -83,17 +89,9 @@ start(["--filter", "@dogos/api", "exec", "tsx", "src/server.ts"], {
   NODE_OPTIONS: "--conditions=development",
   WEB_ORIGIN: webOrigin,
 });
-start(
-  [
-    "--filter",
-    "@dogos/web",
-    "dev",
-    "--webpack",
-    "--hostname",
-    "127.0.0.1",
-    "--port",
-    String(webPort),
-  ],
+startNode(
+  nextCli,
+  ["dev", "--webpack", "--hostname", "127.0.0.1", "--port", String(webPort)],
   {
     NEXT_DIST_DIR: ".next-demo",
     NEXT_PUBLIC_API_URL: apiOrigin,
@@ -101,6 +99,7 @@ start(
     NEXT_PUBLIC_DOGOS_LOCAL_IDENTITY: "unrelated",
     WEB_ORIGIN: webOrigin,
   },
+  resolve(root, "apps/web"),
 );
 
 await Promise.all([
