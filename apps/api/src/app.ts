@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
@@ -12,11 +13,17 @@ import {
   InMemoryCoachConversationStore,
 } from "@dogos/conversation";
 import {
+  InMemoryLiveCoachingStore,
+  InMemoryPrivacyStore,
   IdempotencyConflictError,
+  InMemoryVideoAnalysisStore,
   type AccountRepository,
   type CapabilityUsageRepository,
+  type LiveCoachingStore,
   type OnboardingRepository,
   type PostgresRepository,
+  type PrivacyStore,
+  type VideoAnalysisStore,
 } from "@dogos/database";
 import { LocalProductFixture } from "./local-product-fixture.js";
 import {
@@ -33,6 +40,7 @@ import {
 import type { StripeBillingService } from "./billing.js";
 import { presentGoal, presentStage } from "./training-presentation.js";
 import type { WebOnboardingService } from "./web-onboarding-service.js";
+import { createLiveKitJoinToken, type LiveKitConfig } from "./livekit.js";
 
 const errorCodes = [
   "AUTH_REQUIRED",
@@ -49,6 +57,7 @@ const errorCodes = [
   "SIGNED_ACTION_EXPIRED",
   "SIGNED_ACTION_REPLAYED",
   "BILLING_UNAVAILABLE",
+  "LIVEKIT_UNAVAILABLE",
   "RATE_LIMITED",
 ] as const;
 type ErrorCode = (typeof errorCodes)[number];
@@ -155,7 +164,16 @@ export interface BuildAppOptions {
     "dashboardByDog" | "findPrimaryByHousehold"
   >;
   commands?: Pick<PostgresRepository, "completeSession" | "startSession">;
-  usage?: Pick<CapabilityUsageRepository, "consumeCoachingMessage">;
+  usage?: Pick<
+    CapabilityUsageRepository,
+    | "consumeCoachingMessage"
+    | "consumeLiveCoachingMinutes"
+    | "consumeVideoAnalysis"
+  >;
+  liveKit?: LiveKitConfig;
+  liveSessions?: LiveCoachingStore;
+  privacy?: PrivacyStore;
+  videos?: VideoAnalysisStore;
   product?: LocalProductFixture;
   signedActions?: SignedActionService;
   webOrigin?: string;
@@ -170,6 +188,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const coach =
     options.coach ??
     new CoachConversationService(new InMemoryCoachConversationStore());
+  const videos = options.videos ?? new InMemoryVideoAnalysisStore();
+  const liveSessions = options.liveSessions ?? new InMemoryLiveCoachingStore();
+  const privacy = options.privacy ?? new InMemoryPrivacyStore();
   const authenticator =
     options.authenticator ?? new LocalRequestAuthenticator("test");
   const signed =
@@ -654,7 +675,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           response: { 200: stateSchema, ...commonResponses },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const actor = await authenticator.authenticate(
           request.headers,
           request.id,
@@ -704,7 +725,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           );
         }
         const locale = account?.locale === "en" ? "en" : "de-CH";
-        return coach.send({
+        const coachInput = {
           channel: "web",
           clientMessageId: key(request),
           context: {
@@ -769,7 +790,466 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           },
           tier: account?.tier ?? "freemium",
           traceId: request.id,
+        } satisfies Parameters<CoachConversationService["send"]>[0];
+        const streamRequested =
+          (request.query as { stream?: unknown } | undefined)?.stream === "1";
+        if (streamRequested) {
+          return reply
+            .type("text/plain; charset=utf-8")
+            .header("cache-control", "no-store")
+            .send(Readable.from(coach.sendStream(coachInput)));
+        }
+        return coach.send(coachInput);
+      },
+    );
+
+    routes.get(
+      "/v1/dogs/:id/video-analyses",
+      {
+        schema: {
+          operationId: "listVideoAnalyses",
+          tags: ["video"],
+          headers: authHeaders,
+          params: idParams,
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dogId = (request.params as { id: string }).id;
+        const dashboard = await options.products?.dashboardByDog(
+          dogId,
+          actor.householdId,
+        );
+        const snapshot = product.snapshot();
+        if (options.products !== undefined && dashboard === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (
+          options.products === undefined &&
+          (actor.householdId !== snapshot.household.id ||
+            dogId !== snapshot.dog.id ||
+            actor.identity === "unrelated")
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        return {
+          analyses: await videos.list({
+            dogId,
+            householdId: actor.householdId,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/dogs/:id/video-analyses",
+      {
+        schema: {
+          operationId: "createVideoAnalysis",
+          tags: ["video"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["contentType", "originalFilename", "sizeBytes"],
+            properties: {
+              contentType: {
+                type: "string",
+                enum: ["video/mp4", "video/quicktime", "video/webm"],
+              },
+              originalFilename: {
+                type: "string",
+                minLength: 1,
+                maxLength: 180,
+              },
+              sizeBytes: {
+                type: "integer",
+                minimum: 1,
+                maximum: 262_144_000,
+              },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dogId = (request.params as { id: string }).id;
+        const dashboard = await options.products?.dashboardByDog(
+          dogId,
+          actor.householdId,
+        );
+        const account = await options.accounts?.resolveByAppUser(actor.actorId);
+        const snapshot = product.snapshot();
+        if (options.products !== undefined && dashboard === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (
+          options.products === undefined &&
+          (actor.householdId !== snapshot.household.id ||
+            dogId !== snapshot.dog.id ||
+            actor.identity === "unrelated")
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (
+          account !== null &&
+          account !== undefined &&
+          options.usage !== undefined &&
+          !(await options.usage.consumeVideoAnalysis({
+            actorUserId: actor.actorId,
+            householdId: actor.householdId,
+            limit: account.capabilities.videoAnalysesPerMonth,
+            timezone: account.timezone,
+          }))
+        ) {
+          throw new ApiError(
+            409,
+            "BILLING_UNAVAILABLE",
+            "The monthly video analysis limit has been reached",
+          );
+        }
+        const body = request.body as {
+          contentType: "video/mp4" | "video/quicktime" | "video/webm";
+          originalFilename: string;
+          sizeBytes: number;
+        };
+        const analysis = await videos.create({
+          actorUserId: actor.actorId,
+          contentType: body.contentType,
+          dogId,
+          householdId: actor.householdId,
+          originalFilename: body.originalFilename,
+          sizeBytes: body.sizeBytes,
         });
+        return {
+          analysis,
+          upload: {
+            expiresInSeconds: 900,
+            method: "PUT",
+            url: `dogos://video-uploads/${analysis.storageObjectKey}`,
+          },
+        };
+      },
+    );
+
+    routes.get(
+      "/v1/video-analyses/:id",
+      {
+        schema: {
+          operationId: "getVideoAnalysis",
+          tags: ["video"],
+          headers: authHeaders,
+          params: idParams,
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const analysis = await videos.get({
+          householdId: actor.householdId,
+          id: (request.params as { id: string }).id,
+        });
+        if (analysis === null) {
+          throw new ApiError(404, "RESOURCE_NOT_FOUND", "Video not found");
+        }
+        return { analysis };
+      },
+    );
+
+    routes.post(
+      "/v1/video-analyses/:id/complete-upload",
+      {
+        schema: {
+          operationId: "completeVideoUpload",
+          tags: ["video"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: { type: "object", additionalProperties: false, properties: {} },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        return {
+          analysis: await videos.completeUpload({
+            actorUserId: actor.actorId,
+            householdId: actor.householdId,
+            id: (request.params as { id: string }).id,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/dogs/:id/live-sessions",
+      {
+        schema: {
+          operationId: "createLiveCoachingSession",
+          tags: ["live"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["plannedMinutes"],
+            properties: {
+              plannedMinutes: { type: "integer", minimum: 1, maximum: 60 },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (options.liveKit === undefined) {
+          throw new ApiError(
+            409,
+            "LIVEKIT_UNAVAILABLE",
+            "LiveKit is not configured for this environment",
+          );
+        }
+        const dogId = (request.params as { id: string }).id;
+        const dashboard = await options.products?.dashboardByDog(
+          dogId,
+          actor.householdId,
+        );
+        const account = await options.accounts?.resolveByAppUser(actor.actorId);
+        const snapshot = product.snapshot();
+        if (options.products !== undefined && dashboard === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (
+          options.products === undefined &&
+          (actor.householdId !== snapshot.household.id ||
+            dogId !== snapshot.dog.id ||
+            actor.identity === "unrelated")
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const body = request.body as { plannedMinutes: number };
+        if (
+          account !== null &&
+          account !== undefined &&
+          options.usage !== undefined &&
+          !(await options.usage.consumeLiveCoachingMinutes({
+            actorUserId: actor.actorId,
+            householdId: actor.householdId,
+            limit: account.capabilities.liveCoachingMinutesPerMonth,
+            minutes: body.plannedMinutes,
+            timezone: account.timezone,
+          }))
+        ) {
+          throw new ApiError(
+            409,
+            "BILLING_UNAVAILABLE",
+            "The monthly live coaching minute limit has been reached",
+          );
+        }
+        const session = await liveSessions.create({
+          actorUserId: actor.actorId,
+          dogId,
+          householdId: actor.householdId,
+          plannedMinutes: body.plannedMinutes,
+        });
+        const token = await createLiveKitJoinToken({
+          config: options.liveKit,
+          identity: actor.actorId,
+          metadata: {
+            dogId,
+            householdId: actor.householdId,
+            liveSessionId: session.id,
+          },
+          roomName: session.roomName,
+        });
+        return {
+          liveKit: {
+            token,
+            url: options.liveKit.url,
+          },
+          session,
+        };
+      },
+    );
+
+    routes.get(
+      "/v1/live-sessions/:id",
+      {
+        schema: {
+          operationId: "getLiveCoachingSession",
+          tags: ["live"],
+          headers: authHeaders,
+          params: idParams,
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const session = await liveSessions.get({
+          householdId: actor.householdId,
+          id: (request.params as { id: string }).id,
+        });
+        if (session === null) {
+          throw new ApiError(
+            404,
+            "RESOURCE_NOT_FOUND",
+            "Live session not found",
+          );
+        }
+        return { session };
+      },
+    );
+
+    routes.post(
+      "/v1/live-sessions/:id/complete",
+      {
+        schema: {
+          operationId: "completeLiveCoachingSession",
+          tags: ["live"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["consumedMinutes", "summary"],
+            properties: {
+              consumedMinutes: { type: "integer", minimum: 0, maximum: 60 },
+              summary: { type: "string", minLength: 1, maxLength: 1200 },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const body = request.body as {
+          consumedMinutes: number;
+          summary: string;
+        };
+        return {
+          session: await liveSessions.complete({
+            consumedMinutes: body.consumedMinutes,
+            householdId: actor.householdId,
+            id: (request.params as { id: string }).id,
+            summary: body.summary,
+          }),
+        };
+      },
+    );
+
+    routes.get(
+      "/v1/privacy/export",
+      {
+        schema: {
+          operationId: "exportPrivacyData",
+          tags: ["privacy"],
+          headers: authHeaders,
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        return privacy.exportData({
+          actorUserId: actor.actorId,
+          householdId: actor.householdId,
+        });
+      },
+    );
+
+    routes.post(
+      "/v1/privacy/deletion-requests",
+      {
+        schema: {
+          operationId: "createPrivacyDeletionRequest",
+          tags: ["privacy"],
+          headers: mutationHeaders,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              reason: { type: "string", minLength: 1, maxLength: 500 },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const body = request.body as { reason?: string };
+        return {
+          request: await privacy.createDeletionRequest({
+            actorUserId: actor.actorId,
+            householdId: actor.householdId,
+            ...(body.reason === undefined ? {} : { reason: body.reason }),
+          }),
+        };
       },
     );
 

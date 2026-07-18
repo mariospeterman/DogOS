@@ -6,11 +6,21 @@ import type {
   CoachReply,
   CoachTrainingContext,
 } from "./types.js";
-import { composeCoachReply } from "./reply.js";
+import { citationBlock, composeCoachReply } from "./reply.js";
 import type { CoachConversationStore } from "./store.js";
 
 export type CoachServiceTier = "freemium" | "plus" | "pro" | "ultra";
 export const maxCoachReplyCharacters = 3_600;
+
+function withCitations(input: {
+  context: CoachTrainingContext;
+  locale: "de-CH" | "en";
+  message: string;
+  text: string;
+}): string {
+  if (/\n\n(Quellen|Sources): \[1\]/.test(input.text)) return input.text;
+  return `${input.text}${citationBlock(input)}`;
+}
 
 export interface CoachReplyGenerator {
   generate(input: {
@@ -21,6 +31,14 @@ export interface CoachReplyGenerator {
     tier: CoachServiceTier;
     traceId: string;
   }): Promise<string>;
+  stream?(input: {
+    context: CoachTrainingContext;
+    contextKind?: CoachContextKind;
+    draft: CoachReply;
+    message: string;
+    tier: CoachServiceTier;
+    traceId: string;
+  }): AsyncIterable<string>;
 }
 
 export interface CoachScope {
@@ -145,7 +163,15 @@ export class CoachConversationService {
           generated.trim().length > 0 &&
           generated.length <= maxCoachReplyCharacters
         ) {
-          reply = { ...deterministicReply, text: generated.trim() };
+          reply = {
+            ...deterministicReply,
+            text: withCitations({
+              context: input.context,
+              locale: deterministicReply.locale,
+              message: input.message,
+              text: generated.trim(),
+            }),
+          };
         }
       } catch {
         // The deterministic reply remains available when a model is unavailable.
@@ -168,5 +194,119 @@ export class CoachConversationService {
       traceId: input.traceId,
     });
     return { conversation: await this.store.get(conversation.id), reply };
+  }
+
+  async *sendStream(input: {
+    channel: CoachChannel;
+    clientMessageId: string;
+    context: CoachTrainingContext;
+    contextKind?: CoachContextKind;
+    contextSubjectId?: string;
+    links: CoachLinks;
+    message: string;
+    scope: CoachScope;
+    tier?: CoachServiceTier;
+    traceId: string;
+  }): AsyncIterable<string> {
+    const conversation = await this.store.ensure({
+      ...input.scope,
+      channel: input.channel,
+    });
+    const deterministicReply = composeCoachReply({
+      context: input.context,
+      ...(input.contextKind === undefined
+        ? {}
+        : { contextKind: input.contextKind }),
+      currentLocale: conversation.locale,
+      links: input.links,
+      message: input.message,
+    });
+    const existing = conversation.messages.find(
+      (message) =>
+        message.id === `${input.channel}:client:${input.clientMessageId}`,
+    );
+    if (existing !== undefined) {
+      const existingReply = conversation.messages.find(
+        (message) =>
+          message.id ===
+          `${input.channel}:client:reply:${input.clientMessageId}`,
+      );
+      if (existingReply !== undefined) {
+        yield existingReply.content;
+        return;
+      }
+    }
+    if (existing === undefined) {
+      await this.store.append({
+        actorUserId: input.scope.actorUserId,
+        channel: input.channel,
+        clientMessageId: input.clientMessageId,
+        content: input.message,
+        ...(input.contextKind === undefined
+          ? {}
+          : { contextKind: input.contextKind }),
+        ...(input.contextSubjectId === undefined
+          ? {}
+          : { contextSubjectId: input.contextSubjectId }),
+        conversationId: conversation.id,
+        role: "user",
+        traceId: input.traceId,
+      });
+    }
+
+    let text = "";
+    if (this.generator?.stream !== undefined) {
+      try {
+        for await (const delta of this.generator.stream({
+          context: input.context,
+          ...(input.contextKind === undefined
+            ? {}
+            : { contextKind: input.contextKind }),
+          draft: deterministicReply,
+          message: input.message,
+          tier: input.tier ?? "freemium",
+          traceId: input.traceId,
+        })) {
+          text += delta;
+          if (text.length > maxCoachReplyCharacters) {
+            throw new Error("COACH_REPLY_TOO_LONG");
+          }
+          yield delta;
+        }
+      } catch {
+        text = "";
+      }
+    }
+    if (text.trim().length === 0) {
+      text = deterministicReply.text;
+      yield text;
+    }
+
+    const citedText = withCitations({
+      context: input.context,
+      locale: deterministicReply.locale,
+      message: input.message,
+      text: text.trim(),
+    });
+    if (citedText.length > text.trim().length) {
+      yield citedText.slice(text.trim().length);
+    }
+    const reply = { ...deterministicReply, text: citedText };
+    await this.store.setLocale(conversation.id, reply.locale);
+    await this.store.append({
+      actorUserId: null,
+      channel: input.channel,
+      clientMessageId: `reply:${input.clientMessageId}`,
+      content: reply.text,
+      ...(input.contextKind === undefined
+        ? {}
+        : { contextKind: input.contextKind }),
+      ...(input.contextSubjectId === undefined
+        ? {}
+        : { contextSubjectId: input.contextSubjectId }),
+      conversationId: conversation.id,
+      role: "assistant",
+      traceId: input.traceId,
+    });
   }
 }

@@ -15,6 +15,67 @@ const progressPattern =
   /\b(fortschritt|entwicklung|progress|better|verbess)\w*/i;
 const planPattern = /\b(plan|woche|schedule|kalender|calendar)\b/i;
 
+interface CoachCitation {
+  id: string;
+  label: string;
+  detail: string;
+}
+
+function citationsFor(input: {
+  context: CoachTrainingContext;
+  message: string;
+}): CoachCitation[] {
+  const citations: CoachCitation[] = [
+    {
+      id: "plan",
+      label: "Current DogOS plan",
+      detail: `${input.context.stage}; decision ${input.context.latestDecision}`,
+    },
+    {
+      id: "evidence",
+      label: "Session evidence",
+      detail: `${input.context.evidenceCount} comparable session records`,
+    },
+  ];
+  if (
+    input.context.currentStep !== null &&
+    input.context.currentStep !== undefined
+  ) {
+    citations.push({
+      id: "protocol",
+      label: "Protocol step",
+      detail: `${input.context.currentStep.stepCode}; ${input.context.currentStep.repetitions} reps; ${input.context.currentStep.durationSeconds}s`,
+    });
+  }
+  if (
+    acutePattern.test(input.message) ||
+    input.context.riskDisposition !== undefined
+  ) {
+    citations.push({
+      id: "safety",
+      label: "DogOS safety boundary",
+      detail:
+        input.context.riskDisposition ?? "acute changes stay outside diagnosis",
+    });
+  }
+  return citations;
+}
+
+export function citationBlock(input: {
+  context: CoachTrainingContext;
+  locale: "de-CH" | "en";
+  message: string;
+}): string {
+  const citations = citationsFor(input);
+  const heading = input.locale === "de-CH" ? "Quellen" : "Sources";
+  return `\n\n${heading}: ${citations
+    .map(
+      (citation, index) =>
+        `[${index + 1}] ${citation.label} - ${citation.detail}`,
+    )
+    .join("; ")}`;
+}
+
 function trainingCopy(context: CoachTrainingContext, de: boolean) {
   switch (context.currentStep?.stepCode) {
     case "step.recall_short_distance":
@@ -146,5 +207,9 @@ export function composeCoachReply(input: {
     });
   }
 
-  return { actions, locale, text };
+  return {
+    actions,
+    locale,
+    text: `${text}${citationBlock({ context: input.context, locale, message: input.message })}`,
+  };
 }

@@ -29,6 +29,7 @@ interface AccountView {
 export default function AccountPage() {
   const [account, setAccount] = useState<AccountView | null>(null);
   const [error, setError] = useState(false);
+  const [privacyMessage, setPrivacyMessage] = useState<string | null>(null);
   useEffect(() => {
     void (async () => {
       const response = await fetch(dogosApiUrl("/v1/me"), {
@@ -117,6 +118,64 @@ export default function AccountPage() {
       {error ? (
         <p className="error-note">Kontodaten konnten nicht geladen werden.</p>
       ) : null}
+      <section className="account-distribution">
+        <div>
+          <strong>Datenschutz</strong>
+          <span>Exportiere deine Daten oder stelle eine Löschanfrage.</span>
+        </div>
+        <div className="distribution-actions compact">
+          <button
+            className="button secondary"
+            onClick={async () => {
+              const response = await fetch(dogosApiUrl("/v1/privacy/export"), {
+                headers: await dogosApiHeaders(),
+              });
+              if (response.ok) {
+                const blob = new Blob(
+                  [JSON.stringify(await response.json(), null, 2)],
+                  { type: "application/json" },
+                );
+                const url = URL.createObjectURL(blob);
+                const anchor = document.createElement("a");
+                anchor.href = url;
+                anchor.download = "dogos-privacy-export.json";
+                anchor.click();
+                URL.revokeObjectURL(url);
+              }
+              setPrivacyMessage(
+                response.ok
+                  ? "Export wurde erzeugt und im Browser geladen."
+                  : "Export konnte nicht erzeugt werden.",
+              );
+            }}
+          >
+            Export
+          </button>
+          <button
+            className="button danger"
+            onClick={async () => {
+              const response = await fetch(
+                dogosApiUrl("/v1/privacy/deletion-requests"),
+                {
+                  body: JSON.stringify({ reason: "Owner requested deletion" }),
+                  headers: await dogosApiHeaders(true),
+                  method: "POST",
+                },
+              );
+              setPrivacyMessage(
+                response.ok
+                  ? "Löschanfrage wurde gespeichert."
+                  : "Löschanfrage konnte nicht erstellt werden.",
+              );
+            }}
+          >
+            Löschen
+          </button>
+        </div>
+      </section>
+      {privacyMessage === null ? null : (
+        <p className="helper">{privacyMessage}</p>
+      )}
       <section className="account-distribution">
         <div>
           <strong>DogOS mitnehmen</strong>

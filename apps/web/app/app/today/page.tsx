@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3, MessageCircle, Play, Target } from "lucide-react";
+import { Clock3, MessageCircle, Play, Radio, Target } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
 import { useProductDashboard } from "../../../lib/product";
@@ -79,6 +79,9 @@ export default function TodayPage() {
             href={coachHref("Erkläre mir den heutigen Trainingsblock.")}
           >
             <MessageCircle size={18} /> Coach fragen
+          </Link>
+          <Link className="button secondary" href="/app/live">
+            <Radio size={18} /> Live
           </Link>
         </div>
       </section>

@@ -1,0 +1,187 @@
+"use client";
+
+import { CheckCircle2, Upload, Video } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AppShell } from "../../../components/app-shell";
+import { dogosApiHeaders, dogosApiUrl } from "../../../lib/api-client";
+import { useProductDashboard } from "../../../lib/product";
+
+interface VideoFinding {
+  confidence: number;
+  evidence: string;
+  label: string;
+  recommendation: string;
+}
+
+interface VideoAnalysis {
+  completedAt: string | null;
+  findings: VideoFinding[];
+  id: string;
+  originalFilename: string;
+  status: string;
+}
+
+export default function VideoPage() {
+  const { error, loading, product } = useProductDashboard();
+  const [analyses, setAnalyses] = useState<VideoAnalysis[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [working, setWorking] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (product === null) return;
+    void (async () => {
+      const response = await fetch(
+        dogosApiUrl(`/v1/dogs/${product.dogId}/video-analyses`),
+        { cache: "no-store", headers: await dogosApiHeaders() },
+      );
+      if (response.ok) {
+        const body = (await response.json()) as {
+          analyses: VideoAnalysis[];
+        };
+        setAnalyses(body.analyses);
+      }
+    })();
+  }, [product]);
+
+  async function submit() {
+    if (file === null || product === null) return;
+    setWorking(true);
+    setMessage(null);
+    try {
+      const createResponse = await fetch(
+        dogosApiUrl(`/v1/dogs/${product.dogId}/video-analyses`),
+        {
+          body: JSON.stringify({
+            contentType: file.type,
+            originalFilename: file.name,
+            sizeBytes: file.size,
+          }),
+          headers: await dogosApiHeaders(true),
+          method: "POST",
+        },
+      );
+      if (!createResponse.ok) {
+        setMessage(
+          createResponse.status === 409
+            ? "Dein aktueller Tarif hat kein freies Video-Kontingent."
+            : "Das Video konnte nicht vorbereitet werden.",
+        );
+        return;
+      }
+      const created = (await createResponse.json()) as {
+        analysis: VideoAnalysis;
+      };
+      const completeResponse = await fetch(
+        dogosApiUrl(
+          `/v1/video-analyses/${created.analysis.id}/complete-upload`,
+        ),
+        {
+          body: JSON.stringify({}),
+          headers: await dogosApiHeaders(true),
+          method: "POST",
+        },
+      );
+      if (!completeResponse.ok) {
+        setMessage("Der Upload wurde vorbereitet, aber noch nicht analysiert.");
+        setAnalyses((current) => [created.analysis, ...current]);
+        return;
+      }
+      const completed = (await completeResponse.json()) as {
+        analysis: VideoAnalysis;
+      };
+      setAnalyses((current) => [completed.analysis, ...current]);
+      setFile(null);
+      setMessage(
+        "Analyse abgeschlossen. DogOS zeigt nur überprüfbare Hinweise.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="coach-loading">
+        <span className="coach-pulse" />
+      </div>
+    );
+  }
+  if (product === null) {
+    return (
+      <AppShell title="Video" eyebrow="Analyse">
+        <p className="error-note">
+          {error ?? "Schliesse zuerst das Onboarding ab."}
+        </p>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell title="Video" eyebrow={`${product.dogName} analysieren`}>
+      <section className="auth-form">
+        <label>
+          Trainingsclip
+          <input
+            accept="video/mp4,video/quicktime,video/webm"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            type="file"
+          />
+        </label>
+        <button
+          className="button primary wide"
+          disabled={file === null || working}
+          onClick={submit}
+        >
+          <Upload size={18} />{" "}
+          {working ? "Analyse läuft..." : "Video analysieren"}
+        </button>
+        {message === null ? null : <p className="helper">{message}</p>}
+      </section>
+
+      <section className="settings">
+        {analyses.length === 0 ? (
+          <div>
+            <span>
+              <Video />
+              Noch keine Analyse
+              <small>
+                Clips werden als Hinweise behandelt, nicht als Diagnose.
+              </small>
+            </span>
+            <strong>Bereit</strong>
+          </div>
+        ) : (
+          analyses.map((analysis) => (
+            <div key={analysis.id}>
+              <span>
+                <CheckCircle2 />
+                {analysis.originalFilename}
+                <small>{analysis.status}</small>
+              </span>
+              <strong>{analysis.findings.length} Hinweise</strong>
+            </div>
+          ))
+        )}
+      </section>
+
+      {analyses.flatMap((analysis) =>
+        analysis.findings.map((finding) => (
+          <section
+            className="inline-training-card"
+            key={`${analysis.id}:${finding.label}`}
+          >
+            <div className="inline-card-heading">
+              <span>{analysis.originalFilename}</span>
+              <strong>{finding.label}</strong>
+            </div>
+            <p>{finding.recommendation}</p>
+            <p className="helper">
+              {Math.round(finding.confidence * 100)}% · {finding.evidence}
+            </p>
+          </section>
+        )),
+      )}
+    </AppShell>
+  );
+}

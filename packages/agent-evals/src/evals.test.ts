@@ -7,6 +7,8 @@ import {
 } from "@dogos/agent-tools";
 import { describe, expect, it } from "vitest";
 import {
+  approvedCoachModelSnapshots,
+  assertApprovedCoachModelSnapshot,
   missingPlanFact,
   progressExplanation,
   scoreCoachingCandidate,
@@ -197,5 +199,33 @@ describe("DogOS agent safety evaluations", () => {
         },
       }),
     ).toMatchObject({ eligible: false, score: 90 });
+  });
+
+  it("approves only reviewed model snapshots with exact model IDs", () => {
+    const snapshot = approvedCoachModelSnapshots[0]!;
+    expect(
+      assertApprovedCoachModelSnapshot({
+        freeModel: snapshot.freeModel,
+        onboardingModel: snapshot.onboardingModel,
+        paidModel: snapshot.paidModel,
+        snapshotId: snapshot.id,
+      }),
+    ).toMatchObject({ id: snapshot.id });
+
+    expect(() =>
+      assertApprovedCoachModelSnapshot({
+        freeModel: "unreviewed-model",
+        onboardingModel: snapshot.onboardingModel,
+        paidModel: snapshot.paidModel,
+        snapshotId: snapshot.id,
+      }),
+    ).toThrow("DOGOS_MODEL_SNAPSHOT_MODEL_MISMATCH");
+    expect(() =>
+      assertApprovedCoachModelSnapshot({
+        freeModel: snapshot.freeModel,
+        onboardingModel: snapshot.onboardingModel,
+        paidModel: snapshot.paidModel,
+      }),
+    ).toThrow("DOGOS_MODEL_SNAPSHOT_APPROVAL_REQUIRED");
   });
 });

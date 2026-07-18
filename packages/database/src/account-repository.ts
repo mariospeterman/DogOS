@@ -133,12 +133,14 @@ export class AccountRepository {
     authUserId: string;
     displayName: string;
     locale: string;
+    referralCode?: string | null;
   }): Promise<AccountRecord> {
     await this.#sql`
       select * from private.bootstrap_account(
         ${input.authUserId}::uuid,
         ${input.displayName},
-        ${input.locale}::api.locale_tag
+        ${input.locale}::api.locale_tag,
+        ${input.referralCode ?? null}
       )
     `;
     const account = await this.resolveByAuthUser(input.authUserId);

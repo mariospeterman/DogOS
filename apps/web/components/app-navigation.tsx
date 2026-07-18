@@ -5,6 +5,7 @@ import {
   MessageCircle,
   Route,
   TrendingUp,
+  Video,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -22,6 +23,11 @@ export function AppNavigation({
       href: "/app/progress",
       label: locale === "en" ? "Progress" : "Fortschritt",
       icon: TrendingUp,
+    },
+    {
+      href: "/app/video",
+      label: locale === "en" ? "Video" : "Video",
+      icon: Video,
     },
     {
       href: "/app/account",

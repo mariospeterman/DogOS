@@ -56,6 +56,9 @@ importers:
       '@dogos/agent-auth':
         specifier: workspace:*
         version: link:../../packages/agent-auth
+      '@dogos/agent-evals':
+        specifier: workspace:*
+        version: link:../../packages/agent-evals
       '@dogos/agent-tools':
         specifier: workspace:*
         version: link:../../packages/agent-tools

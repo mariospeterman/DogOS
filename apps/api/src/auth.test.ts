@@ -5,6 +5,7 @@ import {
   CompositeRequestAuthenticator,
   createRequestAuthenticator,
   LocalRequestAuthenticator,
+  SupabaseRequestAuthenticator,
 } from "./auth.js";
 
 describe("request authentication", () => {
@@ -76,4 +77,71 @@ describe("request authentication", () => {
       ).toThrow("HYBRID_AUTH_FORBIDDEN");
     },
   );
+
+  it("passes only bounded referral metadata into account bootstrap", async () => {
+    const calls: Array<{ referralCode?: string | null }> = [];
+    const accounts = {
+      bootstrap: async (input: {
+        authUserId: string;
+        displayName: string;
+        locale: string;
+        referralCode?: string | null;
+      }) => {
+        calls.push(
+          input.referralCode === undefined
+            ? {}
+            : { referralCode: input.referralCode },
+        );
+        return {
+          appUserId: "app-user-1",
+          capabilities: {
+            coachingMessagesPerDay: 12,
+            concurrentDogs: 1,
+            liveCoachingMinutesPerMonth: 0,
+            planAdjustmentsPerMonth: 1,
+            videoAnalysesPerMonth: 0,
+          },
+          country: "CH",
+          currency: "CHF",
+          displayName: input.displayName,
+          householdId: "household-1",
+          householdName: "New Owner household",
+          locale: input.locale,
+          role: "owner" as const,
+          tier: "freemium" as const,
+          timezone: "Europe/Zurich",
+        };
+      },
+      close: async () => undefined,
+      resolveByAuthUser: async () => null,
+    };
+    const fetcher = async () =>
+      new Response(
+        JSON.stringify({
+          email: "owner@example.test",
+          id: "auth-user-1",
+          user_metadata: {
+            full_name: "New Owner",
+            locale: "de-CH",
+            referral_code: " abc123 ",
+          },
+        }),
+      );
+    const authenticator = new SupabaseRequestAuthenticator(
+      "https://supabase.test",
+      "publishable",
+      "postgres://unused",
+      fetcher,
+      accounts as never,
+    );
+
+    await expect(
+      authenticator.authenticate({ authorization: "Bearer token" }, "trace-1"),
+    ).resolves.toMatchObject({
+      actorId: "app-user-1",
+      authMode: "supabase",
+      householdId: "household-1",
+    });
+    expect(calls).toEqual([{ referralCode: "ABC123" }]);
+  });
 });

@@ -4,6 +4,7 @@ import { UserPlus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { AppShell } from "../../../components/app-shell";
+import { normalizeReferralCode } from "../../../lib/distribution";
 import { createClient } from "../../../lib/supabase/client";
 
 export default function SignUpPage() {
@@ -36,12 +37,22 @@ function SignUpForm() {
       requestedNext !== null && requestedNext.startsWith("/")
         ? requestedNext
         : "/app/coach";
+    const referralCode = normalizeReferralCode(searchParams.get("ref"));
+    const confirmUrl = new URL("/auth/confirm", window.location.origin);
+    confirmUrl.searchParams.set("next", next);
+    if (referralCode !== null) confirmUrl.searchParams.set("ref", referralCode);
     const { data, error: signUpError } = await createClient().auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: name.trim(), locale },
-        emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(next)}`,
+        data: {
+          full_name: name.trim(),
+          locale,
+          ...(referralCode === null
+            ? {}
+            : { referral_code: referralCode, referral_source: "landing" }),
+        },
+        emailRedirectTo: confirmUrl.toString(),
       },
     });
     if (signUpError !== null) {

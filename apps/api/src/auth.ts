@@ -72,6 +72,12 @@ interface SupabaseUserResponse {
   user_metadata?: Record<string, unknown>;
 }
 
+function normalizedReferralCode(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toUpperCase();
+  return /^[A-Z0-9]{6,32}$/.test(normalized) ? normalized : null;
+}
+
 export class SupabaseRequestAuthenticator implements RequestAuthenticator {
   readonly #accounts: AccountRepository;
 
@@ -132,6 +138,7 @@ export class SupabaseRequestAuthenticator implements RequestAuthenticator {
         authUserId: authUser.id,
         displayName,
         locale,
+        referralCode: normalizedReferralCode(metadata.referral_code),
       });
     }
 

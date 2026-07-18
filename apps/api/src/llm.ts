@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { assertApprovedCoachModelSnapshot } from "@dogos/agent-evals";
 import type {
   CoachReplyGenerator,
   CoachServiceTier,
@@ -53,7 +54,7 @@ export function loadCoachModelConfig(
     throw new Error("OPENAI_DATA_REGION_UNSUPPORTED");
   }
   const legacyChatMaximum = environment.DOGOS_COACH_MAX_OUTPUT_TOKENS;
-  return {
+  const config = {
     apiKey,
     baseUrl:
       environment.OPENAI_BASE_URL ??
@@ -149,6 +150,17 @@ export function loadCoachModelConfig(
       },
     },
   };
+  if (environment.DOGOS_ENV === "production") {
+    assertApprovedCoachModelSnapshot({
+      freeModel: config.freeModel,
+      onboardingModel: config.onboardingModel,
+      paidModel: config.paidModel,
+      ...(environment.DOGOS_MODEL_SNAPSHOT_APPROVAL === undefined
+        ? {}
+        : { snapshotId: environment.DOGOS_MODEL_SNAPSHOT_APPROVAL }),
+    });
+  }
+  return config;
 }
 
 type ExtractedOnboardingFacts = {
@@ -733,6 +745,78 @@ export class OpenAICoachReplyGenerator implements CoachReplyGenerator {
               },
       });
       return message;
+    } catch (error) {
+      await this.runs.record({
+        latencyMs: Math.round(performance.now() - started),
+        model,
+        outcome: "failed",
+        provider: "openai",
+        usage: null,
+      });
+      throw error;
+    }
+  }
+
+  async *stream(
+    input: Parameters<NonNullable<CoachReplyGenerator["stream"]>>[0],
+  ): AsyncIterable<string> {
+    const purpose = coachGenerationPurpose(input);
+    const model = modelForRequest(this.config, input.tier, purpose);
+    const profile = this.config.profiles[purpose];
+    const started = performance.now();
+    let outputTokens = 0;
+    try {
+      const stream = await this.#client.responses.create(
+        {
+          input: JSON.stringify({
+            canonicalContext: input.context,
+            contextKind: input.contextKind ?? "general",
+            deterministicDraft: input.draft.text,
+            locale: input.draft.locale,
+            ownerMessage: input.message,
+          }),
+          instructions: [
+            ...instructionsFor(purpose),
+            "Return only the owner-visible coaching answer as plain text.",
+            "Do not return JSON, markdown fences, metadata, or citations that are not supplied in canonicalContext.",
+          ].join(" "),
+          max_output_tokens: profile.maxOutputTokens,
+          model,
+          store: false,
+          stream: true,
+        },
+        { timeout: profile.timeoutMs },
+      );
+      for await (const event of stream as AsyncIterable<{
+        delta?: string;
+        response?: { usage?: { output_tokens?: number } };
+        type?: string;
+      }>) {
+        if (
+          event.type === "response.output_text.delta" &&
+          typeof event.delta === "string" &&
+          event.delta.length > 0
+        ) {
+          yield event.delta;
+        }
+        if (event.type === "response.completed") {
+          outputTokens = event.response?.usage?.output_tokens ?? 0;
+        }
+      }
+      await this.runs.record({
+        latencyMs: Math.round(performance.now() - started),
+        model,
+        outcome: "succeeded",
+        provider: "openai",
+        usage:
+          outputTokens === 0
+            ? null
+            : {
+                inputTokens: 0,
+                outputTokens,
+                totalTokens: outputTokens,
+              },
+      });
     } catch (error) {
       await this.runs.record({
         latencyMs: Math.round(performance.now() - started),

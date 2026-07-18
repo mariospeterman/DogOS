@@ -8,10 +8,13 @@ import {
   AccountRepository,
   BillingRepository,
   CapabilityUsageRepository,
+  LiveCoachingRepository,
   ModelRunRepository,
   OnboardingRepository,
   OnboardingSessionRepository,
   PostgresRepository,
+  PrivacyRepository,
+  VideoAnalysisRepository,
 } from "@dogos/database";
 
 import { buildApp } from "./app.js";
@@ -22,6 +25,7 @@ import {
   OpenAICoachReplyGenerator,
   OpenAIOnboardingInterpreter,
 } from "./llm.js";
+import { loadLiveKitConfig } from "./livekit.js";
 import { OnboardingService } from "./onboarding-service.js";
 import { SignedActionService } from "./signed-actions.js";
 import { WebOnboardingService } from "./web-onboarding-service.js";
@@ -42,6 +46,16 @@ const commands = environment.DATABASE_URL
 const capabilityUsage = environment.DATABASE_URL
   ? new CapabilityUsageRepository(environment.DATABASE_URL)
   : undefined;
+const videos = environment.DATABASE_URL
+  ? new VideoAnalysisRepository(environment.DATABASE_URL)
+  : undefined;
+const liveSessions = environment.DATABASE_URL
+  ? new LiveCoachingRepository(environment.DATABASE_URL)
+  : undefined;
+const privacy = environment.DATABASE_URL
+  ? new PrivacyRepository(environment.DATABASE_URL)
+  : undefined;
+const liveKit = loadLiveKitConfig(process.env);
 const stripeConfig = loadStripeBillingConfig(process.env);
 const billingRepository =
   environment.DATABASE_URL && stripeConfig
@@ -123,6 +137,10 @@ const app = buildApp({
   ...(webOnboarding === undefined ? {} : { onboarding: webOnboarding }),
   ...(commands === undefined ? {} : { commands }),
   ...(capabilityUsage === undefined ? {} : { usage: capabilityUsage }),
+  ...(videos === undefined ? {} : { videos }),
+  ...(liveSessions === undefined ? {} : { liveSessions }),
+  ...(privacy === undefined ? {} : { privacy }),
+  ...(liveKit === null ? {} : { liveKit }),
   ...(onboardingRepository === undefined
     ? {}
     : { products: onboardingRepository }),

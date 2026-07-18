@@ -40,6 +40,8 @@ describe("DogOS Coach conversation", () => {
     });
     expect(reply.text).toMatch(/nicht medizinisch beurteilen/);
     expect(reply.text).toMatch(/Coach bleiben verfügbar/);
+    expect(reply.text).toMatch(/Quellen: \[1\] Current DogOS plan/);
+    expect(reply.text).toMatch(/\[3\] DogOS safety boundary/);
     expect(reply.actions).toHaveLength(1);
   });
 
@@ -153,7 +155,8 @@ describe("DogOS Coach conversation", () => {
       tier: "plus",
       traceId: "trace-generated",
     });
-    expect(result.reply.text).toBe("Kurzer, natürlicher Coach-Text.");
+    expect(result.reply.text).toMatch(/^Kurzer, natürlicher Coach-Text\./);
+    expect(result.reply.text).toMatch(/Quellen: \[1\]/);
     expect(result.reply.actions[0]?.href).toBe("/app/plan");
 
     const fallback = new CoachConversationService(
@@ -174,5 +177,32 @@ describe("DogOS Coach conversation", () => {
       traceId: "trace-fallback",
     });
     expect(fallbackResult.reply.text).toMatch(/arbeitet gerade/);
+  });
+
+  it("streams generated text followed by deterministic citations", async () => {
+    const service = new CoachConversationService(
+      new InMemoryCoachConversationStore(),
+      {
+        generate: async () => "unused",
+        stream: async function* () {
+          yield "Streaming ";
+          yield "answer.";
+        },
+      },
+    );
+    const chunks = [];
+    for await (const chunk of service.sendStream({
+      channel: "web",
+      clientMessageId: "streamed",
+      context,
+      links,
+      message: "Why this block?",
+      scope,
+      traceId: "trace-streamed",
+    })) {
+      chunks.push(chunk);
+    }
+    expect(chunks.join("")).toMatch(/^Streaming answer\./);
+    expect(chunks.join("")).toMatch(/Sources: \[1\] Current DogOS plan/);
   });
 });

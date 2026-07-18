@@ -87,6 +87,24 @@ describe("coach model configuration", () => {
         OPENAI_API_KEY: "test-key",
       }),
     ).toThrow("DOGOS_LLM_CHAT_MAX_OUTPUT_TOKENS_INVALID");
+    expect(() =>
+      loadCoachModelConfig({
+        DOGOS_ENV: "production",
+        DOGOS_LLM_MODE: "openai",
+        OPENAI_API_KEY: "test-key",
+      }),
+    ).toThrow("DOGOS_MODEL_SNAPSHOT_APPROVAL_REQUIRED");
+    expect(
+      loadCoachModelConfig({
+        DOGOS_ENV: "production",
+        DOGOS_LLM_MODE: "openai",
+        DOGOS_MODEL_SNAPSHOT_APPROVAL: "dogos-coach-openai-2026-07-18-reviewed",
+        OPENAI_API_KEY: "test-key",
+      }),
+    ).toMatchObject({
+      freeModel: "gpt-5.6-luna",
+      paidModel: "gpt-5.6-terra",
+    });
   });
 
   it("routes chat, plans, evidence, and professional summaries independently", () => {

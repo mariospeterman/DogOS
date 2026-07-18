@@ -17,6 +17,10 @@ describe("API environment", () => {
       expect.arrayContaining([
         "DATABASE_URL",
         "DOGOS_LLM_MODE",
+        "DOGOS_MODEL_SNAPSHOT_APPROVAL",
+        "LIVEKIT_API_KEY",
+        "LIVEKIT_API_SECRET",
+        "LIVEKIT_URL",
         "OPENAI_API_KEY",
         "SUPABASE_SECRET_KEY",
         "STRIPE_SECRET_KEY",

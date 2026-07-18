@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@dogos/agent-auth": "workspace:*",
+    "@dogos/agent-evals": "workspace:*",
     "@dogos/agent-tools": "workspace:*",
     "@dogos/config": "workspace:*",
     "@dogos/contracts": "workspace:*",

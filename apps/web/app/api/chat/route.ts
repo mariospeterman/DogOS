@@ -59,7 +59,9 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_API_URL ??
       "http://127.0.0.1:4000";
     const response = await fetch(
-      `${apiBase}${hasDog ? "/v1/coach/messages" : "/v1/onboarding/messages"}`,
+      `${apiBase}${
+        hasDog ? "/v1/coach/messages?stream=1" : "/v1/onboarding/messages"
+      }`,
       {
         body: JSON.stringify(
           hasDog
@@ -81,6 +83,39 @@ export async function POST(request: Request) {
           : "DogOS could not answer right now",
         { status: response.status },
       );
+    }
+    if (hasDog) {
+      if (response.body === null) {
+        return new Response("Invalid DogOS response", { status: 502 });
+      }
+      const stream = createUIMessageStream({
+        async execute({ writer }) {
+          const id = crypto.randomUUID();
+          const reader = response.body!.getReader();
+          const decoder = new TextDecoder();
+          writer.write({ id, type: "text-start" });
+          try {
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const delta = decoder.decode(value, { stream: true });
+              if (delta.length > 0) {
+                writer.write({ delta, id, type: "text-delta" });
+              }
+            }
+            const final = decoder.decode();
+            if (final.length > 0) {
+              writer.write({ delta: final, id, type: "text-delta" });
+            }
+          } finally {
+            writer.write({ id, type: "text-end" });
+            reader.releaseLock();
+          }
+        },
+        onError: () => "DogOS could not answer right now.",
+        originalMessages: messages,
+      });
+      return createUIMessageStreamResponse({ stream });
     }
     const result = (await response.json()) as
       CoachApiResponse | OnboardingApiResponse;
