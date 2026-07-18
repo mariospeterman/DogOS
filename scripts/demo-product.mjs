@@ -83,7 +83,6 @@ start(["--filter", "@dogos/api", "exec", "tsx", "src/server.ts"], {
   NODE_OPTIONS: "--conditions=development",
   USE_MOCK_PROVIDERS: "true",
   WEB_ORIGIN: webOrigin,
-  WHATSAPP_MODE: "simulator",
 });
 start(
   [
@@ -106,13 +105,13 @@ start(
 
 await Promise.all([
   waitFor(`${apiOrigin}/health/ready`),
-  waitFor(`${webOrigin}/app/today`),
+  waitFor(`${webOrigin}/app/coach`),
 ]);
 
 console.log(`
 DogOS local product is ready
 
-Today:    ${webOrigin}/app/today
+Coach:    ${webOrigin}/app/coach
 Plan:     ${webOrigin}/app/plan
 Account:  ${webOrigin}/app/account
 API:      ${apiOrigin}/openapi.json

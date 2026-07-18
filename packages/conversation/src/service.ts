@@ -60,6 +60,28 @@ export class CoachConversationService {
       (message) =>
         message.id === `${input.channel}:client:${input.clientMessageId}`,
     );
+    const deterministicReply = composeCoachReply({
+      context: input.context,
+      ...(input.contextKind === undefined
+        ? {}
+        : { contextKind: input.contextKind }),
+      currentLocale: conversation.locale,
+      links: input.links,
+      message: input.message,
+    });
+    if (existing !== undefined) {
+      const existingReply = conversation.messages.find(
+        (message) =>
+          message.id ===
+          `${input.channel}:client:reply:${input.clientMessageId}`,
+      );
+      if (existingReply !== undefined) {
+        return {
+          conversation,
+          reply: { ...deterministicReply, text: existingReply.content },
+        };
+      }
+    }
     if (existing === undefined) {
       await this.store.append({
         actorUserId: input.scope.actorUserId,
@@ -77,15 +99,6 @@ export class CoachConversationService {
         traceId: input.traceId,
       });
     }
-    const deterministicReply = composeCoachReply({
-      context: input.context,
-      ...(input.contextKind === undefined
-        ? {}
-        : { contextKind: input.contextKind }),
-      currentLocale: conversation.locale,
-      links: input.links,
-      message: input.message,
-    });
     let reply = deterministicReply;
     if (this.generator !== undefined) {
       try {
@@ -126,47 +139,5 @@ export class CoachConversationService {
       traceId: input.traceId,
     });
     return { conversation: await this.store.get(conversation.id), reply };
-  }
-
-  async recordWhatsAppExchange(input: {
-    contextKind?: CoachContextKind;
-    contactId: string;
-    inboundId: string;
-    inboundText: string;
-    outboundId: string;
-    outboundText: string;
-    scope: CoachScope;
-    traceId: string;
-  }): Promise<CoachConversation> {
-    const conversation = await this.store.ensure({
-      ...input.scope,
-      channel: "whatsapp",
-      externalBindingId: input.contactId,
-    });
-    await this.store.append({
-      actorUserId: input.scope.actorUserId,
-      channel: "whatsapp",
-      content: input.inboundText,
-      ...(input.contextKind === undefined
-        ? {}
-        : { contextKind: input.contextKind }),
-      conversationId: conversation.id,
-      providerMessageId: input.inboundId,
-      role: "user",
-      traceId: input.traceId,
-    });
-    await this.store.append({
-      actorUserId: null,
-      channel: "whatsapp",
-      content: input.outboundText,
-      ...(input.contextKind === undefined
-        ? {}
-        : { contextKind: input.contextKind }),
-      conversationId: conversation.id,
-      providerMessageId: input.outboundId,
-      role: "assistant",
-      traceId: input.traceId,
-    });
-    return this.store.get(conversation.id);
   }
 }

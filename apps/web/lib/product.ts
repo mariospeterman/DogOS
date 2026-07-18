@@ -5,6 +5,7 @@ import { dogosApiHeaders, dogosApiUrl } from "./api-client";
 
 export interface ProductDashboard {
   baselineSuccessRate: number;
+  behaviorConcernDescription?: string;
   calendar: Array<{
     durationSeconds: number;
     id: string;
@@ -22,6 +23,7 @@ export interface ProductDashboard {
   } | null;
   dogId: string;
   dogName: string;
+  dogProfileSummary?: string;
   goal: string;
   goalText: string;
   latestDecision: string;

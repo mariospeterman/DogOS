@@ -30,8 +30,6 @@
     "demo:agent-tools": "NODE_OPTIONS=--conditions=development tsx scripts/demo-agent-tools.ts",
     "demo:mcp": "pnpm --filter @dogos/mcp-server demo",
     "mcp:serve": "pnpm --filter @dogos/mcp-server start",
-    "whatsapp:verify-config": "node --env-file-if-exists=.env.local scripts/run-tsx-with-env.mjs scripts/verify-whatsapp-config.ts",
-    "whatsapp:run-pilot": "node --env-file-if-exists=.env.local scripts/run-tsx-with-env.mjs scripts/run-whatsapp-pilot.ts",
     "test:e2e": "playwright test",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "turbo run typecheck"

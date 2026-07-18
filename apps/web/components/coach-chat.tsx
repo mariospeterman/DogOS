@@ -97,6 +97,7 @@ function CoachRuntime({
 }) {
   const [input, setInput] = useState("");
   const viewport = useRef<HTMLDivElement>(null);
+  const deepLinkSent = useRef(false);
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -124,6 +125,17 @@ function CoachRuntime({
       top: viewport.current.scrollHeight,
     });
   }, [messages, status]);
+
+  useEffect(() => {
+    if (deepLinkSent.current) return;
+    const url = new URL(window.location.href);
+    const prompt = url.searchParams.get("prompt")?.trim();
+    if (prompt === undefined || prompt.length === 0) return;
+    deepLinkSent.current = true;
+    url.searchParams.delete("prompt");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    void sendMessage({ text: prompt.slice(0, 500) });
+  }, [sendMessage]);
 
   async function submit(text = input) {
     const value = text.trim();

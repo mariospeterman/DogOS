@@ -85,7 +85,7 @@ export default function AccountPage() {
             <MessageCircle />
             Coaching
           </span>
-          <strong>WhatsApp</strong>
+          <strong>DogOS App</strong>
         </div>
         <div>
           <span>

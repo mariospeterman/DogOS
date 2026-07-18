@@ -22,7 +22,6 @@
     "@dogos/telemetry": "workspace:*",
     "@dogos/testing": "workspace:*",
     "@dogos/training-engine": "workspace:*",
-    "@dogos/whatsapp": "workspace:*",
     "@fastify/cors": "11.3.0",
     "@fastify/swagger": "9.7.0",
     "fastify": "5.10.0",

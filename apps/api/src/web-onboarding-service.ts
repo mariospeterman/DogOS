@@ -5,7 +5,7 @@ import {
   type ConversationLocale,
   type ConversationSnapshot,
   type OnboardingAnswerState,
-} from "@dogos/whatsapp";
+} from "@dogos/conversation";
 import type { OnboardingService } from "./onboarding-service.js";
 
 interface OnboardingInterpretation {
@@ -69,8 +69,16 @@ function message(role: OnboardingMessage["role"], content: string) {
 function snapshotOf(
   view: ConversationSnapshot & { prompt: string },
 ): ConversationSnapshot {
-  const { prompt: _prompt, ...snapshot } = view;
-  return snapshot;
+  return {
+    answers: view.answers,
+    audit: view.audit,
+    country: view.country,
+    currency: view.currency,
+    locale: view.locale,
+    ...(view.notes === undefined ? {} : { notes: view.notes }),
+    state: view.state,
+    timezone: view.timezone,
+  };
 }
 
 function parseStoredState(value: unknown): OnboardingChatState | null {
@@ -95,7 +103,6 @@ function fallbackInterpretation(
   text: string,
   snapshot: ConversationSnapshot,
 ): OnboardingInterpretation {
-  const lower = text.toLocaleLowerCase();
   const locale: ConversationLocale = /\b(the|and|with|dog|years?|old)\b/i.test(
     text,
   )

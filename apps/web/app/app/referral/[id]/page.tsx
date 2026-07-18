@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../../../components/app-shell";
-import { whatsappCoachUrl } from "../../../../lib/whatsapp";
+import { coachHref } from "../../../../lib/coach";
 
 export default function ReferralPage() {
   return (
@@ -53,14 +53,14 @@ export default function ReferralPage() {
           Bei akuter Gefahr nutze den lokalen tiermedizinischen Notdienst.
         </span>
       </div>
-      <a
+      <Link
         className="button secondary wide"
-        href={whatsappCoachUrl(
+        href={coachHref(
           "Ich möchte eine Beobachtung für die professionelle Einordnung ergänzen.",
         )}
       >
         <MessageCircle size={18} /> Beobachtung im Coach ergänzen
-      </a>
+      </Link>
       <Link className="text-link" href="/app/trainers">
         Fachnetzwerk ansehen <ArrowRight size={16} />
       </Link>

@@ -9,7 +9,7 @@ import {
 import { assessSafety, developmentSafetyRuleSet } from "@dogos/safety-engine";
 import { generatePlan } from "@dogos/training-engine";
 import type { Anamnesis, SafetyEvent } from "@dogos/contracts";
-import type { ConversationSnapshot, ProviderContact } from "@dogos/whatsapp";
+import type { ConversationSnapshot } from "@dogos/conversation";
 
 const goalByChoice = {
   "goal_selection.choice.1": "goal.loose_leash_walking",
@@ -136,58 +136,11 @@ function ids(): OnboardingIds {
 export class OnboardingService {
   constructor(private readonly repository: OnboardingRepository) {}
 
-  findByContact(contactId: string): Promise<DogProductContext | null> {
-    return this.repository.findByContact(contactId);
-  }
-
-  async project(
-    contact: ProviderContact,
-    snapshot: ConversationSnapshot,
-  ): Promise<DogProductContext> {
-    if (contact.userId === null || contact.householdId === null) {
-      throw new Error("LINKED_CONTACT_REQUIRED");
-    }
-    return this.projectSource(
-      {
-        actorUserId: contact.userId,
-        channel: "whatsapp",
-        contactId: contact.id,
-        householdId: contact.householdId,
-        ownerUserId: null,
-      },
-      snapshot,
-    );
-  }
-
-  projectOwner(
+  async projectOwner(
     input: { actorUserId: string; householdId: string },
     snapshot: ConversationSnapshot,
   ): Promise<DogProductContext> {
-    return this.projectSource(
-      {
-        ...input,
-        channel: "pwa",
-        contactId: null,
-        ownerUserId: input.actorUserId,
-      },
-      snapshot,
-    );
-  }
-
-  private async projectSource(
-    source: {
-      actorUserId: string;
-      channel: "pwa" | "whatsapp";
-      contactId: string | null;
-      householdId: string;
-      ownerUserId: string | null;
-    },
-    snapshot: ConversationSnapshot,
-  ): Promise<DogProductContext> {
-    const existing =
-      source.contactId === null
-        ? await this.repository.findByOwner(source.actorUserId)
-        : await this.repository.findByContact(source.contactId);
+    const existing = await this.repository.findByOwner(input.actorUserId);
     if (existing !== null && existing.planStatus !== "setup_required") {
       return existing;
     }
@@ -346,10 +299,7 @@ export class OnboardingService {
                 experienceLevel: "unknown",
               },
               presentationLocale: facts.locale,
-              releaseChannel:
-                source.channel === "whatsapp"
-                  ? "channel.whatsapp"
-                  : "channel.web",
+              releaseChannel: "channel.web",
               safetyAssessment: safety,
             },
             mode: "development",
@@ -392,13 +342,10 @@ export class OnboardingService {
       .update(JSON.stringify(snapshot))
       .digest("hex");
     return this.repository.persist({
-      actorUserId: source.actorUserId,
-      channel: source.channel,
-      contactId: source.contactId,
+      actorUserId: input.actorUserId,
       facts,
-      householdId: source.householdId,
+      householdId: input.householdId,
       ids: entityIds,
-      ownerUserId: source.ownerUserId,
       plan,
       riskAssessment: safety,
       snapshotHash,

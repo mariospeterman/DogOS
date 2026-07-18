@@ -1,11 +1,7 @@
 import { createHash } from "node:crypto";
 import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
-import Fastify, {
-  type FastifyInstance,
-  type FastifyReply,
-  type FastifyRequest,
-} from "fastify";
+import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import rawBody from "fastify-raw-body";
 import {
   localAgentIdentities,
@@ -15,7 +11,6 @@ import {
   CoachConversationService,
   InMemoryCoachConversationStore,
 } from "@dogos/conversation";
-import type { WhatsAppWebhookService } from "@dogos/whatsapp";
 import {
   IdempotencyConflictError,
   type AccountRepository,
@@ -163,13 +158,7 @@ export interface BuildAppOptions {
   usage?: Pick<CapabilityUsageRepository, "consumeCoachingMessage">;
   product?: LocalProductFixture;
   signedActions?: SignedActionService;
-  twilio?: {
-    inboundWebhookUrl: string;
-    service: WhatsAppWebhookService;
-    statusCallbackUrl: string;
-  };
   webOrigin?: string;
-  whatsapp?: WhatsAppWebhookService;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -315,58 +304,6 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       routes.swagger(),
     );
 
-    if (options.whatsapp !== undefined && options.twilio === undefined) {
-      routes.get(
-        "/webhooks/whatsapp",
-        { schema: { hide: true } },
-        async (request, reply) => {
-          const query = request.query as Record<string, unknown>;
-          const challenge = await options.whatsapp!.verifySubscription({
-            challenge: String(query["hub.challenge"] ?? ""),
-            mode: String(query["hub.mode"] ?? ""),
-            verifyToken: String(query["hub.verify_token"] ?? ""),
-          });
-          if (challenge === null) return reply.status(403).send();
-          return reply.type("text/plain").send(challenge);
-        },
-      );
-      routes.post(
-        "/webhooks/whatsapp",
-        {
-          config: { rawBody: true },
-          schema: {
-            hide: true,
-            headers: {
-              type: "object",
-              required: ["x-hub-signature-256"],
-              properties: { "x-hub-signature-256": { type: "string" } },
-            },
-          },
-        },
-        async (request, reply) => {
-          const raw = (request as FastifyRequest & { rawBody?: string })
-            .rawBody;
-          if (raw === undefined)
-            throw new ApiError(400, "VALIDATION_FAILED", "Raw body required");
-          const signature = request.headers["x-hub-signature-256"];
-          if (typeof signature !== "string")
-            throw new ApiError(400, "VALIDATION_FAILED", "Signature required");
-          try {
-            await options.whatsapp!.process(raw, signature);
-          } catch (error) {
-            if (
-              error instanceof Error &&
-              error.message === "WHATSAPP_SIGNATURE_INVALID"
-            ) {
-              return reply.status(401).send();
-            }
-            throw error;
-          }
-          return reply.status(200).send({ received: true });
-        },
-      );
-    }
-
     if (options.billing !== undefined) {
       routes.post(
         "/webhooks/stripe",
@@ -394,176 +331,6 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             return reply.status(400).send();
           }
           return reply.status(200).send({ received: true });
-        },
-      );
-    }
-
-    if (options.twilio !== undefined) {
-      const twilioHeaders = {
-        type: "object",
-        required: ["x-twilio-signature"],
-        properties: { "x-twilio-signature": { type: "string" } },
-      } as const;
-      const processTwilioWebhook = async (
-        request: FastifyRequest,
-        reply: FastifyReply,
-        kind: "inbound" | "status",
-      ) => {
-        const raw = (request as FastifyRequest & { rawBody?: string }).rawBody;
-        const signature = request.headers["x-twilio-signature"];
-        if (raw === undefined || typeof signature !== "string") {
-          return reply.status(400).send();
-        }
-        try {
-          if (kind === "inbound") {
-            await options.twilio!.service.process(raw, signature, {
-              url: options.twilio!.inboundWebhookUrl,
-            });
-          } else {
-            await options.twilio!.service.processDeliveryStatuses(
-              raw,
-              signature,
-              { url: options.twilio!.statusCallbackUrl },
-            );
-          }
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            error.message === "WHATSAPP_SIGNATURE_INVALID"
-          ) {
-            return reply.status(403).send();
-          }
-          throw error;
-        }
-        return kind === "inbound"
-          ? reply.type("text/xml").send("<Response></Response>")
-          : reply.status(204).send();
-      };
-      routes.post(
-        "/webhooks/whatsapp/twilio",
-        {
-          config: { rawBody: true },
-          schema: { hide: true, headers: twilioHeaders },
-        },
-        async (request, reply) =>
-          processTwilioWebhook(request, reply, "inbound"),
-      );
-      routes.post(
-        "/webhooks/whatsapp/twilio/status",
-        {
-          config: { rawBody: true },
-          schema: { hide: true, headers: twilioHeaders },
-        },
-        async (request, reply) =>
-          processTwilioWebhook(request, reply, "status"),
-      );
-    }
-
-    if (options.whatsapp !== undefined) {
-      routes.post(
-        "/v1/whatsapp/link/confirm",
-        {
-          schema: {
-            operationId: "confirmWhatsAppIdentity",
-            tags: ["account"],
-            headers: authHeaders,
-            body: {
-              type: "object",
-              additionalProperties: false,
-              required: ["token"],
-              properties: {
-                token: { type: "string", minLength: 20, maxLength: 200 },
-              },
-            },
-            response: { 200: stateSchema, ...commonResponses },
-          },
-        },
-        async (request) => {
-          const actor = await authenticator.authenticate(
-            request.headers,
-            request.id,
-          );
-          if (actor.role !== "owner" || actor.householdId === null)
-            throw new ApiError(
-              403,
-              "ACCESS_DENIED",
-              "Owner authentication required",
-            );
-          return options.whatsapp!.confirmIdentity(
-            (request.body as { token: string }).token,
-            actor.actorId,
-            actor.householdId,
-          );
-        },
-      );
-      routes.post(
-        "/v1/whatsapp/unlink",
-        {
-          schema: {
-            operationId: "unlinkWhatsAppIdentity",
-            tags: ["account"],
-            headers: mutationHeaders,
-            body: {
-              type: "object",
-              additionalProperties: false,
-              required: ["contactId"],
-              properties: {
-                contactId: { type: "string", minLength: 1, maxLength: 120 },
-              },
-            },
-            response: { 200: stateSchema, ...commonResponses },
-          },
-        },
-        async (request) => {
-          const actor = await authenticator.authenticate(
-            request.headers,
-            request.id,
-          );
-          if (actor.role !== "owner")
-            throw new ApiError(
-              403,
-              "ACCESS_DENIED",
-              "Owner authentication required",
-            );
-          await options.whatsapp!.unlink(
-            (request.body as { contactId: string }).contactId,
-          );
-          return { unlinked: true, traceId: request.id };
-        },
-      );
-      routes.post(
-        "/v1/whatsapp/delete-data",
-        {
-          schema: {
-            operationId: "deleteWhatsAppData",
-            tags: ["account"],
-            headers: mutationHeaders,
-            body: {
-              type: "object",
-              additionalProperties: false,
-              required: ["contactId"],
-              properties: {
-                contactId: { type: "string", minLength: 1, maxLength: 120 },
-              },
-            },
-            response: { 200: stateSchema, ...commonResponses },
-          },
-        },
-        async (request) => {
-          const actor = await authenticator.authenticate(
-            request.headers,
-            request.id,
-          );
-          if (actor.role !== "owner")
-            throw new ApiError(
-              403,
-              "ACCESS_DENIED",
-              "Owner authentication required",
-            );
-          await options.whatsapp!.deleteContact(
-            (request.body as { contactId: string }).contactId,
-          );
-          return { deleted: true, traceId: request.id };
         },
       );
     }
@@ -941,7 +708,20 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           channel: "web",
           clientMessageId: key(request),
           context: {
+            ...(dashboard?.baselineSuccessRate === undefined
+              ? {}
+              : { baselineSuccessRate: dashboard.baselineSuccessRate }),
+            ...(dashboard?.behaviorConcernDescription === undefined
+              ? {}
+              : {
+                  behaviorConcernDescription:
+                    dashboard.behaviorConcernDescription,
+                }),
+            currentStep: dashboard?.currentStep ?? null,
             dogName: dashboard?.dogName ?? snapshot.dog.name,
+            ...(dashboard?.dogProfileSummary === undefined
+              ? {}
+              : { dogProfileSummary: dashboard.dogProfileSummary }),
             durationMinutes: Math.round(
               (dashboard?.currentStep?.durationSeconds ?? 240) / 60,
             ),
@@ -949,7 +729,22 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             goal: presentGoal(dashboard?.goal ?? snapshot.goal, locale),
             latestDecision:
               dashboard?.latestDecision ?? snapshot.latestDecision,
+            ...(dashboard?.requiredConsecutiveSessions === undefined
+              ? {}
+              : {
+                  requiredConsecutiveSessions:
+                    dashboard.requiredConsecutiveSessions,
+                }),
+            ...(dashboard?.riskDisposition === undefined
+              ? {}
+              : { riskDisposition: dashboard.riskDisposition }),
+            ...(dashboard?.calendar === undefined
+              ? {}
+              : { schedule: dashboard.calendar }),
             stage: presentStage(dashboard?.currentStep?.stepCode, locale),
+            ...(dashboard?.targetSuccessRate === undefined
+              ? {}
+              : { targetSuccessRate: dashboard.targetSuccessRate }),
           },
           ...(body.contextKind === undefined
             ? {}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
 import { useProductDashboard } from "../../../lib/product";
 import { trainingPresentation } from "../../../lib/training-presentation";
-import { whatsappCoachUrl } from "../../../lib/whatsapp";
+import { coachHref } from "../../../lib/coach";
 
 export default function TodayPage() {
   const { error, loading, product } = useProductDashboard();
@@ -17,10 +17,10 @@ export default function TodayPage() {
       <AppShell title="Heute" eyebrow="Noch kein aktiver Plan">
         <section className="success-panel">
           <strong>Erzähl DogOS zuerst von deinem Hund</strong>
-          <p>{error ?? "Die kurze Aufnahme läuft direkt in WhatsApp."}</p>
-          <a className="button primary" href={whatsappCoachUrl()}>
-            WhatsApp öffnen
-          </a>
+          <p>{error ?? "Die kurze Aufnahme beginnt direkt im DogOS Coach."}</p>
+          <Link className="button primary" href="/app/coach">
+            Gespräch starten
+          </Link>
         </section>
       </AppShell>
     );
@@ -74,24 +74,20 @@ export default function TodayPage() {
           <Link className="button primary" href={sessionHref}>
             <Play size={18} /> Starten
           </Link>
-          <a
+          <Link
             className="button secondary"
-            href={whatsappCoachUrl(
-              `Erkläre mir ${product.dogName}s heutigen Trainingsblock.`,
-            )}
+            href={coachHref("Erkläre mir den heutigen Trainingsblock.")}
           >
             <MessageCircle size={18} /> Coach fragen
-          </a>
+          </Link>
         </div>
       </section>
-      <a
+      <Link
         className="reactive-note"
-        href={whatsappCoachUrl(
-          `Ich möchte eine neue Beobachtung zu ${product.dogName} festhalten.`,
-        )}
+        href={coachHref("Ich möchte eine neue Beobachtung festhalten.")}
       >
         Neue Beobachtung zu {product.dogName} im Coach festhalten
-      </a>
+      </Link>
     </AppShell>
   );
 }

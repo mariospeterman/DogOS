@@ -13,15 +13,7 @@ const prettierCli = join(root, "node_modules/prettier/bin/prettier.cjs");
 try {
   const result = spawnSync(
     process.execPath,
-    [
-      supabaseCli,
-      "gen",
-      "types",
-      "typescript",
-      "--local",
-      "--schema",
-      "api",
-    ],
+    [supabaseCli, "gen", "types", "typescript", "--local", "--schema", "api"],
     { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
   );
   if (result.status !== 0) {

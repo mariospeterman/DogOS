@@ -16,11 +16,10 @@ describe("API environment", () => {
     expect(environment).toEqual(
       expect.arrayContaining([
         "DATABASE_URL",
+        "DOGOS_LLM_MODE",
+        "OPENAI_API_KEY",
         "SUPABASE_SECRET_KEY",
-        "WHATSAPP_ACCESS_TOKEN",
-        "WHATSAPP_APP_SECRET",
-        "WHATSAPP_MODE",
-        "WHATSAPP_VERIFY_TOKEN",
+        "STRIPE_SECRET_KEY",
       ]),
     );
   });

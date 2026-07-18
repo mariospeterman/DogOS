@@ -1490,7 +1490,7 @@ a {
   }
 }
 
-/* One canonical Coach across DogOS and WhatsApp. */
+/* One canonical Coach across every DogOS product view. */
 .product-main-wide {
   max-width: 860px;
 }
@@ -1971,13 +1971,6 @@ a {
   }
   .bottom-nav a {
     font-size: 0.58rem;
-  }
-  .coach-contextbar a {
-    font-size: 0;
-  }
-  .coach-contextbar a::before {
-    content: "WhatsApp";
-    font-size: 0.7rem;
   }
 }
 @media (max-width: 720px) {

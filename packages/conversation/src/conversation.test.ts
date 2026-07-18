@@ -25,7 +25,7 @@ const links = {
   session: "/app/session/session-1",
 };
 
-describe("omnichannel Coach conversation", () => {
+describe("DogOS Coach conversation", () => {
   it("uses natural language rather than a language selector", () => {
     expect(inferCoachLocale("What should we train today?", "de-CH")).toBe("en");
     expect(inferCoachLocale("Was trainieren wir heute?", "en")).toBe("de-CH");
@@ -82,36 +82,16 @@ describe("omnichannel Coach conversation", () => {
     expect(reply.text).toMatch(/3 vergleichbaren Einheiten/);
   });
 
-  it("records web and WhatsApp in one ordered timeline", async () => {
-    const service = new CoachConversationService(
-      new InMemoryCoachConversationStore(),
-    );
-    await service.recordWhatsAppExchange({
-      contactId: "contact-1",
-      inboundId: "wa-in-1",
-      inboundText: "Heute",
-      outboundId: "wa-out-1",
-      outboundText: "Vier Minuten Orientierung.",
-      scope,
-      traceId: "trace-wa",
-    });
-    const result = await service.send({
-      channel: "web",
-      clientMessageId: "web-1",
-      context,
-      links,
-      message: "Warum dieser Block?",
-      scope,
-      traceId: "trace-web",
-    });
-    expect(
-      result.conversation.messages.map((message) => message.channel),
-    ).toEqual(["whatsapp", "whatsapp", "web", "web"]);
-  });
-
   it("deduplicates a retried web exchange", async () => {
+    let generations = 0;
     const service = new CoachConversationService(
       new InMemoryCoachConversationStore(),
+      {
+        generate: async () => {
+          generations += 1;
+          return `Generated reply ${generations}`;
+        },
+      },
     );
     const input = {
       channel: "web" as const,
@@ -122,9 +102,11 @@ describe("omnichannel Coach conversation", () => {
       scope,
       traceId: "trace-web",
     };
-    await service.send(input);
+    const first = await service.send(input);
     const replay = await service.send(input);
     expect(replay.conversation.messages).toHaveLength(2);
+    expect(replay.reply.text).toBe(first.reply.text);
+    expect(generations).toBe(1);
   });
 
   it("allows bounded presentation rewriting and falls back deterministically", async () => {

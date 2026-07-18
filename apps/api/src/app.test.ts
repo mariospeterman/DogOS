@@ -25,7 +25,7 @@ describe("health routes", () => {
 
     const allowed = await app.inject({
       method: "OPTIONS",
-      url: "/v1/whatsapp/link/confirm",
+      url: "/v1/onboarding/messages",
       headers: {
         origin: "https://mobile.dogos.test",
         "access-control-request-method": "POST",

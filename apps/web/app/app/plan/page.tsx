@@ -1,11 +1,12 @@
 "use client";
 
 import { Info, MessageCircle, Target } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
 import { PlanTabs } from "../../../components/plan-tabs";
 import { useProductDashboard } from "../../../lib/product";
 import { trainingPresentation } from "../../../lib/training-presentation";
-import { whatsappCoachUrl } from "../../../lib/whatsapp";
+import { coachHref } from "../../../lib/coach";
 
 export default function PlanPage() {
   const { loading, product } = useProductDashboard();
@@ -17,7 +18,7 @@ export default function PlanPage() {
       >
         {!loading ? (
           <p className="helper">
-            Schliesse zuerst die Aufnahme in WhatsApp ab.
+            Schliesse zuerst die Aufnahme im DogOS Coach ab.
           </p>
         ) : null}
       </AppShell>
@@ -72,14 +73,14 @@ export default function PlanPage() {
           <span>Entwicklungsprotokoll · professionelle Prüfung ausstehend</span>
         </div>
       </section>
-      <a
+      <Link
         className="button secondary wide"
-        href={whatsappCoachUrl(
-          `Erkläre mir ${product.dogName}s vollständigen Trainingsplan und warum der aktuelle Block jetzt passt.`,
+        href={coachHref(
+          "Erkläre mir den vollständigen Trainingsplan und warum der aktuelle Block jetzt passt.",
         )}
       >
         <MessageCircle size={18} /> Plan mit Coach besprechen
-      </a>
+      </Link>
     </AppShell>
   );
 }

@@ -7,9 +7,10 @@ import {
   MessageCircle,
   TrendingUp,
 } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
 import { useProductDashboard } from "../../../lib/product";
-import { whatsappCoachUrl } from "../../../lib/whatsapp";
+import { coachHref } from "../../../lib/coach";
 
 export default function ProgressPage() {
   const { loading, product } = useProductDashboard();
@@ -69,14 +70,14 @@ export default function ProgressPage() {
         <Info size={15} /> Beobachtete Zusammenhänge sind beschreibend und keine
         Ursache-Wirkungs-Aussage.
       </p>
-      <a
+      <Link
         className="button secondary wide"
-        href={whatsappCoachUrl(
-          `Fasse ${product.dogName}s Fortschritt zusammen und erkläre die nächste Entscheidung.`,
+        href={coachHref(
+          "Fasse den Fortschritt zusammen und erkläre die nächste Entscheidung.",
         )}
       >
         <MessageCircle size={18} /> Fortschritt besprechen
-      </a>
+      </Link>
     </AppShell>
   );
 }

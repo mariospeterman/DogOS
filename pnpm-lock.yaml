@@ -89,9 +89,6 @@ importers:
       '@dogos/training-engine':
         specifier: workspace:*
         version: link:../../packages/training-engine
-      '@dogos/whatsapp':
-        specifier: workspace:*
-        version: link:../../packages/whatsapp
       '@fastify/cors':
         specifier: 11.3.0
         version: 11.3.0

@@ -33,12 +33,9 @@ export interface OnboardingIds {
 
 export interface PersistOnboardingInput {
   actorUserId: string;
-  channel: "pwa" | "whatsapp";
-  contactId: string | null;
   facts: OnboardingFacts;
   householdId: string;
   ids: OnboardingIds;
-  ownerUserId: string | null;
   plan: Plan | null;
   riskAssessment: RiskAssessment;
   snapshotHash: string;
@@ -160,16 +157,6 @@ export class OnboardingRepository {
 
   async close(): Promise<void> {
     await this.#sql.end();
-  }
-
-  async findByContact(contactId: string): Promise<DogProductContext | null> {
-    const rows = await this.#sql`
-      select op.dog_id::text
-      from private.onboarding_projections op
-      where op.contact_id = ${contactId}::uuid
-    `;
-    const dogId = rows[0]?.dog_id;
-    return typeof dogId === "string" ? this.findByDog(dogId) : null;
   }
 
   async findByOwner(ownerUserId: string): Promise<DogProductContext | null> {
@@ -302,6 +289,13 @@ export class OnboardingRepository {
         gv.success_criteria,
         p.id::text as plan_id,
         coalesce(p.status, 'draft') as plan_status,
+        coalesce((
+          select replace(pa.decision_code::text, 'adjustment.', '')
+          from api.plan_adjustments pa
+          where pa.plan_id = p.id
+          order by pa.created_at desc
+          limit 1
+        ), 'repeat_step') as latest_decision,
         ra.disposition_code::text as disposition,
         (select count(*)::integer from api.sessions s where s.dog_id = d.id) as session_count,
         (
@@ -351,7 +345,7 @@ export class OnboardingRepository {
         ? { dogProfileSummary: row.dog_profile_summary }
         : {}),
       goal: String(row.goal),
-      latestDecision: "repeat_step",
+      latestDecision: String(row.latest_decision),
       planId: row.plan_id === null ? null : String(row.plan_id),
       planStatus:
         row.plan_id !== null
@@ -371,9 +365,6 @@ export class OnboardingRepository {
   }
 
   async persist(input: PersistOnboardingInput): Promise<DogProductContext> {
-    if ((input.contactId === null) === (input.ownerUserId === null)) {
-      throw new Error("ONBOARDING_SINGLE_SOURCE_REQUIRED");
-    }
     let projectedDogId = input.ids.dogId;
     await this.#sql.begin(
       "isolation level serializable",
@@ -382,8 +373,7 @@ export class OnboardingRepository {
         const existing = await tx`
         select dog_id, anamnesis_id, goal_id, plan_id
         from private.onboarding_projections
-        where (${input.contactId}::uuid is not null and contact_id = ${input.contactId}::uuid)
-           or (${input.ownerUserId}::uuid is not null and owner_user_id = ${input.ownerUserId}::uuid)
+        where owner_user_id = ${input.actorUserId}::uuid
         for update
       `;
         const projection = existing[0];
@@ -417,8 +407,7 @@ export class OnboardingRepository {
             update private.onboarding_projections
             set plan_id = ${input.ids.planId}, snapshot_hash = ${input.snapshotHash},
                 updated_at = now()
-            where (${input.contactId}::uuid is not null and contact_id = ${input.contactId}::uuid)
-               or (${input.ownerUserId}::uuid is not null and owner_user_id = ${input.ownerUserId}::uuid)
+            where owner_user_id = ${input.actorUserId}::uuid
           `;
           await tx`
             insert into private.audit_events
@@ -426,7 +415,7 @@ export class OnboardingRepository {
                trace_id, metadata)
             values (${input.actorUserId}, 'user', 'onboarding.plan_reconciled',
               'dog', ${projectedDogId}, ${input.snapshotHash},
-              ${tx.json({ channel: input.channel, reason: "setup_reconciled" })})
+              ${tx.json({ channel: "pwa", reason: "setup_reconciled" })})
           `;
           return;
         }
@@ -498,7 +487,7 @@ export class OnboardingRepository {
             (anamnesis_id, question_definition_id, raw_answer_locale,
              answer_value, source, collected_channel)
           values (${input.ids.anamnesisId}, ${questionIds.get(code)!},
-            ${input.facts.locale}, ${tx.json(value)}, 'owner_report', ${input.channel})
+            ${input.facts.locale}, ${tx.json(value)}, 'owner_report', 'pwa')
         `;
         }
         await tx`
@@ -581,7 +570,7 @@ export class OnboardingRepository {
         insert into private.onboarding_projections
           (contact_id, owner_user_id, snapshot_hash, dog_id, anamnesis_id, goal_id, plan_id,
            risk_assessment_id)
-        values (${input.contactId}, ${input.ownerUserId}, ${input.snapshotHash}, ${input.ids.dogId},
+        values (null, ${input.actorUserId}, ${input.snapshotHash}, ${input.ids.dogId},
           ${input.ids.anamnesisId}, ${input.ids.goalId},
           ${input.plan === null ? null : input.ids.planId}, ${input.ids.riskAssessmentId})
       `;
@@ -590,7 +579,7 @@ export class OnboardingRepository {
           (actor_user_id, actor_type, action, target_type, target_id, trace_id, metadata)
         values (${input.actorUserId}, 'user', 'onboarding.projected', 'dog',
           ${input.ids.dogId}, ${input.snapshotHash},
-          ${tx.json({ channel: input.channel, planGenerated: input.plan !== null })})
+          ${tx.json({ channel: "pwa", planGenerated: input.plan !== null })})
       `;
       },
     );

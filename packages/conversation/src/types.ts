@@ -1,4 +1,4 @@
-export type CoachChannel = "web" | "whatsapp";
+export type CoachChannel = "web";
 export type CoachMessageRole = "user" | "assistant" | "system";
 export type CoachContextKind =
   "today" | "plan" | "session" | "progress" | "general";

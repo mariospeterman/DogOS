@@ -7,7 +7,7 @@ import type { ModelRunRepository } from "@dogos/database";
 import type {
   ConversationSnapshot,
   OnboardingAnswerState,
-} from "@dogos/whatsapp";
+} from "@dogos/conversation";
 
 export interface CoachModelConfig {
   apiKey: string;
@@ -626,7 +626,7 @@ function instructionsFor(purpose: CoachGenerationPurpose): string[] {
       "Present the complete computed DogOS training plan in clear sections: objective, setup, sequence, schedule, measurement, and progression logic.",
       "Mention professional input only when canonicalContext or deterministicDraft explicitly requires it; never add a generic referral ending to a low-risk plan.",
       "Explain how and why without adding a protocol step that is absent from canonicalContext or deterministicDraft.",
-      "Fit the response into one WhatsApp message, normally no more than 500 words.",
+      "Use concise mobile-friendly sections; include every canonical plan element needed to act.",
       ...shared,
     ];
   }
@@ -634,7 +634,7 @@ function instructionsFor(purpose: CoachGenerationPurpose): string[] {
     return [
       "Write a concise professional handover using separate observed facts, missing data, measured progress, canonical decision, and questions for the professional.",
       "Do not state causal conclusions or medical diagnoses.",
-      "Fit the response into one WhatsApp message, normally no more than 550 words.",
+      "Use concise mobile-friendly sections and preserve all relevant handover evidence.",
       ...shared,
     ];
   }
@@ -643,7 +643,7 @@ function instructionsFor(purpose: CoachGenerationPurpose): string[] {
       "Explain the persisted measurements, missing data, confidence, and canonical decision in owner-friendly language.",
       "Distinguish observation from inference and do not claim causation from descriptive correlations.",
       "Explain what additional observation would materially improve confidence.",
-      "Fit the response into one WhatsApp message, normally no more than 450 words.",
+      "Use concise mobile-friendly sections without omitting relevant measurements.",
       ...shared,
     ];
   }

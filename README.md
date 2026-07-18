@@ -1,31 +1,38 @@
 # DogOS
 
-DogOS is a multilingual dog-training platform with coaching in WhatsApp and a
-thin web workspace for training, plans, progress, billing, and account data. It is
-Swiss-positioned and DACH-first commercially. German is the first reviewed
-launch content locale, not a technical product boundary. Its core is a
-contextual, deterministic training engine that turns anamnesis, safety checks,
-measurable goals, session evidence, and training history into versioned plans
-and explainable plan adjustments.
+DogOS is a mobile-first dog-training PWA. The authenticated Coach learns the
+dog, handler context, observable problem, goal, and baseline through a natural
+conversation. It then projects those facts into a versioned PostgreSQL record
+and a deterministic training plan. The same conversation remains the primary
+surface for explanations and daily coaching; Plan, Calendar, Progress, Session,
+Billing, and Account are focused supporting views.
 
-DogOS does not use a language model as the authority for training progression,
-safety, medical interpretation, or protocol creation. Initial protocols are
-development content and are not approved for production use.
+The language model extracts explicitly stated facts and presents computed
+results. It is not authoritative for safety disposition, protocol eligibility,
+progression, measurements, or plan adjustment. Initial training protocols are
+development content and still require professional review before release.
 
-## Current status
+## Architecture
 
-Phase 2 Slices 2.1 through 2.7 provide the pinned monorepo, local Supabase
-schema and RLS, deterministic multilingual engines, strict persistence mappers,
-transactional repositories, typed Fastify API and OpenAPI, signed actions, a
-provider-neutral WhatsApp integration, a canonical server-side Coach timeline,
-and the first mobile owner journey. Professional
-protocol, safety, legal, privacy, provider, and launch translation review remain
-production release blockers.
+```text
+Next.js PWA + Vercel AI SDK
+  -> authenticated Fastify API
+  -> compact structured dog context
+  -> OpenAI presentation/extraction adapter (optional)
+  -> deterministic DogOS engines
+  -> Supabase Auth + private PostgreSQL persistence
+```
 
-## Local development
+The app uses one durable Coach timeline per dog. Structured relational data is
+the source of truth for memory; conversation history is episodic context.
+Embeddings and model fine-tuning are intentionally deferred until evaluated
+retrieval failures justify them.
 
-Prerequisites: Node.js 24 LTS, Corepack, and Docker Desktop (used from Slice
-2.2 onward).
+See [Chat-first PWA architecture](docs/architecture/chat-first-pwa.md).
+
+## Local Development
+
+Prerequisites: Node.js 24 LTS, Corepack, and Docker Desktop.
 
 ```bash
 corepack enable
@@ -36,38 +43,42 @@ pnpm db:reset
 pnpm dev
 ```
 
-The web app runs at <http://localhost:3000> and the API health endpoint at
-<http://127.0.0.1:4000/health/live>. See the
-[local development runbook](docs/runbooks/local-development.md) for all checks
-and the current database workflow.
+Open <http://localhost:3000/app/coach>. The API health endpoint is
+<http://127.0.0.1:4000/health/live>.
 
-For the complete reset, seed, API, WhatsApp onboarding, and mobile review experience:
+For an isolated reset and review environment:
 
 ```bash
 pnpm demo:product
 ```
 
-## Phase 1 documentation
+## Verification
 
-- [Architecture](docs/architecture/phase-1.md)
-- [Domain model and contracts](docs/architecture/domain-model.md)
-- [Knowledge governance](docs/knowledge/governance.md)
-- [Safety and escalation](docs/safety/safety-escalation.md)
-- [WhatsApp, mobile, and referral flows](docs/product/whatsapp-mobile.md)
-- [Twilio WhatsApp Sandbox setup](docs/providers/twilio-whatsapp-sandbox.md)
-- [Worked training-plan examples](docs/product/worked-plan.md)
-- [Testing and approval gates](docs/testing/phase-1-approval.md)
+```bash
+pnpm lint
+pnpm format:check
+pnpm typecheck
+pnpm test
+pnpm test:integration
+pnpm test:e2e
+pnpm db:test
+pnpm db:lint
+pnpm build
+```
 
-The original research notes remain in [architecture](architecture) and
-[provider-mvp imporvment](provider-mvp%20imporvment).
+Production credentials belong in deployment secret storage. `.env.example` is
+the committed variable contract; `.env.local` is the uncommitted local source
+of truth.
 
-## Phase 2 implementation
+## Current Release Blockers
 
-- [Slice 2.1 foundation](docs/implementation/slice-2.1-foundation.md)
-- [Slice 2.2 database foundation](docs/implementation/slice-2.2-database.md)
-- [Slice 2.3 deterministic engines](docs/implementation/slice-2.3-engines.md)
-- [Slice 2.4 API and persistence](docs/implementation/slice-2.4-api-persistence.md)
-- [Slice 2.5 local product](docs/implementation/slice-2.5-local-product.md)
-- [Slice 2.6 authenticated WhatsApp](docs/implementation/slice-2.6-authenticated-whatsapp.md)
-- [Slice 2.7 omnichannel Coach](docs/implementation/slice-2.7-omnichannel-coach.md)
-- [RLS access matrix](docs/architecture/phase-2-2-rls-matrix.md)
+- professionally reviewed and versioned training protocols;
+- blind model evaluation for extraction and multilingual coaching quality;
+- privacy export, deletion, and retention workflows;
+- commercial Stripe catalog, tax, legal, and entitlement approval;
+- verified professional supply and referral governance;
+- asynchronous video analysis and later LiveKit live coaching;
+- real-device PWA acceptance and production deployment review.
+
+Historical Phase 1 and provider experiments remain under `docs/` and in old
+migrations for auditability; they are not part of the active PWA runtime.

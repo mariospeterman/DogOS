@@ -5,7 +5,6 @@ const webEnvironmentSchema = z.object({
   NEXT_PUBLIC_DOGOS_ENV: z
     .enum(["local", "preview", "production", "test"])
     .default("local"),
-  NEXT_PUBLIC_WHATSAPP_CHAT_URL: z.url().optional(),
 });
 
 const privateNamePattern = /(SECRET|SERVICE_ROLE|PRIVATE_KEY|ACCESS_TOKEN)/i;

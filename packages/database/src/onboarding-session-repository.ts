@@ -1,4 +1,4 @@
-import postgres, { type Sql } from "postgres";
+import postgres, { type JSONValue, type Sql } from "postgres";
 
 export interface StoredOnboardingSession {
   householdId: string;
@@ -44,7 +44,7 @@ export class OnboardingSessionRepository {
       const [row] = await this.#sql`
         insert into private.owner_onboarding_sessions
           (owner_user_id, household_id, state)
-        values (${input.ownerUserId}, ${input.householdId}, ${this.#sql.json(input.state)})
+        values (${input.ownerUserId}, ${input.householdId}, ${this.#sql.json(input.state as JSONValue)})
         on conflict (owner_user_id) do nothing
         returning state_version
       `;
@@ -54,7 +54,7 @@ export class OnboardingSessionRepository {
 
     const [row] = await this.#sql`
       update private.owner_onboarding_sessions
-      set state = ${this.#sql.json(input.state)},
+      set state = ${this.#sql.json(input.state as JSONValue)},
           state_version = state_version + 1,
           updated_at = now()
       where owner_user_id = ${input.ownerUserId}::uuid
