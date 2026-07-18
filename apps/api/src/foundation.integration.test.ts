@@ -18,7 +18,15 @@ describe("API foundation", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
-      checks: { api: "ready" },
+      checks: {
+        api: "ready",
+        database: "not_configured",
+        liveKit: "not_configured",
+        openAI: "deterministic",
+        stripe: "not_configured",
+        supabaseStorage: "deterministic",
+        workers: "in_process",
+      },
       status: "ready",
     });
   });

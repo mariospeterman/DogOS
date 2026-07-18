@@ -16,6 +16,9 @@ interface TransactionQuery {
   ): Promise<Array<Record<string, unknown>>>;
 }
 
+type JsonValue =
+  boolean | null | number | string | JsonValue[] | { [key: string]: JsonValue };
+
 export interface AppendCoachMessageInput {
   actorUserId: string | null;
   artifactRefs?: Array<{ id: string; kind: string; version: number | null }>;
@@ -216,10 +219,10 @@ export class PostgresCoachConversationStore implements CoachConversationStore {
         ${input.traceId},
         ${input.workspace ?? workspaceFromContext(input.contextKind)},
         ${input.secondaryTags ?? []},
-        ${JSON.stringify(input.artifactRefs ?? [])}::jsonb,
-        ${JSON.stringify(input.uiParts ?? [])}::jsonb,
+        ${this.#sql.json((input.artifactRefs ?? []) as JsonValue)},
+        ${this.#sql.json((input.uiParts ?? []) as JsonValue)},
         ${input.generationStatus ?? "completed"},
-        ${JSON.stringify({ traceId: input.traceId })}::jsonb
+        ${this.#sql.json({ traceId: input.traceId } as JsonValue)}
       )
       on conflict do nothing
       returning id::text, role, channel, content, context_kind,

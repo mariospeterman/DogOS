@@ -7,6 +7,9 @@ interface TransactionQuery {
   ): Promise<Array<Record<string, unknown>>>;
 }
 
+type JsonValue =
+  boolean | null | number | string | JsonValue[] | { [key: string]: JsonValue };
+
 export type MemoryFactCategory =
   | "stable_profile"
   | "episodic_event"
@@ -260,7 +263,7 @@ export class MemoryRepository implements MemoryStore {
         ${input.subject},
         ${input.value},
         ${input.sourceMessageId ?? null}::uuid,
-        ${JSON.stringify(input.evidenceRefs ?? [])}::jsonb,
+        ${this.#sql.json((input.evidenceRefs ?? []) as JsonValue)},
         ${input.confidence ?? 0.5}
       )
       returning *
@@ -289,6 +292,7 @@ export class MemoryRepository implements MemoryStore {
   ): Promise<MemoryFactRecord> {
     const [replacement] = await this.#sql.begin(async (transaction) => {
       const sql = transaction as unknown as TransactionQuery;
+      const tx = transaction as unknown as Sql;
       const existing = (await sql`
         select *
         from private.memory_facts
@@ -310,7 +314,7 @@ export class MemoryRepository implements MemoryStore {
           ${current.subject},
           ${input.value},
           ${current.source_message_id}::uuid,
-          ${JSON.stringify(current.evidence_refs)}::jsonb,
+          ${tx.json(current.evidence_refs as JsonValue)},
           ${current.confidence},
           ${current.sensitivity},
           'confirmed',
