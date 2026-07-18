@@ -18,6 +18,8 @@ create unique index account_attributions_one_first_touch_idx
   on private.account_attributions(auth_user_id)
   where source_code = 'source.landing_referral';
 
+drop function private.bootstrap_account(uuid, text, api.locale_tag);
+
 create or replace function private.bootstrap_account(
   p_auth_user_id uuid,
   p_display_name text,
@@ -160,8 +162,6 @@ $$;
 
 revoke all on table private.account_attributions from public, anon, authenticated;
 grant all on table private.account_attributions to service_role;
-revoke all on function private.bootstrap_account(uuid, text, api.locale_tag)
-  from public, anon, authenticated;
 revoke all on function private.bootstrap_account(uuid, text, api.locale_tag, text)
   from public, anon, authenticated;
 grant execute on function private.bootstrap_account(uuid, text, api.locale_tag, text)
