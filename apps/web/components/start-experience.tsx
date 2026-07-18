@@ -1,7 +1,12 @@
 "use client";
 
-import { ArrowRight, Check, MessageCircle } from "lucide-react";
-import Image from "next/image";
+import {
+  ArrowRight,
+  Bot,
+  Check,
+  LockKeyhole,
+  MessageCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -16,59 +21,97 @@ export function StartExperience() {
   }`;
 
   return (
-    <main className="start-screen">
-      <section className="start-brand">
-        <Image
-          src="/icons/dogos-192.png"
-          alt=""
-          width={72}
-          height={72}
-          priority
-        />
-        <div>
-          <span>DogOS</span>
-          <small>Der Coach, der deinen Hund kennt.</small>
+    <main className="public-chat-shell">
+      <header className="public-chat-header">
+        <Link href="/" className="chat-wordmark" aria-label="DogOS">
+          <span className="coach-mark">D</span>
+          <strong>DogOS</strong>
+        </Link>
+        <nav>
+          <Link href="/auth/sign-in">Anmelden</Link>
+          <Link className="button secondary" href={startUrl}>
+            Starten
+          </Link>
+        </nav>
+      </header>
+
+      <section className="public-chat-main">
+        <div className="public-chat-copy">
+          <p className="eyebrow">Chat-first Training</p>
+          <h1>DogOS Training Chat</h1>
+          <p>
+            Der einfache Workspace für Onboarding, Plan, Training, Fortschritt,
+            Video-Hinweise und Live Coaching.
+          </p>
+        </div>
+
+        <div className="public-chat-window" aria-label="DogOS Vorschau">
+          <div className="public-message assistant">
+            <span className="coach-avatar">D</span>
+            <div className="message-bubble assistant">
+              <p>
+                Erzähl mir kurz von deinem Hund und was ihr verbessern wollt.
+              </p>
+            </div>
+          </div>
+          <div className="public-message user">
+            <div className="message-bubble user">
+              <p>Echo kommt draussen nicht zuverlässig zurück.</p>
+            </div>
+          </div>
+          <div className="public-message assistant">
+            <span className="coach-avatar">D</span>
+            <div className="message-bubble assistant">
+              <p>
+                Ich starte mit einem sicheren Rückruf-Plan, kurzen Einheiten und
+                messbaren Fortschritten.
+              </p>
+            </div>
+          </div>
+          <div className="public-chat-card">
+            <Bot size={17} />
+            <span>
+              <strong>Plan, Memory, Video und Live</strong>
+              <small>
+                Alles bleibt im Coach-Kontext statt in getrennten Tools.
+              </small>
+            </span>
+          </div>
         </div>
       </section>
 
-      <section className="start-core">
-        <p className="eyebrow">Dein persönlicher Trainingscoach</p>
-        <h1>Erzähl mir von deinem Hund.</h1>
-        <p>
-          DogOS erinnert sich an Training, Fortschritt und das, was bei euch
-          funktioniert. Daraus entsteht Schritt für Schritt euer Plan.
-        </p>
-        <Link className="button primary start-primary" href={startUrl}>
-          <MessageCircle size={20} /> Gespräch starten
+      <section className="public-prompt-panel">
+        <div>
+          <MessageCircle size={18} />
+          <span>Starte mit dem ersten Satz über deinen Hund.</span>
+        </div>
+        <Link className="button primary" href={startUrl}>
+          Gespräch starten
           <ArrowRight size={18} />
         </Link>
-        <ul className="start-proof">
+      </section>
+
+      <section className="public-proof-row">
+        <ul>
           <li>
-            <Check size={16} /> Natürlich schreiben statt Formulare ausfüllen
+            <Check size={16} /> Supabase Auth mit Referral-Erhalt
           </li>
           <li>
-            <Check size={16} /> Ein Coach für Plan, Training und Fortschritt
+            <Check size={16} /> Chat UI mit Training Cards
           </li>
           <li>
-            <Check size={16} /> Als App installierbar, direkt im Browser nutzbar
+            <LockKeyhole size={16} /> Keine Diagnose oder Notfallhilfe
           </li>
         </ul>
       </section>
 
-      <section className="start-return">
+      <section className="start-return compact-public">
         <div>
           <strong>DogOS auf diesem Gerät</strong>
-          <span>Schneller zurück zum Coach und aktuellen Training.</span>
+          <span>Installieren, teilen oder direkt zurück zum Coach.</span>
         </div>
         <DistributionActions compact />
       </section>
-
-      <Link className="start-login" href="/auth/sign-in">
-        Schon verbunden? DogOS öffnen <ArrowRight size={16} />
-      </Link>
-      <p className="start-disclosure">
-        KI-gestützter Trainingscoach. Keine Diagnose oder Notfallhilfe.
-      </p>
     </main>
   );
 }

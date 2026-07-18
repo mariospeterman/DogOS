@@ -311,9 +311,11 @@ test("chat-first Coach and management views remain one PWA", async ({
     ).toBeVisible();
   }
   await page.goto("/app/plan");
-  await expect(
-    page.getByRole("link", { name: "Plan mit Coach besprechen" }),
-  ).toHaveAttribute("href", /\/app\/coach\?prompt=/);
+  await expect(page).toHaveURL(/\/app\/coach\?space=plan/);
+  await expect(navigation.getByRole("link", { name: "Plan" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 });
 
 test("account language follows conversation without a selector", async ({
@@ -355,15 +357,16 @@ test("public start opens account creation and preserves referral attribution", a
   await page.goto("/?ref=DOGOS26");
   await expect(
     page.getByRole("heading", {
-      name: "Erzähl mir von deinem Hund.",
+      name: "DogOS Training Chat",
     }),
   ).toBeVisible();
   const start = page.getByRole("link", { name: /Gespräch starten/ });
   await expect(start).toHaveAttribute("href", /\/auth\/sign-up/);
   await expect(start).toHaveAttribute("href", /ref=DOGOS26/);
-  await expect(
-    page.getByRole("link", { name: /DogOS öffnen/ }),
-  ).toHaveAttribute("href", "/auth/sign-in");
+  await expect(page.getByRole("link", { name: "Anmelden" })).toHaveAttribute(
+    "href",
+    "/auth/sign-in",
+  );
   await page.locator("main").screenshot({
     path: resolve(screenshots, `start-${testInfo.project.name}.png`),
   });
