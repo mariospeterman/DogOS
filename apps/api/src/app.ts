@@ -334,6 +334,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
                               ? "Request validation failed"
                               : "The request could not be completed",
                           );
+    if (apiError.status >= 500) {
+      request.log.error({ error }, "Unhandled DogOS API error");
+    }
     void reply.status(apiError.status).send({
       error: { code: apiError.code, message: apiError.message },
       traceId: request.id,

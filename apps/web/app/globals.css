@@ -1775,6 +1775,33 @@ a {
 .auth-form .button {
   margin-top: 18px;
 }
+.live-room {
+  background: #151b22;
+  border: 1px solid var(--line);
+  margin-top: 14px;
+  min-height: 520px;
+  overflow: hidden;
+}
+.live-room .lk-room-container {
+  --lk-bg: #151b22;
+  background: #151b22;
+  min-height: 520px;
+}
+.live-room__bar {
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f6f8fb;
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+.live-room__bar span {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
 .auth-links {
   display: flex;
   justify-content: space-between;

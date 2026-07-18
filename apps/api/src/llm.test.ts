@@ -89,14 +89,14 @@ describe("coach model configuration", () => {
     ).toThrow("DOGOS_LLM_CHAT_MAX_OUTPUT_TOKENS_INVALID");
     expect(() =>
       loadCoachModelConfig({
-        DOGOS_ENV: "production",
+        DOGOS_ENV: "staging",
         DOGOS_LLM_MODE: "openai",
         OPENAI_API_KEY: "test-key",
       }),
     ).toThrow("DOGOS_MODEL_SNAPSHOT_APPROVAL_REQUIRED");
     expect(
       loadCoachModelConfig({
-        DOGOS_ENV: "production",
+        DOGOS_ENV: "staging",
         DOGOS_LLM_MODE: "openai",
         DOGOS_MODEL_SNAPSHOT_APPROVAL: "dogos-coach-openai-2026-07-18-reviewed",
         OPENAI_API_KEY: "test-key",

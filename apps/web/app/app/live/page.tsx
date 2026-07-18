@@ -1,6 +1,13 @@
 "use client";
 
 import {
+  ConnectionState,
+  ControlBar,
+  LiveKitRoom,
+  RoomAudioRenderer,
+  VideoConference,
+} from "@livekit/components-react";
+import {
   CheckCircle2,
   PhoneOff,
   Radio,
@@ -171,10 +178,42 @@ export default function LivePage() {
             <span>
               <CheckCircle2 />
               Sitzungsstatus
-              <small>{session.roomName}</small>
+              <small>LiveKit Raum verbunden ohne sichtbare Zugangsdaten.</small>
             </span>
             <strong>{session.plannedMinutes} Min.</strong>
           </div>
+        </section>
+      )}
+
+      {session === null || liveKit === null ? null : (
+        <section className="live-room" aria-label="Live Coaching Raum">
+          <LiveKitRoom
+            audio
+            connect
+            serverUrl={liveKit.url}
+            token={liveKit.token}
+            video
+          >
+            <div className="live-room__bar">
+              <span>
+                <Radio size={16} />
+                <ConnectionState />
+              </span>
+              <strong>{session.plannedMinutes} Min.</strong>
+            </div>
+            <VideoConference />
+            <RoomAudioRenderer />
+            <ControlBar
+              controls={{
+                camera: true,
+                chat: false,
+                leave: true,
+                microphone: true,
+                screenShare: false,
+              }}
+              saveUserChoices
+            />
+          </LiveKitRoom>
         </section>
       )}
 

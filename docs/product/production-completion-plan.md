@@ -1,12 +1,12 @@
 # DogOS Production Completion Plan
 
-Status: execution plan after the chat-first multimodal wiring slice, 2026-07-18.
+Status: execution plan after the OpenAI/video/LiveKit activation slice, 2026-07-18.
 
 ## Locked Sequence
 
 1. Repository and provider-contract audit.
    - Keep `pnpm demo:product` deterministic.
-   - Keep production model mode behind `DOGOS_LLM_MODE=openai`, reviewed snapshots, eval gates, privacy approval, and protocol approval.
+   - Keep staging and production model mode behind `DOGOS_LLM_MODE=openai`, reviewed snapshots, eval gates, privacy approval, and protocol approval.
    - Maintain one provider-neutral API contract and hide provider-specific streaming details behind DogOS endpoints.
 
 2. Supabase update, migrations, storage, and hosted environment readiness.
@@ -15,6 +15,7 @@ Status: execution plan after the chat-first multimodal wiring slice, 2026-07-18.
    - Keep exposed `api` tables protected by RLS plus explicit grants; keep private/provider tables server-only.
    - Ensure `dog-media` private storage accepts DogOS video MIME types and size limits before enabling real video uploads.
    - Verify Auth redirect URLs, publishable browser keys, server-only secret keys, JWT expiry, and production `DOGOS_AUTH_MODE=supabase`.
+   - On 2026-07-18 the hosted Supabase database used by local `.env.local` was advanced through `20260718190000_production_readiness_contracts.sql`.
 
 3. Landing page, referral attribution, signup, and account bootstrap.
    - Landing page starts a chat-first sign-up flow and preserves bounded `ref` codes.
@@ -30,14 +31,16 @@ Status: execution plan after the chat-first multimodal wiring slice, 2026-07-18.
 
 5. Asynchronous video upload and analysis.
    - Use Supabase signed upload URLs for private `dog-media` objects when hosted Supabase storage is configured.
-   - Add malware/content checks, external video model routing, background job state, and retry/dead-letter handling.
+   - OpenAI frame-analysis adapter is available behind `DOGOS_VIDEO_ANALYSIS_PROVIDER=openai`.
+   - Add `ffmpeg` frame extraction on the worker host, malware/content checks, background job execution, and retry/dead-letter handling.
    - Store extracted observations separately from canonical training decisions.
    - Return video findings as inline chat cards with confidence, missing data, and safety limitations.
 
 6. LiveKit live coaching.
    - Use LiveKit only for media transport.
+   - Web UI uses official LiveKit React room components and no longer exposes raw token/debug UI.
    - DogOS remains authoritative for auth, entitlements, retention, session state, and generated coaching.
-   - Persist live session transcript, user-approved observations, minutes consumed, and post-session summary.
+   - Configure `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET`, then persist live transcript, user-approved observations, minutes consumed, and post-session summary.
 
 7. Entitlements, Stripe, trainer workflows, and chat-native upgrades.
    - Enforce video analyses, live minutes, plan adjustments, concurrent dogs, and coaching messages through shared capability usage.

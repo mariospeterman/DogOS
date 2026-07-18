@@ -22,6 +22,14 @@ export interface CoachModelConfig {
 export type CoachGenerationPurpose =
   "chat" | "evidence" | "onboarding" | "plan" | "professional_summary";
 
+function requiresApprovedSnapshot(environment: NodeJS.ProcessEnv): boolean {
+  const dogosEnv = environment.DOGOS_ENV ?? "local";
+  if (["local", "test", "ci", "development"].includes(dogosEnv)) {
+    return environment.DOGOS_REQUIRE_MODEL_SNAPSHOT === "1";
+  }
+  return true;
+}
+
 export interface CoachGenerationProfile {
   maxOutputTokens: number;
   timeoutMs: number;
@@ -150,7 +158,7 @@ export function loadCoachModelConfig(
       },
     },
   };
-  if (environment.DOGOS_ENV === "production") {
+  if (requiresApprovedSnapshot(environment)) {
     assertApprovedCoachModelSnapshot({
       freeModel: config.freeModel,
       onboardingModel: config.onboardingModel,

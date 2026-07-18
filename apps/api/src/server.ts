@@ -33,6 +33,7 @@ import {
   loadSupabaseStorageConfig,
   SupabaseVideoUploadSigner,
 } from "./storage.js";
+import { loadVideoAnalysisConfig } from "./video-analysis.js";
 import { WebOnboardingService } from "./web-onboarding-service.js";
 
 const environment = loadApiEnv(process.env);
@@ -69,6 +70,7 @@ const videoUploads =
   storageConfig === null
     ? undefined
     : new SupabaseVideoUploadSigner(storageConfig);
+const videoAnalysisConfig = loadVideoAnalysisConfig(process.env);
 const stripeConfig = loadStripeBillingConfig(process.env);
 const billingRepository =
   environment.DATABASE_URL && stripeConfig
@@ -165,7 +167,11 @@ const app = buildApp({
     openAI: coachModelConfig !== null,
     stripe: stripeConfig !== null,
     supabaseStorage: storageConfig !== null,
-    workers: environment.DATABASE_URL !== undefined,
+    workers:
+      environment.DATABASE_URL !== undefined &&
+      (videoAnalysisConfig === null || videoAnalysisConfig.mode !== "openai"
+        ? true
+        : process.env.DOGOS_VIDEO_FRAME_EXTRACTOR === "ffmpeg"),
   },
   signedActions,
 });
