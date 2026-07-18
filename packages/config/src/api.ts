@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-const booleanString = z
-  .enum(["true", "false"])
-  .transform((value) => value === "true");
-
 const apiEnvironmentSchema = z
   .object({
     API_HOST: z.string().min(1).default("127.0.0.1"),
@@ -22,21 +18,9 @@ const apiEnvironmentSchema = z
     SUPABASE_PUBLISHABLE_KEY: z.string().min(20).optional(),
     SUPABASE_URL: z.url().optional(),
     SIGNED_LINK_SECRET: z.string().min(32),
-    USE_MOCK_PROVIDERS: booleanString,
     WEB_ORIGIN: z.url(),
   })
   .superRefine((environment, context) => {
-    if (
-      environment.DOGOS_ENV === "production" &&
-      environment.USE_MOCK_PROVIDERS
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "USE_MOCK_PROVIDERS must be false in production",
-        path: ["USE_MOCK_PROVIDERS"],
-      });
-    }
-
     if (
       environment.DOGOS_AUTH_MODE !== "local" &&
       (environment.DATABASE_URL === undefined ||
@@ -84,7 +68,6 @@ export function loadApiEnv(input: NodeJS.ProcessEnv): ApiEnvironment {
       : {
           DOGOS_AUTH_MODE: "local",
           SIGNED_LINK_SECRET: "local-only-change-before-production-32-chars",
-          USE_MOCK_PROVIDERS: "true",
           WEB_ORIGIN: "http://localhost:3000",
         };
 

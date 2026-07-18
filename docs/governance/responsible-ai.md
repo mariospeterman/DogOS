@@ -17,7 +17,7 @@ features materially change the intended purpose.
 
 ## User transparency
 
-- Tell a person at the start of WhatsApp onboarding that they are interacting
+- Tell a person at the start of PWA onboarding that they are interacting
   with an AI-assisted DogOS coach.
 - Keep the disclosure accessible in account and conversation information.
 - Identify research-backed claims with user-visible source links.

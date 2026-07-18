@@ -9,8 +9,7 @@ import {
 } from "@playwright/test";
 
 const api = "http://127.0.0.1:4200";
-const screenshots = resolve("test-results/slice-2.5/screenshots");
-const distributionScreenshots = resolve("test-results/slice-2.7/screenshots");
+const screenshots = resolve("test-results/chat-first-pwa/screenshots");
 const headers = (key: string, user = "owner") => ({
   "x-dogos-user": user,
   "idempotency-key": key,
@@ -34,31 +33,28 @@ async function clickButton(page: Page, name: string) {
 }
 
 test.beforeAll(async () => {
-  await Promise.all([
-    mkdir(screenshots, { recursive: true }),
-    mkdir(distributionScreenshots, { recursive: true }),
-  ]);
+  await mkdir(screenshots, { recursive: true });
 });
 
-test("scenario 1: German low-risk owner reaches and uses the plan", async ({
+test("scenario 1: German low-risk owner reaches the chat-first coach", async ({
   page,
   request,
 }, testInfo) => {
   await reset(request);
-  await page.goto("/app/today", { waitUntil: "domcontentloaded" });
+  await page.goto("/app/coach", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Rexs Coach")).toBeVisible();
+  await expect(page.getByText("Lockere Leine", { exact: false })).toBeVisible();
+  await page.getByLabel("Nachricht an DogOS").fill("Warum dieser Block?");
+  await page.getByLabel("Nachricht an DogOS").press("Enter");
   await expect(
-    page.getByRole("heading", { name: "Rex / Heute" }),
+    page.getByText("Warum dieser Block?", { exact: true }),
   ).toBeVisible();
   if (testInfo.project.name === "chromium")
     await page.screenshot({
-      path: resolve(screenshots, "german-flow.png"),
+      path: resolve(screenshots, "coach-flow.png"),
       fullPage: true,
     });
-  await expect(
-    page.getByRole("heading", {
-      name: "Orientierung in einem ruhigen Abschnitt",
-    }),
-  ).toBeVisible();
+  await expect(page.getByText("Training starten")).toBeVisible();
 });
 
 test("scenario 2: English owner remains in Switzerland and CHF", async ({

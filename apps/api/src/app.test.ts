@@ -34,7 +34,7 @@ describe("health routes", () => {
     });
     const denied = await app.inject({
       method: "OPTIONS",
-      url: "/v1/whatsapp/link/confirm",
+      url: "/v1/onboarding/messages",
       headers: {
         origin: "https://attacker.test",
         "access-control-request-method": "POST",

@@ -28,19 +28,17 @@ describe("API environment", () => {
     const environment = loadApiEnv({ NODE_ENV: "test" });
 
     expect(environment.API_PORT).toBe(4000);
-    expect(environment.USE_MOCK_PROVIDERS).toBe(true);
   });
 
-  it("rejects mock providers in production", () => {
+  it("requires Supabase credentials in production", () => {
     expect(() =>
       loadApiEnv({
         DOGOS_ENV: "production",
         NODE_ENV: "production",
         SIGNED_LINK_SECRET: "a-production-secret-that-is-long-enough",
-        USE_MOCK_PROVIDERS: "true",
         WEB_ORIGIN: "https://dogos.example",
       }),
-    ).toThrow(/USE_MOCK_PROVIDERS/);
+    ).toThrow(/Supabase auth requires DATABASE_URL/);
   });
 
   it("requires production secrets instead of applying development defaults", () => {
@@ -48,7 +46,6 @@ describe("API environment", () => {
       loadApiEnv({
         DOGOS_ENV: "production",
         NODE_ENV: "production",
-        USE_MOCK_PROVIDERS: "false",
         WEB_ORIGIN: "https://dogos.example",
       }),
     ).toThrow(/SIGNED_LINK_SECRET/);

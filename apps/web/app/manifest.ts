@@ -40,7 +40,7 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         name: "Heutiges Training",
         short_name: "Heute",
-        url: "/app/today?source=app_shortcut",
+        url: "/app/coach?prompt=What%20should%20we%20train%20today%3F",
         icons: [
           {
             src: "/icons/dogos-192.png",

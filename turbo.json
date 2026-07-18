@@ -49,7 +49,6 @@
         "SUPABASE_PUBLISHABLE_KEY",
         "SUPABASE_SECRET_KEY",
         "SUPABASE_URL",
-        "USE_MOCK_PROVIDERS",
         "WEB_ORIGIN"
       ]
     },
