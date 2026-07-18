@@ -24,13 +24,9 @@ alter table api.privacy_deletion_requests force row level security;
 create policy privacy_deletion_requests_owner_read on api.privacy_deletion_requests
 for select to authenticated
 using (
-  exists (
-    select 1 from api.household_members hm
-    where hm.household_id = privacy_deletion_requests.household_id
-      and hm.user_id = api.current_user_id()
-      and hm.role = 'owner'
-      and hm.status = 'active'
-      and hm.revoked_at is null
+  private.has_household_role(
+    household_id,
+    array['owner']::api.membership_role[]
   )
 );
 

@@ -32,7 +32,7 @@ create index live_coaching_sessions_household_dog_created_idx
 
 create policy live_coaching_sessions_household_read on api.live_coaching_sessions
 for select to authenticated
-using (api.is_household_member(household_id));
+using (private.can_read_household(household_id));
 
 revoke all on table api.live_coaching_sessions from public, anon;
 grant select on table api.live_coaching_sessions to authenticated;
