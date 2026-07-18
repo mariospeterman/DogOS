@@ -1280,6 +1280,76 @@ export type Database = {
           },
         ];
       };
+      live_coaching_sessions: {
+        Row: {
+          actor_user_id: string;
+          completed_at: string | null;
+          consumed_minutes: number;
+          created_at: string;
+          dog_id: string;
+          household_id: string;
+          id: string;
+          planned_minutes: number;
+          room_name: string;
+          started_at: string | null;
+          status: Database["api"]["Enums"]["live_coaching_status"];
+          summary: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          actor_user_id: string;
+          completed_at?: string | null;
+          consumed_minutes?: number;
+          created_at?: string;
+          dog_id: string;
+          household_id: string;
+          id?: string;
+          planned_minutes: number;
+          room_name: string;
+          started_at?: string | null;
+          status?: Database["api"]["Enums"]["live_coaching_status"];
+          summary?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          actor_user_id?: string;
+          completed_at?: string | null;
+          consumed_minutes?: number;
+          created_at?: string;
+          dog_id?: string;
+          household_id?: string;
+          id?: string;
+          planned_minutes?: number;
+          room_name?: string;
+          started_at?: string | null;
+          status?: Database["api"]["Enums"]["live_coaching_status"];
+          summary?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "live_coaching_sessions_actor_user_id_fkey";
+            columns: ["actor_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_coaching_sessions_dog_id_fkey";
+            columns: ["dog_id"];
+            isOneToOne: false;
+            referencedRelation: "dogs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_coaching_sessions_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       localized_content: {
         Row: {
           body: Json;
@@ -1874,6 +1944,54 @@ export type Database = {
             columns: ["goal_version_id"];
             isOneToOne: false;
             referencedRelation: "goal_versions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      privacy_deletion_requests: {
+        Row: {
+          actor_user_id: string;
+          completed_at: string | null;
+          household_id: string;
+          id: string;
+          reason: string | null;
+          requested_at: string;
+          retention_summary: Json;
+          status: Database["api"]["Enums"]["privacy_request_status"];
+        };
+        Insert: {
+          actor_user_id: string;
+          completed_at?: string | null;
+          household_id: string;
+          id?: string;
+          reason?: string | null;
+          requested_at?: string;
+          retention_summary?: Json;
+          status?: Database["api"]["Enums"]["privacy_request_status"];
+        };
+        Update: {
+          actor_user_id?: string;
+          completed_at?: string | null;
+          household_id?: string;
+          id?: string;
+          reason?: string | null;
+          requested_at?: string;
+          retention_summary?: Json;
+          status?: Database["api"]["Enums"]["privacy_request_status"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "privacy_deletion_requests_actor_user_id_fkey";
+            columns: ["actor_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "privacy_deletion_requests_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
             referencedColumns: ["id"];
           },
         ];
@@ -2793,6 +2911,82 @@ export type Database = {
         };
         Relationships: [];
       };
+      video_analyses: {
+        Row: {
+          actor_user_id: string;
+          completed_at: string | null;
+          content_type: string;
+          created_at: string;
+          dog_id: string;
+          failure_code: string | null;
+          findings: Json;
+          household_id: string;
+          id: string;
+          original_filename: string;
+          size_bytes: number;
+          status: Database["api"]["Enums"]["video_analysis_status"];
+          storage_object_key: string;
+          updated_at: string;
+          uploaded_at: string | null;
+        };
+        Insert: {
+          actor_user_id: string;
+          completed_at?: string | null;
+          content_type: string;
+          created_at?: string;
+          dog_id: string;
+          failure_code?: string | null;
+          findings?: Json;
+          household_id: string;
+          id?: string;
+          original_filename: string;
+          size_bytes: number;
+          status?: Database["api"]["Enums"]["video_analysis_status"];
+          storage_object_key: string;
+          updated_at?: string;
+          uploaded_at?: string | null;
+        };
+        Update: {
+          actor_user_id?: string;
+          completed_at?: string | null;
+          content_type?: string;
+          created_at?: string;
+          dog_id?: string;
+          failure_code?: string | null;
+          findings?: Json;
+          household_id?: string;
+          id?: string;
+          original_filename?: string;
+          size_bytes?: number;
+          status?: Database["api"]["Enums"]["video_analysis_status"];
+          storage_object_key?: string;
+          updated_at?: string;
+          uploaded_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "video_analyses_actor_user_id_fkey";
+            columns: ["actor_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "video_analyses_dog_id_fkey";
+            columns: ["dog_id"];
+            isOneToOne: false;
+            referencedRelation: "dogs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "video_analyses_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       current_plan_summary: {
@@ -2881,9 +3075,12 @@ export type Database = {
         | "owner_report"
         | "measured_observation"
         | "hypothesis";
+      live_coaching_status: "created" | "active" | "completed" | "failed";
       locale_status: "unconfirmed" | "detected" | "confirmed";
       membership_role: "owner" | "caregiver" | "viewer";
       membership_status: "invited" | "active" | "revoked";
+      privacy_request_status:
+        "requested" | "processing" | "completed" | "rejected_legal_hold";
       translation_method:
         | "source_authored"
         | "machine_translation"
@@ -2897,6 +3094,8 @@ export type Database = {
         | "approved_for_release"
         | "superseded";
       validity_state: "draft" | "valid" | "expired" | "revoked" | "superseded";
+      video_analysis_status:
+        "upload_requested" | "uploaded" | "processing" | "completed" | "failed";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -3033,9 +3232,16 @@ export const Constants = {
         "measured_observation",
         "hypothesis",
       ],
+      live_coaching_status: ["created", "active", "completed", "failed"],
       locale_status: ["unconfirmed", "detected", "confirmed"],
       membership_role: ["owner", "caregiver", "viewer"],
       membership_status: ["invited", "active", "revoked"],
+      privacy_request_status: [
+        "requested",
+        "processing",
+        "completed",
+        "rejected_legal_hold",
+      ],
       translation_method: [
         "source_authored",
         "machine_translation",
@@ -3051,6 +3257,13 @@ export const Constants = {
         "superseded",
       ],
       validity_state: ["draft", "valid", "expired", "revoked", "superseded"],
+      video_analysis_status: [
+        "upload_requested",
+        "uploaded",
+        "processing",
+        "completed",
+        "failed",
+      ],
     },
   },
 } as const;
