@@ -52,6 +52,7 @@
         "SUPABASE_PROJECT_REF",
         "SUPABASE_PUBLISHABLE_KEY",
         "SUPABASE_SECRET_KEY",
+        "SUPABASE_STORAGE_BUCKET",
         "SUPABASE_URL",
         "WEB_ORIGIN"
       ]

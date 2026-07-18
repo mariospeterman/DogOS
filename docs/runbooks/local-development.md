@@ -29,11 +29,11 @@ pnpm db:reset
 The reset applies every migration and reloads deterministic development data.
 `pnpm seed` is an intentional alias for the same clean reset, so deterministic
 fixture IDs never collide with an existing seed. The local Data API is
-<http://127.0.0.1:54321>; Postgres listens on `127.0.0.1:54322`. Optional Studio,
-Realtime, analytics, vector storage, and Edge Runtime services are disabled in
-config. `pnpm dev:services` excludes only the Storage API process while
-retaining Supabase's managed storage schema. The private bucket and object
-policies are migrated and tested as database contracts.
+<http://127.0.0.1:54321>; Postgres listens on `127.0.0.1:54322`. Optional
+Studio, Realtime, analytics, vector storage, and Edge Runtime services are
+disabled in config. Storage is enabled so signed upload flows can be tested
+against the private `dog-media` bucket. The private bucket and object policies
+are migrated and tested as database contracts.
 
 Development fixture accounts use the password `DogOS-local-2026`; their email
 addresses are defined at the top of `supabase/seed.sql`. These credentials are
@@ -86,3 +86,6 @@ pnpm demo:product:check
 `pnpm db:types` regenerates `packages/database/src/database.types.ts`. Commit
 type changes with the migration that produced them. Stop local infrastructure
 with `pnpm exec supabase stop`.
+
+Use [Provider Readiness](provider-readiness.md) before enabling hosted Supabase,
+OpenAI, LiveKit, Stripe, or WhatsApp credentials.

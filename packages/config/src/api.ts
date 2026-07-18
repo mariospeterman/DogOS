@@ -16,6 +16,8 @@ const apiEnvironmentSchema = z
       .enum(["development", "production", "test"])
       .default("development"),
     SUPABASE_PUBLISHABLE_KEY: z.string().min(20).optional(),
+    SUPABASE_SECRET_KEY: z.string().min(20).optional(),
+    SUPABASE_STORAGE_BUCKET: z.string().min(1).default("dog-media"),
     SUPABASE_URL: z.url().optional(),
     SIGNED_LINK_SECRET: z.string().min(32),
     WEB_ORIGIN: z.url(),
@@ -25,12 +27,13 @@ const apiEnvironmentSchema = z
       environment.DOGOS_AUTH_MODE !== "local" &&
       (environment.DATABASE_URL === undefined ||
         environment.SUPABASE_PUBLISHABLE_KEY === undefined ||
+        environment.SUPABASE_SECRET_KEY === undefined ||
         environment.SUPABASE_URL === undefined)
     ) {
       context.addIssue({
         code: "custom",
         message:
-          "Supabase auth requires DATABASE_URL, SUPABASE_URL, and SUPABASE_PUBLISHABLE_KEY",
+          "Supabase auth requires DATABASE_URL, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY",
         path: ["DOGOS_AUTH_MODE"],
       });
     }

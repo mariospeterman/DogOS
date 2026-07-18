@@ -68,16 +68,17 @@ pnpm build
 
 Production credentials belong in deployment secret storage. `.env.example` is
 the committed variable contract; `.env.local` is the uncommitted local source
-of truth.
+of truth. Real-provider activation is tracked in
+[Provider Readiness](docs/runbooks/provider-readiness.md).
 
 ## Current Release Blockers
 
 - professionally reviewed and versioned training protocols;
 - blind model evaluation for extraction and multilingual coaching quality;
-- privacy export, deletion, and retention workflows;
 - commercial Stripe catalog, tax, legal, and entitlement approval;
 - verified professional supply and referral governance;
-- asynchronous video analysis and later LiveKit live coaching;
+- external video model routing, malware/content checks, and LiveKit staging
+  walkthrough;
 - real-device PWA acceptance and production deployment review.
 
 Historical Phase 1 and provider experiments remain under `docs/` and in old

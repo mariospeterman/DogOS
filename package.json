@@ -11,7 +11,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "node --env-file-if-exists=.env.local ./node_modules/turbo/bin/turbo run dev",
-    "dev:services": "supabase start --exclude storage-api",
+    "dev:services": "supabase start",
     "db:reset": "supabase db reset",
     "db:seed": "supabase db reset",
     "seed": "supabase db reset",

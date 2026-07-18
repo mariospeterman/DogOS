@@ -41,6 +41,10 @@ import type { StripeBillingService } from "./billing.js";
 import { presentGoal, presentStage } from "./training-presentation.js";
 import type { WebOnboardingService } from "./web-onboarding-service.js";
 import { createLiveKitJoinToken, type LiveKitConfig } from "./livekit.js";
+import {
+  DeterministicVideoUploadSigner,
+  type VideoUploadSigner,
+} from "./storage.js";
 
 const errorCodes = [
   "AUTH_REQUIRED",
@@ -173,6 +177,7 @@ export interface BuildAppOptions {
   liveKit?: LiveKitConfig;
   liveSessions?: LiveCoachingStore;
   privacy?: PrivacyStore;
+  videoUploads?: VideoUploadSigner;
   videos?: VideoAnalysisStore;
   product?: LocalProductFixture;
   signedActions?: SignedActionService;
@@ -189,6 +194,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     options.coach ??
     new CoachConversationService(new InMemoryCoachConversationStore());
   const videos = options.videos ?? new InMemoryVideoAnalysisStore();
+  const videoUploads =
+    options.videoUploads ?? new DeterministicVideoUploadSigner();
   const liveSessions = options.liveSessions ?? new InMemoryLiveCoachingStore();
   const privacy = options.privacy ?? new InMemoryPrivacyStore();
   const authenticator =
@@ -938,13 +945,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           originalFilename: body.originalFilename,
           sizeBytes: body.sizeBytes,
         });
+        const upload = await videoUploads.createUpload({
+          contentType: analysis.contentType,
+          objectKey: analysis.storageObjectKey,
+        });
         return {
           analysis,
-          upload: {
-            expiresInSeconds: 900,
-            method: "PUT",
-            url: `dogos://video-uploads/${analysis.storageObjectKey}`,
-          },
+          upload,
         };
       },
     );

@@ -797,8 +797,8 @@ using (exists (
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
-  'dog-media', 'dog-media', false, 104857600,
-  array['video/mp4', 'video/quicktime', 'image/jpeg', 'image/png', 'audio/mpeg', 'audio/mp4']
+  'dog-media', 'dog-media', false, 262144000,
+  array['video/mp4', 'video/quicktime', 'video/webm', 'image/jpeg', 'image/png', 'audio/mpeg', 'audio/mp4']
 )
 on conflict (id) do update set
   public = excluded.public,

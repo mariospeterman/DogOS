@@ -28,6 +28,10 @@ import {
 import { loadLiveKitConfig } from "./livekit.js";
 import { OnboardingService } from "./onboarding-service.js";
 import { SignedActionService } from "./signed-actions.js";
+import {
+  loadSupabaseStorageConfig,
+  SupabaseVideoUploadSigner,
+} from "./storage.js";
 import { WebOnboardingService } from "./web-onboarding-service.js";
 
 const environment = loadApiEnv(process.env);
@@ -56,6 +60,11 @@ const privacy = environment.DATABASE_URL
   ? new PrivacyRepository(environment.DATABASE_URL)
   : undefined;
 const liveKit = loadLiveKitConfig(process.env);
+const storageConfig = loadSupabaseStorageConfig(process.env);
+const videoUploads =
+  storageConfig === null
+    ? undefined
+    : new SupabaseVideoUploadSigner(storageConfig);
 const stripeConfig = loadStripeBillingConfig(process.env);
 const billingRepository =
   environment.DATABASE_URL && stripeConfig
@@ -138,6 +147,7 @@ const app = buildApp({
   ...(commands === undefined ? {} : { commands }),
   ...(capabilityUsage === undefined ? {} : { usage: capabilityUsage }),
   ...(videos === undefined ? {} : { videos }),
+  ...(videoUploads === undefined ? {} : { videoUploads }),
   ...(liveSessions === undefined ? {} : { liveSessions }),
   ...(privacy === undefined ? {} : { privacy }),
   ...(liveKit === null ? {} : { liveKit }),

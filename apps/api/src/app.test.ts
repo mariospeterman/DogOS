@@ -132,7 +132,15 @@ describe("product API", () => {
   });
 
   it("creates and completes asynchronous video analysis jobs", async () => {
-    const app = buildApp();
+    const app = buildApp({
+      videoUploads: {
+        createUpload: async (input) => ({
+          expiresInSeconds: 7200,
+          method: "PUT",
+          url: `https://storage.test/signed/${input.objectKey}`,
+        }),
+      },
+    });
     apps.push(app);
     const dogId = "30000000-0000-0000-0000-000000000001";
 
@@ -153,8 +161,13 @@ describe("product API", () => {
       upload: { method: string; url: string };
     };
     expect(body.analysis.status).toBe("upload_requested");
-    expect(body.upload).toMatchObject({ method: "PUT" });
-    expect(body.upload.url).toContain(body.analysis.storageObjectKey);
+    expect(body.upload).toMatchObject({
+      expiresInSeconds: 7200,
+      method: "PUT",
+    });
+    expect(body.upload.url).toBe(
+      `https://storage.test/signed/${body.analysis.storageObjectKey}`,
+    );
 
     const completed = await app.inject({
       method: "POST",

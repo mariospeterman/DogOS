@@ -98,6 +98,9 @@ importers:
       '@fastify/swagger':
         specifier: 9.7.0
         version: 9.7.0
+      '@supabase/supabase-js':
+        specifier: 2.110.7
+        version: 2.110.7
       fastify:
         specifier: 5.10.0
         version: 5.10.0
