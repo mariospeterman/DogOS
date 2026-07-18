@@ -2,7 +2,6 @@ import { CircleUserRound, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppNavigation } from "./app-navigation";
-import { whatsappCoachUrl } from "../lib/whatsapp";
 
 export function AppShell({
   children,
@@ -20,19 +19,19 @@ export function AppShell({
   return (
     <div className="product-shell">
       <header className="topbar">
-        <Link href="/app/today" className="wordmark" aria-label="DogOS heute">
+        <Link href="/app/coach" className="wordmark" aria-label="DogOS Coach">
           <span className="mark">D</span>
           <span>DogOS</span>
         </Link>
         <div className="top-actions">
-          <a
+          <Link
             className="icon-link coach-link"
-            href={whatsappCoachUrl()}
-            aria-label="DogOS Coach in WhatsApp"
-            title="DogOS Coach in WhatsApp"
+            href="/app/coach"
+            aria-label="DogOS Coach"
+            title="DogOS Coach"
           >
             <MessageCircle size={20} />
-          </a>
+          </Link>
           <Link
             className="icon-link"
             href="/app/account"

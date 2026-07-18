@@ -5,4 +5,5 @@ export * from "./capability-usage-repository.js";
 export * from "./mappers.js";
 export * from "./model-run-repository.js";
 export * from "./onboarding-repository.js";
+export * from "./onboarding-session-repository.js";
 export * from "./postgres-repository.js";

@@ -1,11 +1,16 @@
 "use client";
 
-import { CircleUserRound, PawPrint, Route, TrendingUp } from "lucide-react";
+import {
+  CircleUserRound,
+  MessageCircle,
+  Route,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navigation = [
-  { href: "/app/today", label: "Heute", icon: PawPrint },
+  { href: "/app/coach", label: "Coach", icon: MessageCircle },
   { href: "/app/plan", label: "Plan", icon: Route },
   { href: "/app/progress", label: "Fortschritt", icon: TrendingUp },
   { href: "/app/account", label: "Konto", icon: CircleUserRound },
@@ -18,7 +23,9 @@ export function AppNavigation() {
       {navigation.map(({ href, icon: Icon, label }) => {
         const active =
           pathname === href ||
-          (href === "/app/plan" && pathname === "/app/calendar");
+          (href === "/app/plan" &&
+            (pathname === "/app/calendar" ||
+              pathname.startsWith("/app/session")));
         return (
           <Link
             href={href}

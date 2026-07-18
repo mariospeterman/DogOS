@@ -5,19 +5,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import {
-  buildWhatsAppStartUrl,
-  normalizeReferralCode,
-} from "../lib/distribution";
+import { normalizeReferralCode } from "../lib/distribution";
 import { DistributionActions } from "./distribution-actions";
 
 export function StartExperience() {
   const params = useSearchParams();
   const referralCode = normalizeReferralCode(params.get("ref"));
-  const whatsappUrl = buildWhatsAppStartUrl(
-    process.env.NEXT_PUBLIC_WHATSAPP_CHAT_URL ?? "https://wa.me/15551617622",
-    { locale: "de-CH", referralCode },
-  );
+  const startUrl = `/auth/sign-up?next=${encodeURIComponent("/app/coach")}${
+    referralCode === null ? "" : `&ref=${encodeURIComponent(referralCode)}`
+  }`;
 
   return (
     <main className="start-screen">
@@ -31,30 +27,30 @@ export function StartExperience() {
         />
         <div>
           <span>DogOS</span>
-          <small>Training, das bei deinem Hund bleibt.</small>
+          <small>Der Coach, der deinen Hund kennt.</small>
         </div>
       </section>
 
       <section className="start-core">
-        <p className="eyebrow">Dein nächster Trainingsschritt</p>
-        <h1>Im WhatsApp-Chat starten. In DogOS dranbleiben.</h1>
+        <p className="eyebrow">Dein persönlicher Trainingscoach</p>
+        <h1>Erzähl mir von deinem Hund.</h1>
         <p>
-          Erzähle kurz von deinem Hund und Ziel. DogOS baut daraus einen
-          messbaren Plan und hält Einheiten, Fortschritt und Termine zusammen.
+          DogOS erinnert sich an Training, Fortschritt und das, was bei euch
+          funktioniert. Daraus entsteht Schritt für Schritt euer Plan.
         </p>
-        <a className="button primary start-primary" href={whatsappUrl}>
-          <MessageCircle size={20} /> In WhatsApp starten
+        <Link className="button primary start-primary" href={startUrl}>
+          <MessageCircle size={20} /> Gespräch starten
           <ArrowRight size={18} />
-        </a>
+        </Link>
         <ul className="start-proof">
           <li>
-            <Check size={16} /> Keine App-Einrichtung vor dem ersten Gespräch
+            <Check size={16} /> Natürlich schreiben statt Formulare ausfüllen
           </li>
           <li>
-            <Check size={16} /> Deutsch oder Englisch, derselbe Trainingsstand
+            <Check size={16} /> Ein Coach für Plan, Training und Fortschritt
           </li>
           <li>
-            <Check size={16} /> Plan und Fortschritt bleiben in deinem Konto
+            <Check size={16} /> Als App installierbar, direkt im Browser nutzbar
           </li>
         </ul>
       </section>
@@ -62,7 +58,7 @@ export function StartExperience() {
       <section className="start-return">
         <div>
           <strong>DogOS auf diesem Gerät</strong>
-          <span>Schneller zurück zu Heute, Plan und Fortschritt.</span>
+          <span>Schneller zurück zum Coach und aktuellen Training.</span>
         </div>
         <DistributionActions compact />
       </section>

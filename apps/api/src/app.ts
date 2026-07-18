@@ -37,6 +37,7 @@ import {
 } from "./auth.js";
 import type { StripeBillingService } from "./billing.js";
 import { presentGoal, presentStage } from "./training-presentation.js";
+import type { WebOnboardingService } from "./web-onboarding-service.js";
 
 const errorCodes = [
   "AUTH_REQUIRED",
@@ -153,6 +154,7 @@ export interface BuildAppOptions {
     "createCheckout" | "createPortal" | "processWebhook"
   >;
   coach?: CoachConversationService;
+  onboarding?: Pick<WebOnboardingService, "get" | "send">;
   products?: Pick<
     OnboardingRepository,
     "dashboardByDog" | "findPrimaryByHousehold"
@@ -733,6 +735,80 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         return dashboard === null || dashboard === undefined
           ? { status: "onboarding_required", householdId: actor.householdId }
           : { status: "ready", ...dashboard };
+      },
+    );
+
+    routes.get(
+      "/v1/onboarding",
+      {
+        schema: {
+          operationId: "getOnboardingConversation",
+          tags: ["onboarding"],
+          headers: authHeaders,
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        if (actor.householdId === null || options.onboarding === undefined) {
+          throw new ApiError(
+            404,
+            "RESOURCE_NOT_FOUND",
+            "Onboarding unavailable",
+          );
+        }
+        const account = await options.accounts?.resolveByAppUser(actor.actorId);
+        return options.onboarding.get({
+          actorUserId: actor.actorId,
+          householdId: actor.householdId,
+          locale: account?.locale === "en" ? "en" : "de-CH",
+        });
+      },
+    );
+
+    routes.post(
+      "/v1/onboarding/messages",
+      {
+        schema: {
+          operationId: "sendOnboardingMessage",
+          tags: ["onboarding"],
+          headers: mutationHeaders,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["message"],
+            properties: {
+              message: { type: "string", minLength: 1, maxLength: 2000 },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        if (actor.householdId === null || options.onboarding === undefined) {
+          throw new ApiError(
+            404,
+            "RESOURCE_NOT_FOUND",
+            "Onboarding unavailable",
+          );
+        }
+        const account = await options.accounts?.resolveByAppUser(actor.actorId);
+        return options.onboarding.send({
+          actorUserId: actor.actorId,
+          clientMessageId: key(request),
+          householdId: actor.householdId,
+          locale: account?.locale === "en" ? "en" : "de-CH",
+          text: (request.body as { message: string }).message,
+        });
       },
     );
 

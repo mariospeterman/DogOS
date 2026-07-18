@@ -7,7 +7,6 @@ import type { ModelRunRepository } from "@dogos/database";
 import type {
   ConversationSnapshot,
   OnboardingAnswerState,
-  ProviderContact,
 } from "@dogos/whatsapp";
 
 export interface CoachModelConfig {
@@ -380,11 +379,7 @@ export class OpenAIOnboardingInterpreter {
     });
   }
 
-  async interpret(input: {
-    contact: ProviderContact;
-    message: string;
-    snapshot: ConversationSnapshot;
-  }) {
+  async interpret(input: { message: string; snapshot: ConversationSnapshot }) {
     const started = performance.now();
     const profile = this.config.profiles.onboarding;
     const model = this.config.onboardingModel;

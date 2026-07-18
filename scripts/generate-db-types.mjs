@@ -7,13 +7,14 @@ const root = new URL("../", import.meta.url).pathname;
 const output = join(root, "packages/database/src/database.types.ts");
 const directory = await mkdtemp(join(tmpdir(), "dogos-db-types-"));
 const generated = join(directory, "database.types.ts");
+const supabaseCli = join(root, "node_modules/supabase/dist/supabase.js");
+const prettierCli = join(root, "node_modules/prettier/bin/prettier.cjs");
 
 try {
   const result = spawnSync(
-    "pnpm",
+    process.execPath,
     [
-      "exec",
-      "supabase",
+      supabaseCli,
       "gen",
       "types",
       "typescript",
@@ -21,7 +22,7 @@ try {
       "--schema",
       "api",
     ],
-    { cwd: root, encoding: "utf8" },
+    { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
   );
   if (result.status !== 0) {
     throw new Error(result.stderr || "Supabase type generation failed");
@@ -31,9 +32,9 @@ try {
   }
   await writeFile(generated, result.stdout);
   const formatted = spawnSync(
-    "pnpm",
-    ["exec", "prettier", "--write", generated],
-    { cwd: root, encoding: "utf8" },
+    process.execPath,
+    [prettierCli, "--write", generated],
+    { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
   );
   if (formatted.status !== 0) {
     throw new Error(formatted.stderr || "Database type formatting failed");

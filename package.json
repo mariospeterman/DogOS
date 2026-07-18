@@ -16,7 +16,7 @@
     "db:seed": "supabase db reset",
     "seed": "supabase db reset",
     "db:test": "supabase test db",
-    "db:lint": "supabase db lint --local --level warning",
+    "db:lint": "supabase db lint --local --schema api,private,public --level warning --fail-on warning",
     "db:types": "node scripts/generate-db-types.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

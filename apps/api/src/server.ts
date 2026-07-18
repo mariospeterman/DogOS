@@ -21,6 +21,7 @@ import {
   CapabilityUsageRepository,
   ModelRunRepository,
   OnboardingRepository,
+  OnboardingSessionRepository,
   PostgresRepository,
 } from "@dogos/database";
 
@@ -35,6 +36,7 @@ import {
 import { OnboardingService } from "./onboarding-service.js";
 import { SignedActionService } from "./signed-actions.js";
 import { presentStage } from "./training-presentation.js";
+import { WebOnboardingService } from "./web-onboarding-service.js";
 
 const environment = loadApiEnv(process.env);
 const accounts = environment.DATABASE_URL
@@ -42,6 +44,9 @@ const accounts = environment.DATABASE_URL
   : undefined;
 const onboardingRepository = environment.DATABASE_URL
   ? new OnboardingRepository(environment.DATABASE_URL)
+  : undefined;
+const onboardingSessions = environment.DATABASE_URL
+  ? new OnboardingSessionRepository(environment.DATABASE_URL)
   : undefined;
 const commands = environment.DATABASE_URL
   ? new PostgresRepository(environment.DATABASE_URL)
@@ -78,6 +83,18 @@ const onboarding =
   onboardingRepository === undefined
     ? undefined
     : new OnboardingService(onboardingRepository);
+const webOnboarding =
+  onboarding === undefined || onboardingSessions === undefined
+    ? undefined
+    : new WebOnboardingService({
+        ...(onboardingInterpreter === undefined
+          ? {}
+          : {
+              interpret: (input) => onboardingInterpreter.interpret(input),
+            }),
+        projector: onboarding,
+        sessions: onboardingSessions,
+      });
 const authenticator = createRequestAuthenticator({
   ...(accounts === undefined ? {} : { accountRepository: accounts }),
   authMode: environment.DOGOS_AUTH_MODE,
@@ -283,6 +300,7 @@ const app = buildApp({
   authenticator,
   ...(billing === undefined ? {} : { billing }),
   coach,
+  ...(webOnboarding === undefined ? {} : { onboarding: webOnboarding }),
   ...(commands === undefined ? {} : { commands }),
   ...(capabilityUsage === undefined ? {} : { usage: capabilityUsage }),
   ...(onboardingRepository === undefined

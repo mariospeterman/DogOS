@@ -215,6 +215,8 @@ describe("product API", () => {
       "/v1/households/{id}/dogs",
       "/v1/local/reset",
       "/v1/me",
+      "/v1/onboarding",
+      "/v1/onboarding/messages",
       "/v1/plans/{id}/adjust",
       "/v1/plans/{id}/calendar",
       "/v1/plans/{id}/evaluate-progress",

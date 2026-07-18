@@ -44,7 +44,7 @@ function SignInForm() {
     }
     const next = searchParams.get("next");
     window.location.assign(
-      next !== null && next.startsWith("/") ? next : "/app/today",
+      next !== null && next.startsWith("/") ? next : "/app/coach",
     );
   }
 
@@ -82,7 +82,7 @@ function SignInForm() {
         <a className="text-link" href="/auth/forgot-password">
           Passwort vergessen
         </a>
-        <a className="text-link" href="/auth/sign-up">
+        <a className="text-link" href="/auth/sign-up?next=/app/coach">
           Konto erstellen
         </a>
       </div>

@@ -20,3 +20,8 @@ minimumReleaseAgeExclude:
   - "@supabase/storage-js@2.110.7"
   - "@supabase/supabase-js@2.110.7"
   - openai@6.48.0
+  - '@ai-sdk/gateway@4.0.23'
+  - '@ai-sdk/mcp@2.0.15'
+  - '@ai-sdk/provider-utils@5.0.11'
+  - '@ai-sdk/react@4.0.34'
+  - ai@7.0.31

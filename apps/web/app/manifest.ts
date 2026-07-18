@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "DogOS",
     short_name: "DogOS",
     description: "Dog-first training plans, sessions, and progress.",
-    start_url: "/app/today?source=installed_app",
+    start_url: "/app/coach?source=installed_app",
     scope: "/",
     display: "standalone",
     background_color: "#f4f6f9",
@@ -27,9 +27,9 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       {
-        name: "Trainingsplan",
-        short_name: "Plan",
-        url: "/app/plan?source=app_shortcut",
+        name: "DogOS Coach",
+        short_name: "Coach",
+        url: "/app/coach?source=app_shortcut",
         icons: [
           {
             src: "/icons/dogos-192.png",

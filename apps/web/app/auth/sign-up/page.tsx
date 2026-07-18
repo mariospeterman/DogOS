@@ -1,11 +1,23 @@
 "use client";
 
 import { UserPlus } from "lucide-react";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { AppShell } from "../../../components/app-shell";
 import { createClient } from "../../../lib/supabase/client";
 
 export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={<AppShell title="Konto erstellen" eyebrow="DogOS starten" />}
+    >
+      <SignUpForm />
+    </Suspense>
+  );
+}
+
+function SignUpForm() {
+  const searchParams = useSearchParams();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,12 +31,17 @@ export default function SignUpPage() {
     const locale = navigator.language.toLowerCase().startsWith("de")
       ? "de-CH"
       : "en";
+    const requestedNext = searchParams.get("next");
+    const next =
+      requestedNext !== null && requestedNext.startsWith("/")
+        ? requestedNext
+        : "/app/coach";
     const { data, error: signUpError } = await createClient().auth.signUp({
       email,
       password,
       options: {
         data: { full_name: name.trim(), locale },
-        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/app/account`,
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(next)}`,
       },
     });
     if (signUpError !== null) {
@@ -33,7 +50,7 @@ export default function SignUpPage() {
       return;
     }
     if (data.session !== null) {
-      window.location.assign("/app/account");
+      window.location.assign(next);
       return;
     }
     setSent(true);

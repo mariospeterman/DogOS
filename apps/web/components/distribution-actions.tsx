@@ -45,7 +45,7 @@ export function DistributionActions({
   async function share() {
     const data = {
       title: "DogOS",
-      text: "Kurzes, messbares Hundetraining mit deinem Coach in WhatsApp.",
+      text: "Ein persönlicher DogOS Coach, der Training und Fortschritt erinnert.",
       url: buildShareUrl(window.location.origin),
     };
     if (navigator.share !== undefined) {

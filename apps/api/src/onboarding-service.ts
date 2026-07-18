@@ -147,7 +147,47 @@ export class OnboardingService {
     if (contact.userId === null || contact.householdId === null) {
       throw new Error("LINKED_CONTACT_REQUIRED");
     }
-    const existing = await this.repository.findByContact(contact.id);
+    return this.projectSource(
+      {
+        actorUserId: contact.userId,
+        channel: "whatsapp",
+        contactId: contact.id,
+        householdId: contact.householdId,
+        ownerUserId: null,
+      },
+      snapshot,
+    );
+  }
+
+  projectOwner(
+    input: { actorUserId: string; householdId: string },
+    snapshot: ConversationSnapshot,
+  ): Promise<DogProductContext> {
+    return this.projectSource(
+      {
+        ...input,
+        channel: "pwa",
+        contactId: null,
+        ownerUserId: input.actorUserId,
+      },
+      snapshot,
+    );
+  }
+
+  private async projectSource(
+    source: {
+      actorUserId: string;
+      channel: "pwa" | "whatsapp";
+      contactId: string | null;
+      householdId: string;
+      ownerUserId: string | null;
+    },
+    snapshot: ConversationSnapshot,
+  ): Promise<DogProductContext> {
+    const existing =
+      source.contactId === null
+        ? await this.repository.findByOwner(source.actorUserId)
+        : await this.repository.findByContact(source.contactId);
     if (existing !== null && existing.planStatus !== "setup_required") {
       return existing;
     }
@@ -306,7 +346,10 @@ export class OnboardingService {
                 experienceLevel: "unknown",
               },
               presentationLocale: facts.locale,
-              releaseChannel: "channel.whatsapp",
+              releaseChannel:
+                source.channel === "whatsapp"
+                  ? "channel.whatsapp"
+                  : "channel.web",
               safetyAssessment: safety,
             },
             mode: "development",
@@ -349,11 +392,13 @@ export class OnboardingService {
       .update(JSON.stringify(snapshot))
       .digest("hex");
     return this.repository.persist({
-      actorUserId: contact.userId,
-      contactId: contact.id,
+      actorUserId: source.actorUserId,
+      channel: source.channel,
+      contactId: source.contactId,
       facts,
-      householdId: contact.householdId,
+      householdId: source.householdId,
       ids: entityIds,
+      ownerUserId: source.ownerUserId,
       plan,
       riskAssessment: safety,
       snapshotHash,

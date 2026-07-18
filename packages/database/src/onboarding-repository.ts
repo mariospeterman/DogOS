@@ -33,10 +33,12 @@ export interface OnboardingIds {
 
 export interface PersistOnboardingInput {
   actorUserId: string;
-  contactId: string;
+  channel: "pwa" | "whatsapp";
+  contactId: string | null;
   facts: OnboardingFacts;
   householdId: string;
   ids: OnboardingIds;
+  ownerUserId: string | null;
   plan: Plan | null;
   riskAssessment: RiskAssessment;
   snapshotHash: string;
@@ -170,14 +172,24 @@ export class OnboardingRepository {
     return typeof dogId === "string" ? this.findByDog(dogId) : null;
   }
 
+  async findByOwner(ownerUserId: string): Promise<DogProductContext | null> {
+    const rows = await this.#sql`
+      select op.dog_id::text
+      from private.onboarding_projections op
+      where op.owner_user_id = ${ownerUserId}::uuid
+    `;
+    const dogId = rows[0]?.dog_id;
+    return typeof dogId === "string" ? this.findByDog(dogId) : null;
+  }
+
   async findPrimaryByHousehold(
     householdId: string,
   ): Promise<ProductDashboard | null> {
     const [projection] = await this.#sql`
       select op.dog_id::text
       from private.onboarding_projections op
-      join private.whatsapp_provider_contacts contact on contact.id = op.contact_id
-      where contact.household_id = ${householdId}::uuid
+      join api.dogs dog on dog.id = op.dog_id
+      where dog.household_id = ${householdId}::uuid
       order by op.updated_at desc
       limit 1
     `;
@@ -359,6 +371,9 @@ export class OnboardingRepository {
   }
 
   async persist(input: PersistOnboardingInput): Promise<DogProductContext> {
+    if ((input.contactId === null) === (input.ownerUserId === null)) {
+      throw new Error("ONBOARDING_SINGLE_SOURCE_REQUIRED");
+    }
     let projectedDogId = input.ids.dogId;
     await this.#sql.begin(
       "isolation level serializable",
@@ -367,7 +382,8 @@ export class OnboardingRepository {
         const existing = await tx`
         select dog_id, anamnesis_id, goal_id, plan_id
         from private.onboarding_projections
-        where contact_id = ${input.contactId}::uuid
+        where (${input.contactId}::uuid is not null and contact_id = ${input.contactId}::uuid)
+           or (${input.ownerUserId}::uuid is not null and owner_user_id = ${input.ownerUserId}::uuid)
         for update
       `;
         const projection = existing[0];
@@ -401,7 +417,8 @@ export class OnboardingRepository {
             update private.onboarding_projections
             set plan_id = ${input.ids.planId}, snapshot_hash = ${input.snapshotHash},
                 updated_at = now()
-            where contact_id = ${input.contactId}::uuid
+            where (${input.contactId}::uuid is not null and contact_id = ${input.contactId}::uuid)
+               or (${input.ownerUserId}::uuid is not null and owner_user_id = ${input.ownerUserId}::uuid)
           `;
           await tx`
             insert into private.audit_events
@@ -409,7 +426,7 @@ export class OnboardingRepository {
                trace_id, metadata)
             values (${input.actorUserId}, 'user', 'onboarding.plan_reconciled',
               'dog', ${projectedDogId}, ${input.snapshotHash},
-              ${tx.json({ channel: "whatsapp", reason: "setup_reconciled" })})
+              ${tx.json({ channel: input.channel, reason: "setup_reconciled" })})
           `;
           return;
         }
@@ -481,7 +498,7 @@ export class OnboardingRepository {
             (anamnesis_id, question_definition_id, raw_answer_locale,
              answer_value, source, collected_channel)
           values (${input.ids.anamnesisId}, ${questionIds.get(code)!},
-            ${input.facts.locale}, ${tx.json(value)}, 'owner_report', 'whatsapp')
+            ${input.facts.locale}, ${tx.json(value)}, 'owner_report', ${input.channel})
         `;
         }
         await tx`
@@ -562,9 +579,9 @@ export class OnboardingRepository {
 
         await tx`
         insert into private.onboarding_projections
-          (contact_id, snapshot_hash, dog_id, anamnesis_id, goal_id, plan_id,
+          (contact_id, owner_user_id, snapshot_hash, dog_id, anamnesis_id, goal_id, plan_id,
            risk_assessment_id)
-        values (${input.contactId}, ${input.snapshotHash}, ${input.ids.dogId},
+        values (${input.contactId}, ${input.ownerUserId}, ${input.snapshotHash}, ${input.ids.dogId},
           ${input.ids.anamnesisId}, ${input.ids.goalId},
           ${input.plan === null ? null : input.ids.planId}, ${input.ids.riskAssessmentId})
       `;
@@ -573,7 +590,7 @@ export class OnboardingRepository {
           (actor_user_id, actor_type, action, target_type, target_id, trace_id, metadata)
         values (${input.actorUserId}, 'user', 'onboarding.projected', 'dog',
           ${input.ids.dogId}, ${input.snapshotHash},
-          ${tx.json({ channel: "whatsapp", planGenerated: input.plan !== null })})
+          ${tx.json({ channel: input.channel, planGenerated: input.plan !== null })})
       `;
       },
     );
