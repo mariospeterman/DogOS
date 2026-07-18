@@ -476,10 +476,11 @@ a {
 }
 .mark {
   align-items: center;
-  background: var(--coral);
+  background: #0b1f3a url("/icons/dogos-192.png") center / cover no-repeat;
   border-radius: 7px;
-  color: #fff;
+  color: transparent;
   display: flex;
+  font-size: 0;
   height: 30px;
   justify-content: center;
   width: 30px;
@@ -823,24 +824,23 @@ a {
 .coach-mark,
 .coach-avatar {
   align-items: center;
-  background: #0b1f3a;
-  color: #fff;
+  background: #0b1f3a url("/icons/dogos-192.png") center / cover no-repeat;
+  color: transparent;
   display: flex;
   flex: none;
   font-family: Arial, Helvetica, sans-serif;
+  font-size: 0;
   font-weight: 800;
   justify-content: center;
   line-height: 1;
 }
 .coach-mark {
-  border-radius: 7px;
-  font-size: 1.1rem;
+  border-radius: 50%;
   height: 38px;
   width: 38px;
 }
 .coach-avatar {
   border-radius: 50%;
-  font-size: 0.72rem;
   height: 27px;
   margin-top: 3px;
   width: 27px;
