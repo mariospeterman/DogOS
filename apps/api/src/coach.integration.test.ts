@@ -4,12 +4,14 @@ import {
   CoachConversationService,
   PostgresCoachConversationStore,
 } from "@dogos/conversation";
+import { SearchRepository } from "@dogos/database";
 
 const connection =
   process.env.DOGOS_TEST_DATABASE_URL ??
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const sql = postgres(connection, { prepare: false });
 const store = new PostgresCoachConversationStore(connection);
+const search = new SearchRepository(connection);
 const service = new CoachConversationService(store);
 const scope = {
   actorUserId: "10000000-0000-0000-0000-000000000001",
@@ -31,6 +33,7 @@ afterAll(async () => {
     where household_id = ${scope.householdId} and dog_id = ${scope.dogId}
   `;
   await store.close();
+  await search.close();
   await sql.end();
 });
 
@@ -84,8 +87,27 @@ describe("PostgreSQL chat-first Coach", () => {
     const [counts] = await sql`
       select
         (select count(*)::int from private.coach_channel_bindings) as bindings,
-        (select count(*)::int from private.coach_messages) as messages
+        (select count(*)::int from private.coach_messages) as messages,
+        (select count(*)::int from private.coach_chapters where household_id = ${scope.householdId}) as chapters
     `;
-    expect(counts).toMatchObject({ bindings: 1, messages: 4 });
+    expect(counts).toMatchObject({ bindings: 1, chapters: 2, messages: 4 });
+    await expect(
+      search.search({
+        dogId: scope.dogId,
+        householdId: scope.householdId,
+        query: "Block",
+      }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "chapter",
+          workspace: "plan",
+        }),
+        expect.objectContaining({
+          kind: "message",
+          workspace: "plan",
+        }),
+      ]),
+    );
   });
 });

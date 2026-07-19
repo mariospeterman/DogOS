@@ -15,6 +15,7 @@ import {
   OnboardingSessionRepository,
   PostgresRepository,
   PrivacyRepository,
+  SearchRepository,
   VideoAnalysisRepository,
 } from "@dogos/database";
 
@@ -63,6 +64,9 @@ const memories = environment.DATABASE_URL
   : undefined;
 const privacy = environment.DATABASE_URL
   ? new PrivacyRepository(environment.DATABASE_URL)
+  : undefined;
+const search = environment.DATABASE_URL
+  ? new SearchRepository(environment.DATABASE_URL)
   : undefined;
 const liveKit = loadLiveKitConfig(process.env);
 const storageConfig = loadSupabaseStorageConfig(process.env);
@@ -157,6 +161,7 @@ const app = buildApp({
   ...(liveSessions === undefined ? {} : { liveSessions }),
   ...(memories === undefined ? {} : { memories }),
   ...(privacy === undefined ? {} : { privacy }),
+  ...(search === undefined ? {} : { search }),
   ...(liveKit === null ? {} : { liveKit }),
   ...(onboardingRepository === undefined
     ? {}

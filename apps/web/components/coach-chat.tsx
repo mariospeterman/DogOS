@@ -76,6 +76,22 @@ interface LiveSession {
   summary: string | null;
 }
 
+interface SearchResult {
+  createdAt: string;
+  excerpt: string;
+  href: string;
+  id: string;
+  kind:
+    | "chapter"
+    | "live_session"
+    | "memory"
+    | "message"
+    | "video_analysis"
+    | "video_observation";
+  title: string;
+  workspace: "coach" | "media" | "plan" | "progress" | "setup" | "train";
+}
+
 interface AccountView {
   billingAvailable: boolean;
   country: string;
@@ -800,6 +816,136 @@ function InlineWorkspacePanel({
   );
 }
 
+function searchKindLabel(kind: SearchResult["kind"], english: boolean): string {
+  if (kind === "chapter") return english ? "Topic" : "Thema";
+  if (kind === "message") return english ? "Message" : "Nachricht";
+  if (kind === "video_analysis") return english ? "Video" : "Video";
+  if (kind === "video_observation")
+    return english ? "Video observation" : "Video-Beobachtung";
+  if (kind === "live_session") return "Live";
+  return "Memory";
+}
+
+function DurableSearchResults({
+  english,
+  onNavigate,
+  results,
+  searching,
+}: {
+  english: boolean;
+  onNavigate: () => void;
+  results: SearchResult[];
+  searching: boolean;
+}) {
+  if (searching) {
+    return <p>{english ? "Searching..." : "Suche läuft..."}</p>;
+  }
+  if (results.length === 0) {
+    return <p>{english ? "No durable matches" : "Keine Treffer"}</p>;
+  }
+  return (
+    <>
+      {results.map((result) => (
+        <a href={result.href} key={result.id} onClick={onNavigate}>
+          <strong>{result.title}</strong>
+          <small>
+            {searchKindLabel(result.kind, english)} · {result.workspace}
+          </small>
+        </a>
+      ))}
+    </>
+  );
+}
+
+function InlineSpaceSummary({
+  activeSpace,
+  english,
+  product,
+}: {
+  activeSpace: string;
+  english: boolean;
+  product: ProductDashboard;
+}) {
+  const presentation = trainingPresentation(product, english ? "en" : "de-CH");
+  const duration = Math.max(
+    1,
+    Math.ceil((product.currentStep?.durationSeconds ?? 180) / 60),
+  );
+  if (activeSpace === "plan") {
+    return (
+      <section className="chat-inline-panel">
+        <div className="inline-panel-header">
+          <span>{english ? "Plan" : "Plan"}</span>
+        </div>
+        <div className="inline-panel-body">
+          <p>{presentation.instruction(product.dogName)}</p>
+          <div className="inline-panel-list">
+            <span>
+              <strong>{presentation.title}</strong>
+              <small>{presentation.stage}</small>
+            </span>
+            <span>
+              <strong>{english ? "Target" : "Ziel"}</strong>
+              <small>
+                {product.baselineSuccessRate}% →{" "}
+                {product.targetSuccessRate ?? 80}%
+              </small>
+            </span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+  if (activeSpace === "train") {
+    return (
+      <section className="chat-inline-panel">
+        <div className="inline-panel-header">
+          <span>{english ? "Training session" : "Trainingseinheit"}</span>
+        </div>
+        <div className="inline-panel-body">
+          <div className="inline-panel-list">
+            <span>
+              <strong>{presentation.title}</strong>
+              <small>
+                {duration} Min. · {product.currentStep?.repetitions ?? 6}{" "}
+                {presentation.unit}
+              </small>
+            </span>
+          </div>
+          <p>{presentation.instruction(product.dogName)}</p>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section className="chat-inline-panel">
+      <div className="inline-panel-header">
+        <span>{english ? "Progress" : "Fortschritt"}</span>
+      </div>
+      <div className="inline-panel-body">
+        <div className="inline-panel-list">
+          <span>
+            <strong>
+              {product.baselineSuccessRate}% → {product.targetSuccessRate ?? 80}
+              %
+            </strong>
+            <small>
+              {product.sessionCount}{" "}
+              {english ? "recorded sessions" : "gespeicherte Einheiten"}
+            </small>
+          </span>
+          <span>
+            <strong>{english ? "Decision" : "Entscheid"}</strong>
+            <small>
+              {trainingDecisionLabel(product.latestDecision, english)}
+            </small>
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CoachRuntime({
   initialMessages,
   locale,
@@ -827,6 +973,8 @@ function CoachRuntime({
               : null,
   );
   const [historyQuery, setHistoryQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [chatArchived, setChatArchived] = useState(false);
@@ -894,6 +1042,45 @@ function CoachRuntime({
             : english
               ? `Tell DogOS what happened with ${product.dogName}...`
               : `Erzähl DogOS, was mit ${product.dogName} passiert ist...`;
+
+  useEffect(() => {
+    const query = historyQuery.trim();
+    if (query.length < 2) {
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      setSearching(true);
+      void (async () => {
+        try {
+          const parameters = new URLSearchParams({
+            dogId: product.dogId,
+            limit: "20",
+            query,
+          });
+          const response = await fetch(
+            dogosApiUrl(`/v1/search?${parameters}`),
+            {
+              cache: "no-store",
+              headers: await dogosApiHeaders(),
+              signal: controller.signal,
+            },
+          );
+          if (!response.ok) throw new Error("SEARCH_UNAVAILABLE");
+          const body = (await response.json()) as { results: SearchResult[] };
+          setSearchResults(body.results);
+        } catch {
+          if (!controller.signal.aborted) setSearchResults([]);
+        } finally {
+          if (!controller.signal.aborted) setSearching(false);
+        }
+      })();
+    }, 180);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [historyQuery, product.dogId]);
 
   useEffect(() => {
     viewport.current?.scrollTo({
@@ -1014,6 +1201,8 @@ function CoachRuntime({
   const filteredConversationChapters =
     filterNavigationEntries(conversationChapters);
   const filteredTrainingEntries = filterNavigationEntries(trainingEntries);
+  const durableSearchActive = historyQuery.trim().length >= 2;
+  const visibleSearchResults = durableSearchActive ? searchResults : [];
   const navigatorEntries = messages
     .filter((message) => textOf(message).trim().length > 0)
     .slice(-18)
@@ -1059,7 +1248,10 @@ function CoachRuntime({
       icon: Video,
       id: "live",
       label: "Live",
-      action: () => setActivePanel("live"),
+      action: () => {
+        setActivePanel("live");
+        router.push("/app/coach?space=media&action=start-live");
+      },
     },
   ] as const;
   const heldCopy = heldTrainingCopy(trainingState, english);
@@ -1100,7 +1292,14 @@ function CoachRuntime({
         </label>
         <section className="sidebar-section">
           <span>{english ? "Conversations" : "Gespräche"}</span>
-          {filteredConversationChapters.length === 0 ? (
+          {durableSearchActive ? (
+            <DurableSearchResults
+              english={english}
+              onNavigate={() => setMobileDrawerOpen(false)}
+              results={visibleSearchResults}
+              searching={searching}
+            />
+          ) : filteredConversationChapters.length === 0 ? (
             <p>{english ? "No topics found" : "Keine Themen gefunden"}</p>
           ) : (
             filteredConversationChapters.map((entry) => (
@@ -1130,6 +1329,22 @@ function CoachRuntime({
               <small>{entry.meta}</small>
             </Link>
           ))}
+          <Link
+            href="/app/coach?space=media&action=upload-video"
+            onClick={() => setActivePanel("video")}
+          >
+            <strong>{english ? "Video analysis" : "Videoanalyse"}</strong>
+            <small>
+              {english ? "Upload and review" : "Upload und Prüfung"}
+            </small>
+          </Link>
+          <Link
+            href="/app/coach?space=media&action=start-live"
+            onClick={() => setActivePanel("live")}
+          >
+            <strong>{english ? "Live session" : "Live Session"}</strong>
+            <small>{english ? "Camera session" : "Kamera-Session"}</small>
+          </Link>
         </section>
         <div className="sidebar-account">
           <button onClick={() => setActivePanel("profile")} type="button">
@@ -1179,19 +1394,45 @@ function CoachRuntime({
             </label>
             <section className="sidebar-section">
               <span>{english ? "Conversations" : "Gespräche"}</span>
-              {filteredConversationChapters.map((entry) => (
-                <a
-                  href={entry.href}
-                  key={entry.id}
-                  onClick={() => setMobileDrawerOpen(false)}
-                >
-                  <strong>{entry.label}</strong>
-                  <small>{entry.meta}</small>
-                </a>
-              ))}
+              {durableSearchActive ? (
+                <DurableSearchResults
+                  english={english}
+                  onNavigate={() => setMobileDrawerOpen(false)}
+                  results={visibleSearchResults}
+                  searching={searching}
+                />
+              ) : (
+                filteredConversationChapters.map((entry) => (
+                  <a
+                    href={entry.href}
+                    key={entry.id}
+                    onClick={() => setMobileDrawerOpen(false)}
+                  >
+                    <strong>{entry.label}</strong>
+                    <small>{entry.meta}</small>
+                  </a>
+                ))
+              )}
             </section>
             <section className="sidebar-section">
               <span>{english ? "Training plan" : "Trainingsplan"}</span>
+              <Link
+                href="/app/coach?space=plan"
+                onClick={() => setMobileDrawerOpen(false)}
+              >
+                <strong>{english ? "Current plan" : "Aktueller Plan"}</strong>
+                <small>{presentation.stage}</small>
+              </Link>
+              <Link
+                href="/app/coach?space=progress"
+                onClick={() => setMobileDrawerOpen(false)}
+              >
+                <strong>{english ? "Progress" : "Fortschritt"}</strong>
+                <small>
+                  {product.baselineSuccessRate}% →{" "}
+                  {product.targetSuccessRate ?? 80}%
+                </small>
+              </Link>
               {filteredTrainingEntries.map((entry) => (
                 <Link
                   href={entry.href}
@@ -1202,6 +1443,28 @@ function CoachRuntime({
                   <small>{entry.meta}</small>
                 </Link>
               ))}
+              <Link
+                href="/app/coach?space=media&action=upload-video"
+                onClick={() => {
+                  setActivePanel("video");
+                  setMobileDrawerOpen(false);
+                }}
+              >
+                <strong>{english ? "Video analysis" : "Videoanalyse"}</strong>
+                <small>
+                  {english ? "Upload and review" : "Upload und Prüfung"}
+                </small>
+              </Link>
+              <Link
+                href="/app/coach?space=media&action=start-live"
+                onClick={() => {
+                  setActivePanel("live");
+                  setMobileDrawerOpen(false);
+                }}
+              >
+                <strong>{english ? "Live session" : "Live Session"}</strong>
+                <small>{english ? "Camera session" : "Kamera-Session"}</small>
+              </Link>
             </section>
             <div className="sidebar-account">
               <button
@@ -1445,6 +1708,16 @@ function CoachRuntime({
                   </article>
                 );
               })}
+
+          {!chatDeleted &&
+          activeSpace !== "media" &&
+          ["plan", "train", "progress"].includes(activeSpace) ? (
+            <InlineSpaceSummary
+              activeSpace={activeSpace}
+              english={english}
+              product={product}
+            />
+          ) : null}
 
           {!chatDeleted && trainingAllowed ? (
             <section className="inline-training-card">

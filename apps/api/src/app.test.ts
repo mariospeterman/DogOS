@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { InMemorySearchStore } from "@dogos/database";
 
 import { buildApp } from "./app.js";
 
@@ -357,6 +358,39 @@ describe("product API", () => {
     expect(forgotten.json().fact.status).toBe("forgotten");
   });
 
+  it("searches scoped workspace history across durable sources", async () => {
+    const app = buildApp({
+      search: new InMemorySearchStore([
+        {
+          createdAt: new Date(0).toISOString(),
+          excerpt: "Recall setup with Echo",
+          href: "#message-search-1",
+          id: "message:search-1",
+          kind: "message",
+          rank: 0.2,
+          title: "DogOS response",
+          workspace: "coach",
+        },
+      ]),
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/search?query=recall&dogId=30000000-0000-0000-0000-000000000001",
+      headers: { "x-dogos-user": "owner" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().results).toEqual([
+      expect.objectContaining({
+        href: "#message-search-1",
+        kind: "message",
+        title: "DogOS response",
+      }),
+    ]);
+  });
+
   it("enforces local roles without weakening authentication", async () => {
     const app = buildApp();
     apps.push(app);
@@ -479,6 +513,7 @@ describe("product API", () => {
       "/v1/privacy/export",
       "/v1/product",
       "/v1/referrals/{id}",
+      "/v1/search",
       "/v1/scheduled-sessions/{id}/start",
       "/v1/sessions/{id}",
       "/v1/sessions/{id}/check-in",

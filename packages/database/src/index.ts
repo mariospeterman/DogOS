@@ -10,4 +10,5 @@ export * from "./onboarding-repository.js";
 export * from "./onboarding-session-repository.js";
 export * from "./postgres-repository.js";
 export * from "./privacy-repository.js";
+export * from "./search-repository.js";
 export * from "./video-analysis-repository.js";

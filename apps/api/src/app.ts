@@ -16,6 +16,7 @@ import {
   InMemoryLiveCoachingStore,
   InMemoryMemoryStore,
   InMemoryPrivacyStore,
+  InMemorySearchStore,
   IdempotencyConflictError,
   InMemoryVideoAnalysisStore,
   type AccountRepository,
@@ -25,6 +26,7 @@ import {
   type OnboardingRepository,
   type PostgresRepository,
   type PrivacyStore,
+  type SearchStore,
   type VideoAnalysisStore,
 } from "@dogos/database";
 import { LocalProductFixture } from "./local-product-fixture.js";
@@ -180,6 +182,7 @@ export interface BuildAppOptions {
   liveSessions?: LiveCoachingStore;
   memories?: MemoryStore;
   privacy?: PrivacyStore;
+  search?: SearchStore;
   videoUploads?: VideoUploadSigner;
   videos?: VideoAnalysisStore;
   product?: LocalProductFixture;
@@ -210,6 +213,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const liveSessions = options.liveSessions ?? new InMemoryLiveCoachingStore();
   const memories = options.memories ?? new InMemoryMemoryStore();
   const privacy = options.privacy ?? new InMemoryPrivacyStore();
+  const search = options.search ?? new InMemorySearchStore();
   const authenticator =
     options.authenticator ?? new LocalRequestAuthenticator("test");
   const signed =
@@ -1522,6 +1526,50 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             actorUserId: actor.actorId,
             householdId: actor.householdId,
             id: (request.params as { id: string }).id,
+          }),
+        };
+      },
+    );
+
+    routes.get(
+      "/v1/search",
+      {
+        schema: {
+          operationId: "searchWorkspaceHistory",
+          tags: ["search"],
+          headers: authHeaders,
+          querystring: {
+            type: "object",
+            additionalProperties: false,
+            required: ["query"],
+            properties: {
+              dogId: { type: "string", format: "uuid" },
+              limit: { type: "integer", minimum: 1, maximum: 50 },
+              query: { type: "string", minLength: 1, maxLength: 200 },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const query = request.query as {
+          dogId?: string;
+          limit?: number;
+          query: string;
+        };
+        return {
+          results: await search.search({
+            dogId: query.dogId ?? null,
+            householdId: actor.householdId,
+            limit: query.limit ?? 20,
+            query: query.query,
           }),
         };
       },

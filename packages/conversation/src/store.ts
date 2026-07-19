@@ -252,6 +252,33 @@ export class PostgresCoachConversationStore implements CoachConversationStore {
       set last_message_at = ${row.created_at}::timestamptz, updated_at = now()
       where id = ${input.conversationId}::uuid
     `;
+    if (input.role === "user") {
+      const title = chapterTitleFromContent(input.content);
+      await this.#sql`
+        insert into private.coach_chapters (
+          conversation_id, household_id, dog_id, workspace, title, summary,
+          first_message_id, latest_message_id, message_count
+        )
+        select
+          conversation.id,
+          conversation.household_id,
+          conversation.dog_id,
+          ${row.workspace},
+          ${title},
+          left(${input.content}, 1200),
+          ${row.id}::uuid,
+          ${row.id}::uuid,
+          1
+        from private.coach_conversations conversation
+        where conversation.id = ${input.conversationId}::uuid
+        on conflict (conversation_id, workspace, lower(title))
+        do update set
+          summary = left(private.coach_chapters.summary || ' ' || excluded.summary, 1200),
+          latest_message_id = excluded.latest_message_id,
+          message_count = private.coach_chapters.message_count + 1,
+          updated_at = now()
+      `;
+    }
     return mapMessage(row);
   }
 
@@ -320,6 +347,17 @@ function workspaceFromContext(contextKind?: CoachContextKind): CoachWorkspace {
   if (contextKind === "progress") return "progress";
   if (contextKind === "media") return "media";
   return "coach";
+}
+
+function chapterTitleFromContent(content: string): string {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (normalized.length === 0) return "Training topic";
+  const lower = normalized.toLowerCase();
+  if (/video|clip|film|aufnahme/.test(lower)) return "Video review";
+  if (/live|camera|kamera|stream/.test(lower)) return "Live coaching";
+  if (/plan|block|übung|uebung|training/.test(lower)) return "Training plan";
+  if (/fortschritt|progress|besser|trend/.test(lower)) return "Progress review";
+  return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
 }
 
 function parseArray<T = unknown>(value: unknown): T[] {
