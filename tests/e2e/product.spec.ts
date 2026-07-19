@@ -315,6 +315,18 @@ test("chat-first Coach and management views remain one PWA", async ({
       page.getByRole("complementary", { name: "DogOS navigation" }),
     ).toBeVisible();
     await expect(page.getByLabel("Verlauf suchen")).toBeVisible();
+    await page.getByLabel("Nachricht an DogOS").fill("echo ist die beste");
+    await page.getByLabel("Nachricht an DogOS").press("Enter");
+    await expect(
+      page.getByRole("article").getByText("echo ist die beste"),
+    ).toBeVisible();
+    await page.getByLabel("Verlauf suchen").fill("beste");
+    await expect(
+      page
+        .getByRole("complementary", { name: "DogOS navigation" })
+        .getByText("echo ist die beste"),
+    ).toBeVisible();
+    await page.getByLabel("Verlauf suchen").fill("");
     await page.getByLabel("Seitenleiste einklappen").click();
     await expect(page.getByLabel("Seitenleiste öffnen")).toBeVisible();
     await page.getByLabel("Seitenleiste öffnen").click();

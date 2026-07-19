@@ -31,7 +31,13 @@ import {
 import { DefaultChatTransport, type UIMessage } from "ai";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { dogosApiHeaders, dogosApiUrl } from "../lib/api-client";
 import type { ProductDashboard } from "../lib/product";
@@ -281,6 +287,26 @@ function sessionLabel(plannedStart: string, english: boolean): string {
     month: "short",
     weekday: "short",
   }).format(date);
+}
+
+function inferUiLocaleFromMessages(
+  messages: UIMessage[],
+  fallback: "de-CH" | "en",
+): "de-CH" | "en" {
+  const latestUser = messages.findLast((message) => message.role === "user");
+  if (latestUser === undefined) return fallback;
+  const text = textOf(latestUser).toLowerCase();
+  if (
+    /\b(the|what|why|how|today|training|progress|plan|video|live)\b/.test(text)
+  )
+    return "en";
+  if (
+    /\b(der|die|das|was|warum|heute|training|fortschritt|übung|uebung)\b/.test(
+      text,
+    )
+  )
+    return "de-CH";
+  return fallback;
 }
 
 export function CoachChat({ product }: { product: ProductDashboard }) {
@@ -871,24 +897,53 @@ function InlineSpaceSummary({
     1,
     Math.ceil((product.currentStep?.durationSeconds ?? 180) / 60),
   );
+  const trainingAllowed = trainingActionState(product) === "ready";
   if (activeSpace === "plan") {
     return (
-      <section className="chat-inline-panel">
+      <section className="chat-inline-panel space-summary-panel">
         <div className="inline-panel-header">
           <span>{english ? "Plan" : "Plan"}</span>
         </div>
         <div className="inline-panel-body">
+          <div className="summary-metrics">
+            <span>
+              <small>{english ? "Focus" : "Fokus"}</small>
+              <strong>{presentation.title}</strong>
+            </span>
+            <span>
+              <small>{english ? "Target" : "Ziel"}</small>
+              <strong>
+                {product.baselineSuccessRate}% →{" "}
+                {product.targetSuccessRate ?? 80}%
+              </strong>
+            </span>
+            <span>
+              <small>{english ? "Sessions" : "Einheiten"}</small>
+              <strong>{product.sessionCount}</strong>
+            </span>
+          </div>
           <p>{presentation.instruction(product.dogName)}</p>
+          <div className="summary-progress">
+            <span
+              style={
+                {
+                  "--progress": `${Math.min(
+                    100,
+                    Math.max(0, product.baselineSuccessRate),
+                  )}%`,
+                } as CSSProperties
+              }
+            />
+          </div>
           <div className="inline-panel-list">
             <span>
-              <strong>{presentation.title}</strong>
+              <strong>{english ? "Stage" : "Stufe"}</strong>
               <small>{presentation.stage}</small>
             </span>
             <span>
-              <strong>{english ? "Target" : "Ziel"}</strong>
+              <strong>{english ? "Evidence gate" : "Evidenz-Gate"}</strong>
               <small>
-                {product.baselineSuccessRate}% →{" "}
-                {product.targetSuccessRate ?? 80}%
+                {trainingDecisionLabel(product.latestDecision, english)}
               </small>
             </span>
           </div>
@@ -898,48 +953,93 @@ function InlineSpaceSummary({
   }
   if (activeSpace === "train") {
     return (
-      <section className="chat-inline-panel">
+      <section className="chat-inline-panel space-summary-panel">
         <div className="inline-panel-header">
           <span>{english ? "Training session" : "Trainingseinheit"}</span>
         </div>
         <div className="inline-panel-body">
-          <div className="inline-panel-list">
+          <div className="summary-metrics">
             <span>
-              <strong>{presentation.title}</strong>
-              <small>
-                {duration} Min. · {product.currentStep?.repetitions ?? 6}{" "}
-                {presentation.unit}
-              </small>
+              <small>{english ? "Duration" : "Dauer"}</small>
+              <strong>{duration} Min.</strong>
+            </span>
+            <span>
+              <small>{english ? "Reps" : "Wiederholungen"}</small>
+              <strong>
+                {product.currentStep?.repetitions ?? 6} {presentation.unit}
+              </strong>
+            </span>
+            <span>
+              <small>{english ? "Status" : "Status"}</small>
+              <strong>
+                {trainingAllowed ? (english ? "Ready" : "Bereit") : "Hold"}
+              </strong>
             </span>
           </div>
           <p>{presentation.instruction(product.dogName)}</p>
+          <div className="inline-panel-list">
+            <span>
+              <strong>{presentation.title}</strong>
+              <small>{presentation.stage}</small>
+            </span>
+          </div>
         </div>
       </section>
     );
   }
   return (
-    <section className="chat-inline-panel">
+    <section className="chat-inline-panel space-summary-panel">
       <div className="inline-panel-header">
         <span>{english ? "Progress" : "Fortschritt"}</span>
       </div>
       <div className="inline-panel-body">
-        <div className="inline-panel-list">
+        <div className="summary-metrics">
           <span>
+            <small>{english ? "Current" : "Aktuell"}</small>
             <strong>
               {product.baselineSuccessRate}% → {product.targetSuccessRate ?? 80}
               %
             </strong>
-            <small>
-              {product.sessionCount}{" "}
-              {english ? "recorded sessions" : "gespeicherte Einheiten"}
-            </small>
           </span>
           <span>
-            <strong>{english ? "Decision" : "Entscheid"}</strong>
-            <small>
-              {trainingDecisionLabel(product.latestDecision, english)}
-            </small>
+            <small>{english ? "Sessions" : "Einheiten"}</small>
+            <strong>{product.sessionCount}</strong>
           </span>
+          <span>
+            <small>{english ? "Decision" : "Entscheid"}</small>
+            <strong>
+              {trainingDecisionLabel(product.latestDecision, english)}
+            </strong>
+          </span>
+        </div>
+        <div className="summary-progress">
+          <span
+            style={
+              {
+                "--progress": `${Math.min(
+                  100,
+                  Math.max(0, product.baselineSuccessRate),
+                )}%`,
+              } as CSSProperties
+            }
+          />
+        </div>
+        <div className="inline-panel-list">
+          {product.calendar.slice(0, 3).map((session) => (
+            <span key={session.id}>
+              <strong>
+                {session.isRecovery
+                  ? english
+                    ? "Recovery observation"
+                    : "Beobachtungstag"
+                  : presentation.title}
+              </strong>
+              <small>
+                {sessionLabel(session.plannedStart, english)} ·{" "}
+                {Math.ceil(session.durationSeconds / 60)} Min.
+              </small>
+            </span>
+          ))}
         </div>
       </div>
     </section>
@@ -1016,8 +1116,9 @@ function CoachRuntime({
     transport,
   });
   const busy = status === "submitted" || status === "streaming";
-  const presentation = trainingPresentation(product, locale);
-  const english = locale === "en";
+  const uiLocale = inferUiLocaleFromMessages(messages, locale);
+  const presentation = trainingPresentation(product, uiLocale);
+  const english = uiLocale === "en";
   const duration = Math.max(
     1,
     Math.ceil((product.currentStep?.durationSeconds ?? 180) / 60),
@@ -1202,7 +1303,41 @@ function CoachRuntime({
     filterNavigationEntries(conversationChapters);
   const filteredTrainingEntries = filterNavigationEntries(trainingEntries);
   const durableSearchActive = historyQuery.trim().length >= 2;
-  const visibleSearchResults = durableSearchActive ? searchResults : [];
+  const localSearchResults: SearchResult[] = [
+    ...filteredConversationChapters.map((entry): SearchResult => {
+      return {
+        createdAt: new Date(0).toISOString(),
+        excerpt: entry.search,
+        href: entry.href,
+        id: `local-conversation:${entry.id}`,
+        kind: "chapter",
+        title: entry.label,
+        workspace: "coach",
+      };
+    }),
+    ...filteredTrainingEntries.map((entry): SearchResult => {
+      return {
+        createdAt: new Date(0).toISOString(),
+        excerpt: entry.search,
+        href: entry.href,
+        id: `local-training:${entry.id}`,
+        kind: "chapter",
+        title: entry.label,
+        workspace: "train",
+      };
+    }),
+  ].slice(0, 12);
+  const visibleSearchResults = durableSearchActive
+    ? (searchResults.length > 0 ? searchResults : localSearchResults).filter(
+        (result, index, results) =>
+          results.findIndex(
+            (candidate) =>
+              candidate.href === result.href &&
+              candidate.title.toLowerCase() === result.title.toLowerCase() &&
+              candidate.kind === result.kind,
+          ) === index,
+      )
+    : [];
   const navigatorEntries = messages
     .filter((message) => textOf(message).trim().length > 0)
     .slice(-18)
@@ -1246,6 +1381,15 @@ function CoachRuntime({
     },
     {
       icon: Video,
+      id: "video",
+      label: "Video",
+      action: () => {
+        setActivePanel("video");
+        router.push("/app/coach?space=media&action=upload-video");
+      },
+    },
+    {
+      icon: Camera,
       id: "live",
       label: "Live",
       action: () => {
@@ -1671,7 +1815,7 @@ function CoachRuntime({
             : messages.map((message) => {
                 const text = textOf(message);
                 if (text.length === 0) return null;
-                const { body, sources } = splitSources(text, locale);
+                const { body, sources } = splitSources(text, uiLocale);
                 return (
                   <article
                     className={`coach-message ${message.role}`}
@@ -1837,7 +1981,11 @@ function CoachRuntime({
         <div className="composer-quick-actions" aria-label="Coach actions">
           {quickActions.map(({ action, icon: Icon, id, label }) => (
             <button
-              aria-pressed={activeSpace === id}
+              aria-pressed={
+                activeSpace === id ||
+                (id === "video" && activePanel === "video") ||
+                (id === "live" && activePanel === "live")
+              }
               key={id}
               onClick={() => void action()}
               type="button"
