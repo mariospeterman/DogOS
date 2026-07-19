@@ -229,9 +229,7 @@ interface VertexGenerateResponse {
   }>;
 }
 
-export class VertexGeminiVideoAnalysisProvider
-  implements VideoAnalysisProvider
-{
+export class VertexGeminiVideoAnalysisProvider implements VideoAnalysisProvider {
   readonly #config: VideoAnalysisConfig;
 
   constructor(config: VideoAnalysisConfig) {

@@ -57,15 +57,6 @@ function dogosServerApiBase(): string {
     process.env.DOGOS_INTERNAL_API_URL ??
     process.env.DOGOS_API_URL ??
     process.env.NEXT_PUBLIC_API_URL;
-  const local = (process.env.NEXT_PUBLIC_DOGOS_ENV ?? "local") === "local";
-  if (
-    local &&
-    (configured === undefined ||
-      configured.startsWith("http://127.0.0.1") ||
-      configured.startsWith("http://localhost"))
-  ) {
-    return "http://127.0.0.1:4000";
-  }
   return configured ?? "http://127.0.0.1:4000";
 }
 

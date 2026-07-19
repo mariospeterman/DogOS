@@ -1844,8 +1844,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           dogId,
           householdId: actor.householdId,
         });
-        const targetProfessionalType =
-          body.targetProfessionalType ?? "trainer";
+        const targetProfessionalType = body.targetProfessionalType ?? "trainer";
         const artifact = buildProfessionalHandoffArtifact({
           dashboard: effectiveDashboard,
           memories: relevantMemory,
@@ -2032,7 +2031,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
               },
               recipientRole: {
                 type: "string",
-                enum: ["caregiver", "observer_guest", "trainer", "veterinarian"],
+                enum: [
+                  "caregiver",
+                  "observer_guest",
+                  "trainer",
+                  "veterinarian",
+                ],
               },
             },
           },
@@ -2283,7 +2287,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             additionalProperties: false,
             required: ["consentReference", "packageType"],
             properties: {
-              consentReference: { type: "string", minLength: 4, maxLength: 200 },
+              consentReference: {
+                type: "string",
+                minLength: 4,
+                maxLength: 200,
+              },
               packageType: {
                 type: "string",
                 enum: ["trainer_handoff", "veterinary_handoff"],
@@ -2847,9 +2855,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         );
         requireWrite(actor);
         const body = request.body as { locale?: "de-CH" | "en" };
-        return product.command(actor.actorId, key(request), body, () =>
+        const result = product.command(actor.actorId, key(request), body, () =>
           product.reset(body.locale),
         ).result;
+        await coach.clearForScope({
+          dogId: result.dog.id,
+          householdId: result.household.id,
+        });
+        return result;
       },
     );
 

@@ -26,8 +26,8 @@ export function planCoachTurn(input: {
   const message = input.message.trim();
   const lowerRisk =
     safetyPattern.test(message) ||
-    input.context.riskDisposition !== undefined &&
-      input.context.riskDisposition !== "continue_low_risk_training";
+    (input.context.riskDisposition !== undefined &&
+      input.context.riskDisposition !== "continue_low_risk_training");
   const primaryIntent = lowerRisk
     ? "ask_clarifying"
     : handoffPattern.test(message)
@@ -46,12 +46,16 @@ export function planCoachTurn(input: {
   const requestedArtifacts: CoachTurnPlan["requestedArtifacts"] = [];
   if (primaryIntent === "explain_plan") requestedArtifacts.push("plan");
   if (primaryIntent === "review_progress") requestedArtifacts.push("progress");
-  if (primaryIntent === "request_video") requestedArtifacts.push("video_analysis");
+  if (primaryIntent === "request_video")
+    requestedArtifacts.push("video_analysis");
   if (primaryIntent === "request_perspective")
     requestedArtifacts.push("feedback_request");
   if (primaryIntent === "prepare_handoff")
     requestedArtifacts.push("handoff_preview");
-  if (input.context.currentStep !== undefined && input.context.currentStep !== null) {
+  if (
+    input.context.currentStep !== undefined &&
+    input.context.currentStep !== null
+  ) {
     requestedArtifacts.push("session");
   }
   const proposedTools: string[] = ["dogos_get_relevant_context"];
@@ -102,6 +106,9 @@ export function planCoachTurn(input: {
       : primaryIntent === "respond" || primaryIntent === "record_observation"
         ? "routine"
         : "decision_bearing",
-    stepLimit: primaryIntent === "respond" || primaryIntent === "record_observation" ? 2 : 3,
+    stepLimit:
+      primaryIntent === "respond" || primaryIntent === "record_observation"
+        ? 2
+        : 3,
   };
 }

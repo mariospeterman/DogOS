@@ -2,18 +2,10 @@ import { createHash, randomBytes } from "node:crypto";
 import postgres, { type Sql } from "postgres";
 
 type JsonValue =
-  | boolean
-  | null
-  | number
-  | string
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  boolean | null | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 export type CaseShareRecipientRole =
-  | "observer_guest"
-  | "trainer"
-  | "veterinarian"
-  | "professional_assistant";
+  "observer_guest" | "trainer" | "veterinarian" | "professional_assistant";
 export type CaseShareScope =
   | "dog_profile.read"
   | "goal.read"
@@ -508,7 +500,9 @@ export class CollaborationRepository implements CollaborationStore {
         share_grant_id::text, status
     `;
     return {
-      deliveryMethod: String(row!.delivery_method) as HandoffDeliveryRecord["deliveryMethod"],
+      deliveryMethod: String(
+        row!.delivery_method,
+      ) as HandoffDeliveryRecord["deliveryMethod"],
       handoffPackageId: String(row!.handoff_package_id),
       id: String(row!.id),
       shareGrantId:
@@ -554,7 +548,9 @@ function withoutPrivateGrantFields(
   };
 }
 
-function mapFeedbackRequest(row: Record<string, unknown>): FeedbackRequestRecord {
+function mapFeedbackRequest(
+  row: Record<string, unknown>,
+): FeedbackRequestRecord {
   return {
     dogId: String(row.dog_id),
     id: String(row.id),
@@ -567,10 +563,11 @@ function mapFeedbackRequest(row: Record<string, unknown>): FeedbackRequestRecord
   };
 }
 
-function mapFeedbackResponse(row: Record<string, unknown>): FeedbackResponseRecord {
+function mapFeedbackResponse(
+  row: Record<string, unknown>,
+): FeedbackResponseRecord {
   const observations = row.structured_observations as
-    | { summary?: unknown }
-    | undefined;
+    { summary?: unknown } | undefined;
   return {
     certainty: Number(row.certainty),
     id: String(row.id),
@@ -584,14 +581,17 @@ function mapFeedbackResponse(row: Record<string, unknown>): FeedbackResponseReco
   };
 }
 
-function mapProfessionalReview(row: Record<string, unknown>): ProfessionalReviewRecord {
+function mapProfessionalReview(
+  row: Record<string, unknown>,
+): ProfessionalReviewRecord {
   const corrections = Array.isArray(row.observable_corrections)
     ? (row.observable_corrections as Array<{ summary?: unknown }>)
     : [];
   return {
     correctionType: String(row.correction_type),
     id: String(row.id),
-    professionalRole: String(row.professional_role) as "trainer" | "veterinarian",
+    professionalRole: String(row.professional_role) as
+      "trainer" | "veterinarian",
     summary:
       typeof corrections[0]?.summary === "string" ? corrections[0].summary : "",
   };
@@ -603,7 +603,9 @@ function mapHandoffPackage(row: Record<string, unknown>): HandoffPackageRecord {
     dogId: String(row.dog_id),
     expiresAt: String(row.expires_at),
     id: String(row.id),
-    packageType: String(row.package_type) as HandoffPackageRecord["packageType"],
+    packageType: String(
+      row.package_type,
+    ) as HandoffPackageRecord["packageType"],
     revokedAt: row.revoked_at === null ? null : String(row.revoked_at),
     snapshot:
       typeof row.snapshot === "object" && row.snapshot !== null

@@ -75,7 +75,9 @@ export default function HistoryPage() {
         {results.length === 0 ? (
           <div className="empty-state">
             <Sparkles size={22} />
-            <strong>{searched ? "No matching records" : "Ready to search"}</strong>
+            <strong>
+              {searched ? "No matching records" : "Ready to search"}
+            </strong>
             <p>
               Try the goal, a cue, a place, a concern, or a video observation.
             </p>
@@ -83,7 +85,11 @@ export default function HistoryPage() {
         ) : (
           <div className="timeline-list">
             {results.map((result) => (
-              <Link className="timeline-node link-node" href={result.href} key={result.id}>
+              <Link
+                className="timeline-node link-node"
+                href={result.href}
+                key={result.id}
+              >
                 <Search size={18} />
                 <span>
                   <strong>{result.title}</strong>

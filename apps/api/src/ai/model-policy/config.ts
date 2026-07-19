@@ -120,10 +120,7 @@ function stringArrayField(
   value: unknown,
   field: keyof AiReleaseManifest,
 ): string[] {
-  if (
-    !Array.isArray(value) ||
-    value.some((item) => typeof item !== "string")
-  ) {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     throw new Error(`DOGOS_AI_RELEASE_MANIFESTS_INVALID_${field}`);
   }
   return [...value];

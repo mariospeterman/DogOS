@@ -70,9 +70,7 @@ describe("DogOS AI policy configuration", () => {
     );
     const manifestIds = Object.fromEntries(
       textTasks.map((task) => [
-        `DOGOS_AI_RELEASE_MANIFEST_${task
-          .toUpperCase()
-          .replaceAll(".", "_")}`,
+        `DOGOS_AI_RELEASE_MANIFEST_${task.toUpperCase().replaceAll(".", "_")}`,
         `manifest-${task}`,
       ]),
     );

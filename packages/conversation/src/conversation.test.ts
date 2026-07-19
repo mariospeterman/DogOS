@@ -177,10 +177,7 @@ describe("DogOS Coach conversation", () => {
       }),
     ).toMatchObject({
       primaryIntent: "prepare_handoff",
-      proposedTools: [
-        "dogos_get_relevant_context",
-        "dogos_preview_handoff",
-      ],
+      proposedTools: ["dogos_get_relevant_context", "dogos_preview_handoff"],
       responseRisk: "decision_bearing",
       stepLimit: 3,
     });

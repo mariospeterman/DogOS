@@ -242,7 +242,10 @@ function trainingActionState(product: ProductDashboard): TrainingActionState {
   if (product.riskDisposition === "require_more_information") {
     return "needs_information";
   }
-  if (product.riskDisposition !== "continue_low_risk_training") {
+  if (
+    product.riskDisposition !== "continue_low_risk_training" ||
+    product.latestDecision === "reduce_difficulty"
+  ) {
     return "stopped";
   }
   if (product.planStatus !== "active" || product.todaySessionId === null) {
@@ -966,7 +969,9 @@ function InlineSpaceSummary({
     return (
       <section className="chat-inline-panel space-summary-panel">
         <div className="inline-panel-header">
-          <span>{english ? "Plan DogOS is using" : "Plan, den DogOS nutzt"}</span>
+          <span>
+            {english ? "Plan DogOS is using" : "Plan, den DogOS nutzt"}
+          </span>
         </div>
         <div className="inline-panel-body">
           <div className="summary-metrics">
@@ -1265,9 +1270,7 @@ function CoachRuntime({
   const uiLocale = inferUiLocaleFromMessages(messages, locale);
   const presentation = trainingPresentation(product, uiLocale);
   const english = uiLocale === "en";
-  const handlerName =
-    account?.displayName ??
-    (english ? "Handler" : "Mensch");
+  const handlerName = account?.displayName ?? (english ? "Handler" : "Mensch");
   const handlerInitial = handlerName.trim().charAt(0).toUpperCase() || "U";
   const duration = Math.max(
     1,
@@ -2049,7 +2052,7 @@ function CoachRuntime({
           {!chatDeleted &&
           activeSpace !== "media" &&
           ["plan", "train", "progress"].includes(activeSpace) ? (
-            <article className="coach-message assistant coach-panel-message">
+            <section className="coach-message assistant coach-panel-message">
               <span className="coach-avatar">D</span>
               <div className="assistant-response">
                 <p>
@@ -2071,62 +2074,65 @@ function CoachRuntime({
                   product={product}
                 />
               </div>
-            </article>
+            </section>
           ) : null}
 
           {!chatDeleted && activeSpace === "coach" && trainingAllowed ? (
-            <article className="coach-message assistant coach-panel-message">
+            <section className="coach-message assistant coach-panel-message">
               <span className="coach-avatar">D</span>
               <section className="inline-training-card">
-              <div className="inline-card-heading">
-                <span>
+                <div className="inline-card-heading">
+                  <span>
+                    {english
+                      ? `Today with ${product.dogName}`
+                      : `Heute mit ${product.dogName}`}
+                  </span>
+                  <em>{english ? "Ready" : "Bereit"}</em>
+                  <strong>{presentation.title}</strong>
+                </div>
+                <div className="inline-card-meta">
+                  <span>
+                    <Clock3 size={15} /> {duration} Min.
+                  </span>
+                  <span>
+                    <Target size={15} /> {product.currentStep?.repetitions ?? 6}{" "}
+                    {presentation.unit}
+                  </span>
+                </div>
+                <p>{presentation.instruction(product.dogName)}</p>
+                <small>
                   {english
-                    ? `Today with ${product.dogName}`
-                    : `Heute mit ${product.dogName}`}
-                </span>
-                <em>{english ? "Ready" : "Bereit"}</em>
-                <strong>{presentation.title}</strong>
-              </div>
-              <div className="inline-card-meta">
-                <span>
-                  <Clock3 size={15} /> {duration} Min.
-                </span>
-                <span>
-                  <Target size={15} /> {product.currentStep?.repetitions ?? 6}{" "}
-                  {presentation.unit}
-                </span>
-              </div>
-              <p>{presentation.instruction(product.dogName)}</p>
-              <small>
-                {english
-                  ? `Why this: ${product.sessionCount} sessions; ${trainingDecisionLabel(product.latestDecision, english)}.`
-                  : `Warum: ${product.sessionCount} Einheiten; ${trainingDecisionLabel(product.latestDecision, english)}.`}
-              </small>
-              <div className="inline-card-actions">
-                <Link
-                  className="button primary"
-                  href={`/app/coach?space=train&session=${product.todaySessionId}`}
-                >
-                  {english ? "Open guided session" : "Geführte Einheit öffnen"}
-                </Link>
-                <Link className="text-link inline" href="/app/coach?space=plan">
-                  {english ? "Show full plan" : "Gesamten Plan zeigen"}
-                </Link>
-              </div>
+                    ? `Why this: ${product.sessionCount} sessions; ${trainingDecisionLabel(product.latestDecision, english)}.`
+                    : `Warum: ${product.sessionCount} Einheiten; ${trainingDecisionLabel(product.latestDecision, english)}.`}
+                </small>
+                <div className="inline-card-actions">
+                  <Link
+                    className="button primary"
+                    href={`/app/coach?space=train&session=${product.todaySessionId}`}
+                  >
+                    {english ? "Start training" : "Training starten"}
+                  </Link>
+                  <Link
+                    className="text-link inline"
+                    href="/app/coach?space=plan"
+                  >
+                    {english ? "View plan" : "Plan ansehen"}
+                  </Link>
+                </div>
               </section>
-            </article>
+            </section>
           ) : !chatDeleted && activeSpace === "coach" ? (
-            <article className="coach-message assistant coach-panel-message">
+            <section className="coach-message assistant coach-panel-message">
               <span className="coach-avatar">D</span>
               <section className="inline-training-card held">
-              <div className="inline-card-heading">
-                <span>{heldCopy.label}</span>
-                <em>{heldCopy.status}</em>
-                <strong>{heldCopy.title}</strong>
-              </div>
-              <p>{heldCopy.body}</p>
+                <div className="inline-card-heading">
+                  <span>{heldCopy.label}</span>
+                  <em>{heldCopy.status}</em>
+                  <strong>{heldCopy.title}</strong>
+                </div>
+                <p>{heldCopy.body}</p>
               </section>
-            </article>
+            </section>
           ) : null}
 
           {activePanel === null ? null : (

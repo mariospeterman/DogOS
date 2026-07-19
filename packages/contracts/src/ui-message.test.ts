@@ -43,7 +43,9 @@ describe("DogOS UI message contracts", () => {
     expect(
       dogosDataPartSchema.parse({
         accessibilityLabel: "360 case summary",
-        agreements: ["Owner and video both show food refusal near the trigger."],
+        agreements: [
+          "Owner and video both show food refusal near the trigger.",
+        ],
         conflicts: [
           "Owner reports cue failure; video shows handler movement before cue.",
         ],

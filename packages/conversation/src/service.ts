@@ -142,7 +142,11 @@ function coachUiParts(input: {
       type: "data-video-analysis",
     });
   }
-  if (/\b(handoff|trainer|veterinarian|vet|fachperson|tierarzt)\b/i.test(input.reply.text)) {
+  if (
+    /\b(handoff|trainer|veterinarian|vet|fachperson|tierarzt)\b/i.test(
+      input.reply.text,
+    )
+  ) {
     parts.push({
       ...base(),
       accessibilityLabel: "Professional handoff candidate",
@@ -197,6 +201,10 @@ export class CoachConversationService {
 
   ensure(scope: CoachScope, channel: CoachChannel = "web") {
     return this.store.ensure({ ...scope, channel });
+  }
+
+  clearForScope(input: { dogId: string; householdId: string }) {
+    return this.store.clearForScope(input);
   }
 
   async importHistory(input: {

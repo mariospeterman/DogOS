@@ -1,9 +1,6 @@
 import { randomUUID } from "node:crypto";
 import postgres, { type Sql } from "postgres";
-import {
-  dogosDataPartSchema,
-  type DogOSDataPart,
-} from "@dogos/contracts";
+import { dogosDataPartSchema, type DogOSDataPart } from "@dogos/contracts";
 
 import type {
   CoachChannel,
@@ -50,6 +47,7 @@ export interface CoachConversationStore {
     locale: "de-CH" | "en";
   }): Promise<CoachConversation>;
   append(input: AppendCoachMessageInput): Promise<CoachMessage>;
+  clearForScope(input: { dogId: string; householdId: string }): Promise<void>;
   get(conversationId: string): Promise<CoachConversation>;
   setLocale(conversationId: string, locale: "de-CH" | "en"): Promise<void>;
 }
@@ -116,6 +114,18 @@ export class InMemoryCoachConversationStore implements CoachConversationStore {
     };
     conversation.messages.push(message);
     return Promise.resolve(structuredClone(message));
+  }
+
+  clearForScope(input: { dogId: string; householdId: string }): Promise<void> {
+    for (const [id, conversation] of this.#conversations) {
+      if (
+        conversation.dogId === input.dogId &&
+        conversation.householdId === input.householdId
+      ) {
+        this.#conversations.delete(id);
+      }
+    }
+    return Promise.resolve();
   }
 
   get(conversationId: string): Promise<CoachConversation> {
@@ -284,6 +294,17 @@ export class PostgresCoachConversationStore implements CoachConversationStore {
       `;
     }
     return mapMessage(row);
+  }
+
+  async clearForScope(input: {
+    dogId: string;
+    householdId: string;
+  }): Promise<void> {
+    await this.#sql`
+      delete from private.coach_conversations
+      where dog_id = ${input.dogId}::uuid
+        and household_id = ${input.householdId}::uuid
+    `;
   }
 
   async get(conversationId: string): Promise<CoachConversation> {

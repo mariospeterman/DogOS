@@ -1,6 +1,11 @@
 "use client";
 
-import { BadgeCheck, CalendarClock, ExternalLink, ShieldCheck } from "lucide-react";
+import {
+  BadgeCheck,
+  CalendarClock,
+  ExternalLink,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/app-shell";
@@ -81,18 +86,24 @@ export default function TrainersPage() {
         {offers.map((offer) => (
           <article className="glass-panel" key={offer.id}>
             <span className="panel-kicker">
-              <BadgeCheck size={16} /> {offer.evidenceLevel.replaceAll("_", " ")}
+              <BadgeCheck size={16} />{" "}
+              {offer.evidenceLevel.replaceAll("_", " ")}
             </span>
             <h3>{offer.title}</h3>
             <p className="microcopy">{offer.reason}</p>
             <div className="stat-row">
               <span>{offer.city ?? offer.kind.replaceAll("_", " ")}</span>
-              <strong>{offer.priceLabel ?? `${Math.round(offer.rank * 100)}% fit`}</strong>
+              <strong>
+                {offer.priceLabel ?? `${Math.round(offer.rank * 100)}% fit`}
+              </strong>
             </div>
             <p className="legal-line">
               <ShieldCheck size={15} /> {offer.disclosure}
             </p>
-            <button className="button primary wide" onClick={() => void createReferral(offer.id)}>
+            <button
+              className="button primary wide"
+              onClick={() => void createReferral(offer.id)}
+            >
               <ExternalLink size={17} /> Open
             </button>
           </article>

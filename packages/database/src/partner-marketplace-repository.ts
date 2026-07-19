@@ -105,7 +105,9 @@ export class InMemoryPartnerMarketplaceStore implements PartnerMarketplaceStore 
     this.#offers = offers;
   }
 
-  async listOffers(input: Parameters<PartnerMarketplaceStore["listOffers"]>[0]) {
+  async listOffers(
+    input: Parameters<PartnerMarketplaceStore["listOffers"]>[0],
+  ) {
     return this.#offers
       .filter(
         (offer) =>
@@ -156,7 +158,9 @@ export class PartnerMarketplaceRepository implements PartnerMarketplaceStore {
     await this.#sql.end();
   }
 
-  async listOffers(input: Parameters<PartnerMarketplaceStore["listOffers"]>[0]) {
+  async listOffers(
+    input: Parameters<PartnerMarketplaceStore["listOffers"]>[0],
+  ) {
     const rows = await this.#sql<OfferRow[]>`
       select
         offer.id::text,
@@ -228,7 +232,8 @@ const defaultPartnerOffers: PartnerOfferRecord[] = [
     kind: "veterinary_triage",
     priceLabel: null,
     rank: 0.88,
-    reason: "Use when pain, acute health change, injury, or food refusal appears.",
+    reason:
+      "Use when pain, acute health change, injury, or food refusal appears.",
     title: "Veterinary triage guidance",
   },
   {
@@ -242,7 +247,8 @@ const defaultPartnerOffers: PartnerOfferRecord[] = [
     kind: "affiliate_equipment",
     priceLabel: "CHF 24-39",
     rank: 0.8,
-    reason: "Long-line recall setup for distance without removing safety control.",
+    reason:
+      "Long-line recall setup for distance without removing safety control.",
     title: "Light 5-10m training line",
   },
 ];

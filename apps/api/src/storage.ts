@@ -120,9 +120,7 @@ interface ProbePayload {
   }>;
 }
 
-export class SupabaseFfmpegVideoObjectInspector
-  implements VideoObjectInspector
-{
+export class SupabaseFfmpegVideoObjectInspector implements VideoObjectInspector {
   readonly #bucket: string;
   readonly #client: ReturnType<typeof createClient>;
   readonly #ffmpegPath: string;
@@ -202,19 +200,25 @@ export class SupabaseFfmpegVideoObjectInspector
       ]);
       const frames: VideoFrameEvidence[] = [];
       for (let index = 1; index <= input.maxFrames; index += 1) {
-        const path = join(directory, `frame-${String(index).padStart(3, "0")}.jpg`);
+        const path = join(
+          directory,
+          `frame-${String(index).padStart(3, "0")}.jpg`,
+        );
         try {
           const data = await readFile(path);
           frames.push({
             contentType: "image/jpeg",
             data: data.toString("base64"),
-            timestampMs: Math.round(((index - 1) * 60_000) / Math.max(1, input.maxFrames)),
+            timestampMs: Math.round(
+              ((index - 1) * 60_000) / Math.max(1, input.maxFrames),
+            ),
           });
         } catch {
           break;
         }
       }
-      if (frames.length === 0) throw new Error("VIDEO_ANALYSIS_FRAMES_REQUIRED");
+      if (frames.length === 0)
+        throw new Error("VIDEO_ANALYSIS_FRAMES_REQUIRED");
       return frames;
     } finally {
       await rm(directory, { force: true, recursive: true });

@@ -1,12 +1,7 @@
 import postgres, { type Sql } from "postgres";
 
 type JsonValue =
-  | boolean
-  | null
-  | number
-  | string
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  boolean | null | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 export type ProfessionalHandoffTarget = "trainer" | "veterinary";
 
@@ -110,8 +105,7 @@ function mapRow(row: ProfessionalHandoffRow): ProfessionalHandoffRecord {
     dogId: row.dog_id,
     evidenceRefs: evidenceRefs(row.handoff_evidence_refs),
     goalId: row.goal_id,
-    handoffGeneratedAt:
-      iso(row.handoff_generated_at) ?? iso(row.created_at)!,
+    handoffGeneratedAt: iso(row.handoff_generated_at) ?? iso(row.created_at)!,
     householdId: row.household_id,
     id: row.id,
     reasonCode: row.reason_code,
@@ -137,9 +131,7 @@ export interface ProfessionalHandoffStore {
   }): Promise<ProfessionalHandoffRecord>;
 }
 
-export class InMemoryProfessionalHandoffStore
-  implements ProfessionalHandoffStore
-{
+export class InMemoryProfessionalHandoffStore implements ProfessionalHandoffStore {
   readonly #records = new Map<string, ProfessionalHandoffRecord>();
 
   async create(
@@ -166,9 +158,7 @@ export class InMemoryProfessionalHandoffStore
   }
 }
 
-export class ProfessionalHandoffRepository
-  implements ProfessionalHandoffStore
-{
+export class ProfessionalHandoffRepository implements ProfessionalHandoffStore {
   readonly #sql: Sql;
 
   constructor(connectionString: string) {
@@ -217,7 +207,8 @@ export class ProfessionalHandoffRepository
         handoff_evidence_refs, handoff_disagreements, handoff_generated_at,
         share_expires_at, created_at
     `;
-    if (row === undefined) throw new Error("PROFESSIONAL_HANDOFF_CREATE_FAILED");
+    if (row === undefined)
+      throw new Error("PROFESSIONAL_HANDOFF_CREATE_FAILED");
     return mapRow(row);
   }
 }

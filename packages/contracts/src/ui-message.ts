@@ -257,9 +257,7 @@ export const dogosDataPartSchema = z.discriminatedUnion("type", [
 
 export type DogOSDataPart = z.infer<typeof dogosDataPartSchema>;
 
-export type DogOSMessageMetadata = z.infer<
-  typeof dogosUiMessageMetadataSchema
->;
+export type DogOSMessageMetadata = z.infer<typeof dogosUiMessageMetadataSchema>;
 
 export type DogOSTools = Record<string, unknown>;
 

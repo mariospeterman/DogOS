@@ -31,66 +31,62 @@ describe("health routes", () => {
     expect(response.json()).toEqual({ status: "ok" });
   }, 10_000);
 
-  it(
-    "reports configured provider readiness separately from liveness",
-    async () => {
-      const app = buildApp({
-        readiness: {
-          ai: {
-            asr: "disabled",
-            cv: "disabled",
-            embedding: "disabled",
-            knowledgeRelease: null,
-            live: "disabled",
-            moderation: "disabled",
-            policyVersion: "test-policy",
-            text: "ready",
-            vod: "disabled",
-          },
-          database: true,
-          liveKit: false,
-          openAI: true,
-          stripe: false,
-          supabaseStorage: true,
-          workers: true,
-        },
-      });
-      apps.push(app);
-
-      const response = await app.inject({
-        method: "GET",
-        url: "/health/ready",
-      });
-
-      expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({
-        checks: {
-          api: "ready",
-          database: "configured",
-          liveKit: "not_configured",
-          openAI: "configured",
-          stripe: "not_configured",
-          supabaseStorage: "configured",
-          workers: "configured",
-        },
-        status: "ready",
-      });
-
-      const capabilities = await app.inject({
-        method: "GET",
-        url: "/health/capabilities",
-      });
-      expect(capabilities.statusCode).toBe(200);
-      expect(capabilities.json()).toEqual({
-        capabilities: expect.objectContaining({
+  it("reports configured provider readiness separately from liveness", async () => {
+    const app = buildApp({
+      readiness: {
+        ai: {
+          asr: "disabled",
+          cv: "disabled",
+          embedding: "disabled",
+          knowledgeRelease: null,
+          live: "disabled",
+          moderation: "disabled",
           policyVersion: "test-policy",
           text: "ready",
           vod: "disabled",
-        }),
-      });
-    },
-    10_000,
-  );
+        },
+        database: true,
+        liveKit: false,
+        openAI: true,
+        stripe: false,
+        supabaseStorage: true,
+        workers: true,
+      },
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/health/ready",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      checks: {
+        api: "ready",
+        database: "configured",
+        liveKit: "not_configured",
+        openAI: "configured",
+        stripe: "not_configured",
+        supabaseStorage: "configured",
+        workers: "configured",
+      },
+      status: "ready",
+    });
+
+    const capabilities = await app.inject({
+      method: "GET",
+      url: "/health/capabilities",
+    });
+    expect(capabilities.statusCode).toBe(200);
+    expect(capabilities.json()).toEqual({
+      capabilities: expect.objectContaining({
+        policyVersion: "test-policy",
+        text: "ready",
+        vod: "disabled",
+      }),
+    });
+  }, 10_000);
 
   it("allows browser API calls only from the configured web origin", async () => {
     const app = buildApp({ webOrigin: "https://mobile.dogos.test" });
