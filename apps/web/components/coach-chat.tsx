@@ -966,7 +966,7 @@ function InlineSpaceSummary({
     return (
       <section className="chat-inline-panel space-summary-panel">
         <div className="inline-panel-header">
-          <span>{english ? "Plan" : "Plan"}</span>
+          <span>{english ? "Plan DogOS is using" : "Plan, den DogOS nutzt"}</span>
         </div>
         <div className="inline-panel-body">
           <div className="summary-metrics">
@@ -986,7 +986,11 @@ function InlineSpaceSummary({
               <strong>{product.sessionCount}</strong>
             </span>
           </div>
-          <p>{presentation.instruction(product.dogName)}</p>
+          <p>
+            {english
+              ? `This is the current training path. Each module stays small enough to run as a micro-session and only progresses when the evidence gate is met.`
+              : `Das ist der aktuelle Trainingspfad. Jedes Modul bleibt klein genug für eine Mikro-Einheit und wird nur erhöht, wenn das Evidenz-Gate passt.`}
+          </p>
           <div className="summary-progress">
             <span
               style={
@@ -999,17 +1003,59 @@ function InlineSpaceSummary({
               }
             />
           </div>
-          <div className="inline-panel-list">
-            <span>
-              <strong>{english ? "Stage" : "Stufe"}</strong>
-              <small>{presentation.stage}</small>
-            </span>
-            <span>
-              <strong>{english ? "Evidence gate" : "Evidenz-Gate"}</strong>
-              <small>
-                {trainingDecisionLabel(product.latestDecision, english)}
-              </small>
-            </span>
+          <div className="plan-module-stack">
+            {[
+              {
+                body: presentation.instruction(product.dogName),
+                label: english ? "Module 1" : "Modul 1",
+                reason: english
+                  ? "Builds a calm baseline before adding harder distractions."
+                  : "Baut eine ruhige Basis auf, bevor stärkere Ablenkungen dazukommen.",
+                title: presentation.title,
+              },
+              {
+                body: english
+                  ? "Repeat the same cue and reward timing in one slightly busier place."
+                  : "Wiederhole dasselbe Timing für Signal und Belohnung an einem leicht schwierigeren Ort.",
+                label: english ? "Module 2" : "Modul 2",
+                reason: english
+                  ? "Generalizes the behavior without changing everything at once."
+                  : "Überträgt das Verhalten, ohne alles gleichzeitig zu verändern.",
+                title: english
+                  ? "Same rule, mild distraction"
+                  : "Gleiche Regel, leichte Ablenkung",
+              },
+              {
+                body: english
+                  ? "Use the observation day to confirm whether the difficulty should increase, repeat, or drop."
+                  : "Nutze den Beobachtungstag, um zu prüfen, ob die Schwierigkeit steigt, bleibt oder sinkt.",
+                label: english ? "Module 3" : "Modul 3",
+                reason: english
+                  ? "Prevents DogOS from inventing progress from a single good attempt."
+                  : "Verhindert, dass DogOS aus einem einzelnen guten Versuch Fortschritt erfindet.",
+                title: english ? "Evidence check" : "Evidenz prüfen",
+              },
+            ].map((module, index) => (
+              <details key={module.label} open={index === 0}>
+                <summary>
+                  <span>{module.label}</span>
+                  <strong>{module.title}</strong>
+                </summary>
+                <p>{module.body}</p>
+                <small>
+                  {english ? "Why: " : "Warum: "}
+                  {module.reason}
+                </small>
+              </details>
+            ))}
+            <div className="inline-panel-list compact">
+              <span>
+                <strong>{english ? "Evidence gate" : "Evidenz-Gate"}</strong>
+                <small>
+                  {trainingDecisionLabel(product.latestDecision, english)}
+                </small>
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -1019,7 +1065,9 @@ function InlineSpaceSummary({
     return (
       <section className="chat-inline-panel space-summary-panel">
         <div className="inline-panel-header">
-          <span>{english ? "Training session" : "Trainingseinheit"}</span>
+          <span>
+            {english ? "Guided micro-session" : "Geführte Mikro-Einheit"}
+          </span>
         </div>
         <div className="inline-panel-body">
           <div className="summary-metrics">
@@ -1040,12 +1088,45 @@ function InlineSpaceSummary({
               </strong>
             </span>
           </div>
-          <p>{presentation.instruction(product.dogName)}</p>
-          <div className="inline-panel-list">
-            <span>
-              <strong>{presentation.title}</strong>
-              <small>{presentation.stage}</small>
-            </span>
+          <p>
+            {english
+              ? "Tick each step while you train. Stop early if the leash gets tense repeatedly, Rex avoids, or the environment becomes too hard."
+              : "Hake jeden Schritt während der Einheit ab. Stoppe früher, wenn die Leine wiederholt straff wird, Rex ausweicht oder die Umgebung zu schwer wird."}
+          </p>
+          <div className="micro-session-checklist">
+            {[
+              english
+                ? "Choose a quiet 10-15 m section before you start."
+                : "Wähle vor dem Start einen ruhigen Abschnitt von 10-15 m.",
+              presentation.instruction(product.dogName),
+              english
+                ? "Mark one clean repetition when Rex reorients before the leash tightens."
+                : "Zähle eine saubere Wiederholung, wenn Rex sich orientiert, bevor die Leine straff wird.",
+              english
+                ? "End after the planned reps or after two signs of stress."
+                : "Beende nach den geplanten Wiederholungen oder nach zwei Stresszeichen.",
+            ].map((step, index) => (
+              <label key={step}>
+                <input type="checkbox" />
+                <span>
+                  <strong>
+                    {english ? `Step ${index + 1}` : `Schritt ${index + 1}`}
+                  </strong>
+                  {step}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="inline-card-actions">
+            <Link
+              className="button primary"
+              href={`/app/session/${product.todaySessionId ?? ""}`}
+            >
+              {english ? "Open session timer" : "Session-Timer öffnen"}
+            </Link>
+            <Link className="text-link inline" href="/app/coach?space=plan">
+              {english ? "Why this plan?" : "Warum dieser Plan?"}
+            </Link>
           </div>
         </div>
       </section>
@@ -1920,6 +2001,9 @@ function CoachRuntime({
                     id={`message-${message.id}`}
                     key={message.id}
                   >
+                    {message.role === "assistant" ? (
+                      <span className="coach-avatar">D</span>
+                    ) : null}
                     <div
                       className={
                         message.role === "assistant"
@@ -1965,15 +2049,35 @@ function CoachRuntime({
           {!chatDeleted &&
           activeSpace !== "media" &&
           ["plan", "train", "progress"].includes(activeSpace) ? (
-            <InlineSpaceSummary
-              activeSpace={activeSpace}
-              english={english}
-              product={product}
-            />
+            <article className="coach-message assistant coach-panel-message">
+              <span className="coach-avatar">D</span>
+              <div className="assistant-response">
+                <p>
+                  {activeSpace === "plan"
+                    ? english
+                      ? `Here is the plan I am using for ${product.dogName}.`
+                      : `Hier ist der Plan, den ich für ${product.dogName} nutze.`
+                    : activeSpace === "train"
+                      ? english
+                        ? "Start with this checklist and keep the session short."
+                        : "Starte mit dieser Checkliste und halte die Einheit kurz."
+                      : english
+                        ? "Here is what I am comparing before changing the plan."
+                        : "Das vergleiche ich, bevor ich den Plan ändere."}
+                </p>
+                <InlineSpaceSummary
+                  activeSpace={activeSpace}
+                  english={english}
+                  product={product}
+                />
+              </div>
+            </article>
           ) : null}
 
-          {!chatDeleted && trainingAllowed ? (
-            <section className="inline-training-card">
+          {!chatDeleted && activeSpace === "coach" && trainingAllowed ? (
+            <article className="coach-message assistant coach-panel-message">
+              <span className="coach-avatar">D</span>
+              <section className="inline-training-card">
               <div className="inline-card-heading">
                 <span>
                   {english
@@ -2003,22 +2107,26 @@ function CoachRuntime({
                   className="button primary"
                   href={`/app/coach?space=train&session=${product.todaySessionId}`}
                 >
-                  {english ? "Start training" : "Training starten"}
+                  {english ? "Open guided session" : "Geführte Einheit öffnen"}
                 </Link>
                 <Link className="text-link inline" href="/app/coach?space=plan">
-                  {english ? "View plan" : "Plan ansehen"}
+                  {english ? "Show full plan" : "Gesamten Plan zeigen"}
                 </Link>
               </div>
-            </section>
-          ) : !chatDeleted ? (
-            <section className="inline-training-card held">
+              </section>
+            </article>
+          ) : !chatDeleted && activeSpace === "coach" ? (
+            <article className="coach-message assistant coach-panel-message">
+              <span className="coach-avatar">D</span>
+              <section className="inline-training-card held">
               <div className="inline-card-heading">
                 <span>{heldCopy.label}</span>
                 <em>{heldCopy.status}</em>
                 <strong>{heldCopy.title}</strong>
               </div>
               <p>{heldCopy.body}</p>
-            </section>
+              </section>
+            </article>
           ) : null}
 
           {activePanel === null ? null : (

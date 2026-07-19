@@ -1,8 +1,8 @@
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
+  safeValidateUIMessages,
   type UIMessage,
-  validateUIMessages,
 } from "ai";
 
 interface CoachApiResponse {
@@ -24,6 +24,51 @@ function latestUserText(messages: UIMessage[]): string | null {
   return text.length > 0 && text.length <= 2_000 ? text : null;
 }
 
+function isUiMessageArray(value: unknown): value is UIMessage[] {
+  return Array.isArray(value);
+}
+
+function latestUserTextFromUnknown(messages: unknown): string | null {
+  if (!Array.isArray(messages)) return null;
+  const message = messages.findLast(
+    (entry): entry is { parts: unknown[]; role: "user" } =>
+      typeof entry === "object" &&
+      entry !== null &&
+      (entry as { role?: unknown }).role === "user" &&
+      Array.isArray((entry as { parts?: unknown }).parts),
+  );
+  if (message === undefined) return null;
+  const text = message.parts
+    .filter(
+      (part): part is { text: string; type: "text" } =>
+        typeof part === "object" &&
+        part !== null &&
+        (part as { type?: unknown }).type === "text" &&
+        typeof (part as { text?: unknown }).text === "string",
+    )
+    .map((part) => part.text)
+    .join("\n")
+    .trim();
+  return text.length > 0 && text.length <= 2_000 ? text : null;
+}
+
+function dogosServerApiBase(): string {
+  const configured =
+    process.env.DOGOS_INTERNAL_API_URL ??
+    process.env.DOGOS_API_URL ??
+    process.env.NEXT_PUBLIC_API_URL;
+  const local = (process.env.NEXT_PUBLIC_DOGOS_ENV ?? "local") === "local";
+  if (
+    local &&
+    (configured === undefined ||
+      configured.startsWith("http://127.0.0.1") ||
+      configured.startsWith("http://localhost"))
+  ) {
+    return "http://127.0.0.1:4000";
+  }
+  return configured ?? "http://127.0.0.1:4000";
+}
+
 export async function POST(request: Request) {
   try {
     const raw = (await request.json()) as {
@@ -32,15 +77,22 @@ export async function POST(request: Request) {
       dogId?: string;
       messages?: unknown;
     };
-    const messages = await validateUIMessages({ messages: raw.messages });
-    const message = latestUserText(messages);
+    const validation = await safeValidateUIMessages({ messages: raw.messages });
+    const messages =
+      validation.success && isUiMessageArray(validation.data)
+        ? validation.data
+        : [];
+    const message =
+      messages.length === 0
+        ? latestUserTextFromUnknown(raw.messages)
+        : latestUserText(messages);
     if (message === null) {
       return new Response("Invalid chat request", { status: 400 });
     }
     const hasDog = typeof raw.dogId === "string";
     if (
       hasDog &&
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         raw.dogId!,
       )
     )
@@ -55,10 +107,7 @@ export async function POST(request: Request) {
       const value = request.headers.get(name);
       if (value !== null) upstreamHeaders[name] = value;
     }
-    const apiBase =
-      process.env.DOGOS_API_URL ??
-      process.env.NEXT_PUBLIC_API_URL ??
-      "http://127.0.0.1:4000";
+    const apiBase = dogosServerApiBase();
     const response = await fetch(
       `${apiBase}${
         hasDog ? "/v1/coach/messages?stream=1" : "/v1/onboarding/messages"
@@ -114,7 +163,7 @@ export async function POST(request: Request) {
           }
         },
         onError: () => "DogOS could not answer right now.",
-        originalMessages: messages,
+        ...(messages.length === 0 ? {} : { originalMessages: messages }),
       });
       return createUIMessageStreamResponse({ stream });
     }
@@ -136,10 +185,16 @@ export async function POST(request: Request) {
         writer.write({ id, type: "text-end" });
       },
       onError: () => "DogOS could not answer right now.",
-      originalMessages: messages,
+      ...(messages.length === 0 ? {} : { originalMessages: messages }),
     });
     return createUIMessageStreamResponse({ stream });
-  } catch {
-    return new Response("Invalid chat request", { status: 400 });
+  } catch (caught) {
+    const local = (process.env.NEXT_PUBLIC_DOGOS_ENV ?? "local") === "local";
+    return new Response(
+      local && caught instanceof Error
+        ? `Invalid chat request: ${caught.message}`
+        : "Invalid chat request",
+      { status: 400 },
+    );
   }
 }
