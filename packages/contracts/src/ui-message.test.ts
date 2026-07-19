@@ -35,7 +35,45 @@ describe("DogOS UI message contracts", () => {
       "train",
       "progress",
       "media",
+      "team",
     ]);
+  });
+
+  it("accepts persisted collaboration and 360 analysis parts", () => {
+    expect(
+      dogosDataPartSchema.parse({
+        accessibilityLabel: "360 case summary",
+        agreements: ["Owner and video both show food refusal near the trigger."],
+        conflicts: [
+          "Owner reports cue failure; video shows handler movement before cue.",
+        ],
+        id: "perspective-summary-1",
+        missingInformation: ["Starting distance is still unknown."],
+        nextObservation: "Record the first four repetitions from the side.",
+        type: "data-perspective-summary",
+      }),
+    ).toMatchObject({
+      conflicts: expect.arrayContaining([
+        expect.stringMatching(/handler movement/),
+      ]),
+      type: "data-perspective-summary",
+    });
+
+    expect(
+      dogosDataPartSchema.parse({
+        accessibilityLabel: "Trainer handoff preview",
+        excludedCount: 4,
+        includedCount: 8,
+        mediaIncluded: true,
+        id: "handoff-preview-1",
+        targetProfessionalType: "trainer",
+        type: "data-handoff-preview",
+      }),
+    ).toMatchObject({
+      mediaIncluded: true,
+      targetProfessionalType: "trainer",
+      type: "data-handoff-preview",
+    });
   });
 
   it("records safe metadata defaults for persisted UI messages", () => {

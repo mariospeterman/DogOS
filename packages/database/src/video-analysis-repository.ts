@@ -1,5 +1,8 @@
 import postgres, { type Sql } from "postgres";
 
+type JsonValue =
+  boolean | null | number | string | JsonValue[] | { [key: string]: JsonValue };
+
 export type VideoAnalysisStatus =
   "upload_requested" | "uploaded" | "processing" | "completed" | "failed";
 
@@ -87,6 +90,16 @@ export interface VideoAnalysisStore {
     householdId: string;
     id: string;
   }): Promise<VideoAnalysisRecord>;
+  completeAnalysis(input: {
+    findings: VideoFinding[];
+    householdId: string;
+    id: string;
+  }): Promise<VideoAnalysisRecord>;
+  failAnalysis(input: {
+    failureCode: string;
+    householdId: string;
+    id: string;
+  }): Promise<VideoAnalysisRecord>;
   create(input: {
     actorUserId: string;
     contentType: "video/mp4" | "video/quicktime" | "video/webm";
@@ -160,6 +173,45 @@ export class InMemoryVideoAnalysisStore implements VideoAnalysisStore {
     const updated: VideoAnalysisRecord = {
       ...record,
       status: "processing",
+    };
+    this.#records.set(input.id, updated);
+    return structuredClone(updated);
+  }
+
+  async completeAnalysis(input: {
+    findings: VideoFinding[];
+    householdId: string;
+    id: string;
+  }): Promise<VideoAnalysisRecord> {
+    const record = this.#records.get(input.id);
+    if (record === undefined || record.householdId !== input.householdId) {
+      throw new Error("RESOURCE_NOT_FOUND");
+    }
+    const updated: VideoAnalysisRecord = {
+      ...record,
+      completedAt: new Date().toISOString(),
+      failureCode: null,
+      findings: structuredClone(input.findings),
+      status: "completed",
+    };
+    this.#records.set(input.id, updated);
+    return structuredClone(updated);
+  }
+
+  async failAnalysis(input: {
+    failureCode: string;
+    householdId: string;
+    id: string;
+  }): Promise<VideoAnalysisRecord> {
+    const record = this.#records.get(input.id);
+    if (record === undefined || record.householdId !== input.householdId) {
+      throw new Error("RESOURCE_NOT_FOUND");
+    }
+    const updated: VideoAnalysisRecord = {
+      ...record,
+      completedAt: new Date().toISOString(),
+      failureCode: input.failureCode,
+      status: "failed",
     };
     this.#records.set(input.id, updated);
     return structuredClone(updated);
@@ -271,6 +323,57 @@ export class VideoAnalysisRepository implements VideoAnalysisStore {
       returning *
     `;
     if (row === undefined) throw new Error("RESOURCE_NOT_FOUND");
+    return mapRow(row);
+  }
+
+  async completeAnalysis(input: {
+    findings: VideoFinding[];
+    householdId: string;
+    id: string;
+  }): Promise<VideoAnalysisRecord> {
+    const [row] = await this.#sql<VideoAnalysisRow[]>`
+      update api.video_analyses
+      set status = 'completed',
+        findings = ${this.#sql.json(input.findings as unknown as JsonValue)},
+        completed_at = now(),
+        failure_code = null
+      where id = ${input.id}::uuid
+        and household_id = ${input.householdId}::uuid
+        and status in ('uploaded', 'processing')
+      returning *
+    `;
+    if (row === undefined) throw new Error("RESOURCE_NOT_FOUND");
+    await this.#sql`
+      update private.video_analysis_jobs
+      set status = 'completed', updated_at = now()
+      where analysis_id = ${input.id}::uuid
+    `;
+    return mapRow(row);
+  }
+
+  async failAnalysis(input: {
+    failureCode: string;
+    householdId: string;
+    id: string;
+  }): Promise<VideoAnalysisRecord> {
+    const [row] = await this.#sql<VideoAnalysisRow[]>`
+      update api.video_analyses
+      set status = 'failed',
+        failure_code = ${input.failureCode},
+        completed_at = now()
+      where id = ${input.id}::uuid
+        and household_id = ${input.householdId}::uuid
+        and status in ('uploaded', 'processing')
+      returning *
+    `;
+    if (row === undefined) throw new Error("RESOURCE_NOT_FOUND");
+    await this.#sql`
+      update private.video_analysis_jobs
+      set status = 'failed',
+        failure_code = ${input.failureCode},
+        updated_at = now()
+      where analysis_id = ${input.id}::uuid
+    `;
     return mapRow(row);
   }
 

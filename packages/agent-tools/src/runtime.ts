@@ -66,7 +66,13 @@ const endpoint = (
         expectedVersion: input.expectedVersion,
       });
     case "dogos_request_professional_handoff":
-      return post(`/v1/dogs/${String(input.dogId)}/referrals`);
+      return post(`/v1/dogs/${String(input.dogId)}/referrals`, {
+        ...(input.reason === undefined ? {} : { reason: input.reason }),
+        ...(input.targetProfessionalType === undefined
+          ? {}
+          : { targetProfessionalType: input.targetProfessionalType }),
+        ...(input.ttlDays === undefined ? {} : { ttlDays: input.ttlDays }),
+      });
   }
 };
 

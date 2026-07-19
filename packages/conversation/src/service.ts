@@ -1,3 +1,4 @@
+import type { DogOSDataPart } from "@dogos/contracts";
 import type {
   CoachChannel,
   CoachContextKind,
@@ -8,11 +9,23 @@ import type {
 } from "./types.js";
 import { citationBlock, composeCoachReply } from "./reply.js";
 import type { CoachConversationStore } from "./store.js";
+import { planCoachTurn } from "./turn-planner.js";
 
 export type CoachServiceTier = "freemium" | "plus" | "pro" | "ultra";
 export const maxCoachReplyCharacters = 3_600;
 const forbiddenOwnerVisibleClaim =
   /\b(diagnos(?:e|is)|anxiety disorder|trauma|pain|aggression|biometric|face recognition|medical emergency|medizinische diagnose|schmerzdiagnose|aggressionsdiagnose)\b/i;
+
+function validationPendingAcknowledgement(input: {
+  dogName?: string;
+  locale: "de-CH" | "en";
+}): string {
+  const name = input.dogName?.trim() || "deines Hundes";
+  if (input.locale === "de-CH") {
+    return `Ich prüfe ${name}s aktuellen Plan und die letzten DogOS Daten...\n\n`;
+  }
+  return `I'm checking ${name}'s current plan and recent DogOS data...\n\n`;
+}
 
 function withCitations(input: {
   context: CoachTrainingContext;
@@ -59,6 +72,95 @@ function validateOwnerVisibleReply(input: {
     }
   }
   return text;
+}
+
+function coachUiParts(input: {
+  context: CoachTrainingContext;
+  contextKind?: CoachContextKind;
+  reply: CoachReply;
+}): DogOSDataPart[] {
+  const parts: DogOSDataPart[] = [];
+  const base = (): Pick<
+    DogOSDataPart,
+    "actions" | "artifact" | "canonicalCode" | "evidenceRefs" | "schemaVersion"
+  > => ({
+    actions: [],
+    artifact: null,
+    canonicalCode: null,
+    evidenceRefs: [],
+    schemaVersion: "1.0.0",
+  });
+  const step = input.context.currentStep;
+  const now = new Date().toISOString();
+  if (input.contextKind === "plan" || input.contextKind === undefined) {
+    parts.push({
+      ...base(),
+      accessibilityLabel: "Current DogOS training plan",
+      durationMinutes: input.context.durationMinutes,
+      id: "artifact-plan-current",
+      state: "active",
+      summary: `${input.context.goal}: ${input.context.stage}`,
+      type: "data-plan",
+    });
+  }
+  if (step !== null && step !== undefined) {
+    parts.push({
+      ...base(),
+      accessibilityLabel: "Current micro-session",
+      durationSeconds: step.durationSeconds,
+      id: "artifact-session-current",
+      repetitions: step.repetitions,
+      state: "active",
+      stepCode: step.stepCode,
+      type: "data-session",
+    });
+  }
+  if (
+    input.contextKind === "progress" ||
+    input.context.baselineSuccessRate !== undefined ||
+    input.context.targetSuccessRate !== undefined
+  ) {
+    parts.push({
+      ...base(),
+      accessibilityLabel: "Current progress target",
+      baselineSuccessRate: input.context.baselineSuccessRate ?? 0,
+      id: "artifact-progress-current",
+      state: "active",
+      targetSuccessRate: input.context.targetSuccessRate ?? null,
+      type: "data-progress",
+    });
+  }
+  if (input.contextKind === "media") {
+    parts.push({
+      ...base(),
+      accessibilityLabel: "Video review request",
+      filename: "training-clip",
+      findingsCount: 0,
+      id: `artifact-video-request-${now}`,
+      state: "proposed",
+      status: "upload_requested",
+      type: "data-video-analysis",
+    });
+  }
+  if (/\b(handoff|trainer|veterinarian|vet|fachperson|tierarzt)\b/i.test(input.reply.text)) {
+    parts.push({
+      ...base(),
+      accessibilityLabel: "Professional handoff candidate",
+      disagreementCount: 0,
+      evidenceCount: input.context.evidenceCount,
+      handoffId: null,
+      id: `artifact-handoff-preview-${now}`,
+      state: "proposed",
+      summary: input.reply.text.slice(0, 1_000),
+      targetProfessionalType: /\b(vet|veterinarian|tierarzt)\b/i.test(
+        input.reply.text,
+      )
+        ? "veterinary"
+        : "trainer",
+      type: "data-professional-handoff",
+    });
+  }
+  return parts;
 }
 
 export interface CoachReplyGenerator {
@@ -134,6 +236,7 @@ export class CoachConversationService {
     contextSubjectId?: string;
     links: CoachLinks;
     message: string;
+    modelEnabled?: boolean;
     scope: CoachScope;
     tier?: CoachServiceTier;
     traceId: string;
@@ -153,6 +256,13 @@ export class CoachConversationService {
         : { contextKind: input.contextKind }),
       currentLocale: conversation.locale,
       links: input.links,
+      message: input.message,
+    });
+    const turnPlan = planCoachTurn({
+      context: input.context,
+      ...(input.contextKind === undefined
+        ? {}
+        : { contextKind: input.contextKind }),
       message: input.message,
     });
     if (existing !== undefined) {
@@ -186,7 +296,7 @@ export class CoachConversationService {
       });
     }
     let reply = deterministicReply;
-    if (this.generator !== undefined) {
+    if (this.generator !== undefined && input.modelEnabled !== false) {
       try {
         const generated = await this.generator.generate({
           context: input.context,
@@ -222,8 +332,20 @@ export class CoachConversationService {
       }
     }
     await this.store.setLocale(conversation.id, reply.locale);
+    const uiParts = coachUiParts({
+      context: input.context,
+      ...(input.contextKind === undefined
+        ? {}
+        : { contextKind: input.contextKind }),
+      reply,
+    });
     await this.store.append({
       actorUserId: null,
+      artifactRefs: uiParts.map((part) => ({
+        id: part.id,
+        kind: part.type,
+        version: null,
+      })),
       channel: input.channel,
       clientMessageId: `reply:${input.clientMessageId}`,
       content: reply.text,
@@ -234,8 +356,13 @@ export class CoachConversationService {
         ? {}
         : { contextSubjectId: input.contextSubjectId }),
       conversationId: conversation.id,
+      secondaryTags: [
+        `intent:${turnPlan.primaryIntent}`,
+        `risk:${turnPlan.responseRisk}`,
+      ],
       role: "assistant",
       traceId: input.traceId,
+      uiParts,
     });
     return { conversation: await this.store.get(conversation.id), reply };
   }
@@ -248,6 +375,7 @@ export class CoachConversationService {
     contextSubjectId?: string;
     links: CoachLinks;
     message: string;
+    modelEnabled?: boolean;
     scope: CoachScope;
     tier?: CoachServiceTier;
     traceId: string;
@@ -263,6 +391,13 @@ export class CoachConversationService {
         : { contextKind: input.contextKind }),
       currentLocale: conversation.locale,
       links: input.links,
+      message: input.message,
+    });
+    const turnPlan = planCoachTurn({
+      context: input.context,
+      ...(input.contextKind === undefined
+        ? {}
+        : { contextKind: input.contextKind }),
       message: input.message,
     });
     const existing = conversation.messages.find(
@@ -298,8 +433,12 @@ export class CoachConversationService {
       });
     }
 
+    yield validationPendingAcknowledgement({
+      dogName: input.context.dogName,
+      locale: deterministicReply.locale,
+    });
     let text = "";
-    if (this.generator?.stream !== undefined) {
+    if (this.generator?.stream !== undefined && input.modelEnabled !== false) {
       try {
         for await (const delta of this.generator.stream({
           context: input.context,
@@ -319,15 +458,30 @@ export class CoachConversationService {
             throw new Error("COACH_REPLY_TOO_LONG");
           }
           text = next;
-          yield delta;
         }
       } catch {
         text = "";
       }
     }
-    if (text.trim().length === 0) {
-      text = deterministicReply.text;
-      yield text;
+    if (
+      text.trim().length === 0 &&
+      this.generator !== undefined &&
+      input.modelEnabled !== false
+    ) {
+      try {
+        text = await this.generator.generate({
+          context: input.context,
+          ...(input.contextKind === undefined
+            ? {}
+            : { contextKind: input.contextKind }),
+          draft: deterministicReply,
+          message: input.message,
+          tier: input.tier ?? "freemium",
+          traceId: input.traceId,
+        });
+      } catch {
+        text = "";
+      }
     }
 
     try {
@@ -338,7 +492,6 @@ export class CoachConversationService {
       });
     } catch {
       text = deterministicReply.text;
-      yield text;
     }
 
     const citedText = withCitations({
@@ -347,13 +500,23 @@ export class CoachConversationService {
       message: input.message,
       text,
     });
-    if (citedText.length > text.length) {
-      yield citedText.slice(text.length);
-    }
+    yield citedText;
     const reply = { ...deterministicReply, text: citedText };
     await this.store.setLocale(conversation.id, reply.locale);
+    const uiParts = coachUiParts({
+      context: input.context,
+      ...(input.contextKind === undefined
+        ? {}
+        : { contextKind: input.contextKind }),
+      reply,
+    });
     await this.store.append({
       actorUserId: null,
+      artifactRefs: uiParts.map((part) => ({
+        id: part.id,
+        kind: part.type,
+        version: null,
+      })),
       channel: input.channel,
       clientMessageId: `reply:${input.clientMessageId}`,
       content: reply.text,
@@ -364,8 +527,13 @@ export class CoachConversationService {
         ? {}
         : { contextSubjectId: input.contextSubjectId }),
       conversationId: conversation.id,
+      secondaryTags: [
+        `intent:${turnPlan.primaryIntent}`,
+        `risk:${turnPlan.responseRisk}`,
+      ],
       role: "assistant",
       traceId: input.traceId,
+      uiParts,
     });
   }
 }

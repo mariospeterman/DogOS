@@ -4,7 +4,6 @@ import { useChat } from "@ai-sdk/react";
 import {
   Archive,
   Camera,
-  CircleUserRound,
   Clock3,
   CreditCard,
   FileText,
@@ -50,6 +49,7 @@ interface PersistedConversation {
     content: string;
     id: string;
     role: "assistant" | "system" | "user";
+    uiParts?: Array<Record<string, unknown> & { type: string }>;
   }>;
 }
 
@@ -117,7 +117,10 @@ function toUiMessages(conversation: PersistedConversation): UIMessage[] {
     .filter((message) => message.role !== "system")
     .map((message) => ({
       id: message.id,
-      parts: [{ text: message.content, type: "text" as const }],
+      parts: [
+        { text: message.content, type: "text" as const },
+        ...((message.uiParts ?? []) as Array<UIMessage["parts"][number]>),
+      ],
       role: message.role as "assistant" | "user",
     }));
 }
@@ -127,6 +130,63 @@ function textOf(message: UIMessage): string {
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("\n");
+}
+
+function dataPartsOf(message: UIMessage) {
+  return message.parts.filter((part) => part.type.startsWith("data-")) as Array<
+    Record<string, unknown> & { type: string }
+  >;
+}
+
+function ArtifactPartCard({
+  english,
+  part,
+}: {
+  english: boolean;
+  part: Record<string, unknown> & { type: string };
+}) {
+  const label =
+    typeof part.accessibilityLabel === "string"
+      ? part.accessibilityLabel
+      : part.type.replace(/^data-/, "").replaceAll("-", " ");
+  const summary =
+    typeof part.summary === "string"
+      ? part.summary
+      : typeof part.observationSummary === "string"
+        ? part.observationSummary
+        : typeof part.prompt === "string"
+          ? part.prompt
+          : null;
+  const meta =
+    part.type === "data-session"
+      ? `${String(part.repetitions ?? "?")} reps · ${Math.round(
+          Number(part.durationSeconds ?? 0) / 60,
+        )} min`
+      : part.type === "data-progress"
+        ? `${String(part.baselineSuccessRate ?? 0)}% → ${String(
+            part.targetSuccessRate ?? "?",
+          )}%`
+        : part.type === "data-video-analysis"
+          ? `${String(part.status ?? "requested")} · ${String(
+              part.findingsCount ?? 0,
+            )} findings`
+          : part.type === "data-professional-handoff"
+            ? `${String(part.targetProfessionalType ?? "trainer")} · ${String(
+                part.evidenceCount ?? 0,
+              )} evidence refs`
+            : null;
+  return (
+    <div className="timeline-artifact" data-artifact-type={part.type}>
+      <span>{label}</span>
+      {summary === null ? null : <strong>{summary}</strong>}
+      {meta === null ? null : <small>{meta}</small>}
+      {part.type === "data-handoff-preview" ? (
+        <small>
+          {english ? "Owner approval required" : "Freigabe erforderlich"}
+        </small>
+      ) : null}
+    </div>
+  );
 }
 
 function presentLegacyText(text: string, locale: "de-CH" | "en"): string {
@@ -1081,6 +1141,7 @@ function CoachRuntime({
   const [chatDeleted, setChatDeleted] = useState(false);
   const [chatPinned, setChatPinned] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [account, setAccount] = useState<AccountView | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "light";
@@ -1119,6 +1180,10 @@ function CoachRuntime({
   const uiLocale = inferUiLocaleFromMessages(messages, locale);
   const presentation = trainingPresentation(product, uiLocale);
   const english = uiLocale === "en";
+  const handlerName =
+    account?.displayName ??
+    (english ? "Handler" : "Mensch");
+  const handlerInitial = handlerName.trim().charAt(0).toUpperCase() || "U";
   const duration = Math.max(
     1,
     Math.ceil((product.currentStep?.durationSeconds ?? 180) / 60),
@@ -1143,6 +1208,21 @@ function CoachRuntime({
             : english
               ? `Tell DogOS what happened with ${product.dogName}...`
               : `Erzähl DogOS, was mit ${product.dogName} passiert ist...`;
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const response = await fetch(dogosApiUrl("/v1/me"), {
+        cache: "no-store",
+        headers: await dogosApiHeaders(),
+      });
+      if (!active || !response.ok) return;
+      setAccount((await response.json()) as AccountView);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const query = historyQuery.trim();
@@ -1408,8 +1488,13 @@ function CoachRuntime({
     >
       <aside className="coach-sidebar" aria-label="DogOS navigation">
         <div className="sidebar-brand">
-          <span className="coach-mark">D</span>
-          <strong>DogOS</strong>
+          <span className="profile-avatar" aria-hidden="true">
+            {handlerInitial}
+          </span>
+          <span>
+            <strong>{handlerName}</strong>
+            <small>{english ? "Handler profile" : "Handler-Profil"}</small>
+          </span>
           <button
             aria-label={
               english ? "Collapse sidebar" : "Seitenleiste einklappen"
@@ -1492,7 +1577,9 @@ function CoachRuntime({
         </section>
         <div className="sidebar-account">
           <button onClick={() => setActivePanel("profile")} type="button">
-            <CircleUserRound size={17} />
+            <span className="profile-avatar mini" aria-hidden="true">
+              {handlerInitial}
+            </span>
             {english ? "Profile" : "Profil"}
           </button>
           <button onClick={() => setActivePanel("settings")} type="button">
@@ -1516,8 +1603,13 @@ function CoachRuntime({
           />
           <div className="mobile-drawer-panel">
             <div className="sidebar-brand">
-              <span className="coach-mark">D</span>
-              <strong>DogOS</strong>
+              <span className="profile-avatar" aria-hidden="true">
+                {handlerInitial}
+              </span>
+              <span>
+                <strong>{handlerName}</strong>
+                <small>{english ? "Handler profile" : "Handler-Profil"}</small>
+              </span>
               <button
                 aria-label={english ? "Close menu" : "Menü schliessen"}
                 className="sidebar-icon-button"
@@ -1618,7 +1710,9 @@ function CoachRuntime({
                 }}
                 type="button"
               >
-                <CircleUserRound size={17} />
+                <span className="profile-avatar mini" aria-hidden="true">
+                  {handlerInitial}
+                </span>
                 {english ? "Profile" : "Profil"}
               </button>
               <button
@@ -1655,7 +1749,6 @@ function CoachRuntime({
             >
               <PanelLeftOpen size={20} />
             </button>
-            <span className="coach-mark">D</span>
             <div>
               <strong>
                 {english
@@ -1816,6 +1909,7 @@ function CoachRuntime({
                 const text = textOf(message);
                 if (text.length === 0) return null;
                 const { body, sources } = splitSources(text, uiLocale);
+                const dataParts = dataPartsOf(message);
                 return (
                   <article
                     className={`coach-message ${message.role}`}
@@ -1847,6 +1941,17 @@ function CoachRuntime({
                             ))}
                           </ul>
                         </details>
+                      )}
+                      {dataParts.length === 0 ? null : (
+                        <div className="timeline-artifacts">
+                          {dataParts.map((part, index) => (
+                            <ArtifactPartCard
+                              english={english}
+                              key={`${message.id}:artifact:${index}`}
+                              part={part}
+                            />
+                          ))}
+                        </div>
                       )}
                     </div>
                   </article>

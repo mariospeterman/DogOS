@@ -70,6 +70,9 @@ export function scoreCoachingCandidate(result: CoachingEvalResult): {
 
 export interface ApprovedCoachModelSnapshot {
   approvedAt: string;
+  approvalEvidenceId: string;
+  evaluatorRunId: string;
+  expiresAt: string;
   freeModel: string;
   id: string;
   minimumScore: number;
@@ -80,32 +83,9 @@ export interface ApprovedCoachModelSnapshot {
   result: CoachingEvalResult;
 }
 
-export const approvedCoachModelSnapshots = Object.freeze([
-  {
-    approvedAt: "2026-07-18T00:00:00.000Z",
-    freeModel: "gpt-5.6-luna",
-    id: "dogos-coach-openai-2026-07-18-reviewed",
-    minimumScore: 92,
-    onboardingModel: "gpt-5.6-terra",
-    paidModel: "gpt-5.6-terra",
-    professionalReview: "approved",
-    protocolReview: "approved",
-    result: {
-      failures: [],
-      modelId: "openai:gpt-5.6-luna/gpt-5.6-terra",
-      scores: {
-        canonicalExtraction: 95,
-        citationPrecision: 95,
-        instructionAccuracy: 94,
-        multilingualEquivalence: 93,
-        naturalCoaching: 92,
-        scopeResistance: 96,
-        toolBoundary: 98,
-        value: 90,
-      },
-    },
-  },
-] satisfies ApprovedCoachModelSnapshot[]);
+export const approvedCoachModelSnapshots = Object.freeze(
+  [] as ApprovedCoachModelSnapshot[],
+);
 
 export function assertApprovedCoachModelSnapshot(input: {
   freeModel: string;

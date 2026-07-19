@@ -18,7 +18,14 @@ const sourceRefSchema = z.strictObject({
   id: z.string().min(1).max(120),
   label: z.string().min(1).max(160),
   href: z.url().nullable(),
-  kind: z.enum(["protocol", "research", "memory", "session", "video"]),
+  kind: z.enum([
+    "protocol",
+    "research",
+    "memory",
+    "session",
+    "video",
+    "handoff",
+  ]),
 });
 
 const dogosActionSchema = z.strictObject({
@@ -49,6 +56,7 @@ export const dogosWorkspaceSchema = z.enum([
   "train",
   "progress",
   "media",
+  "team",
 ]);
 
 export type DogOSWorkspace = z.infer<typeof dogosWorkspaceSchema>;
@@ -125,7 +133,104 @@ export const dogosDataPartSchema = z.discriminatedUnion("type", [
   }),
   basePartSchema.extend({
     type: z.literal("data-professional-handoff"),
+    disagreementCount: z.number().int().nonnegative().default(0),
+    evidenceCount: z.number().int().nonnegative().default(0),
+    handoffId: z.string().min(1).max(120).nullable().default(null),
     summary: z.string().min(1).max(1200),
+    targetProfessionalType: z
+      .enum(["trainer", "veterinary"])
+      .default("trainer"),
+  }),
+  basePartSchema.extend({
+    type: z.literal("data-feedback-request"),
+    dueAt: isoTimestampSchema.nullable().default(null),
+    prompt: z.string().min(1).max(600),
+    recipientRole: z.enum([
+      "caregiver",
+      "observer_guest",
+      "trainer",
+      "veterinarian",
+    ]),
+    scopeCount: z.number().int().nonnegative().default(0),
+  }),
+  basePartSchema.extend({
+    type: z.literal("data-feedback-response"),
+    certainty: confidenceSchema,
+    observationSummary: z.string().min(1).max(800),
+    responderRole: z.enum([
+      "owner",
+      "caregiver",
+      "observer_guest",
+      "trainer",
+      "veterinarian",
+    ]),
+    subjectiveInterpretation: z.string().max(800).nullable().default(null),
+  }),
+  basePartSchema.extend({
+    type: z.literal("data-perspective-summary"),
+    agreements: z.array(z.string().min(1).max(240)).max(8).default([]),
+    conflicts: z.array(z.string().min(1).max(300)).max(8).default([]),
+    missingInformation: z.array(z.string().min(1).max(240)).max(8).default([]),
+    nextObservation: z.string().min(1).max(300).nullable().default(null),
+  }),
+  basePartSchema.extend({
+    type: z.literal("data-perspective-conflict"),
+    conflict: z.string().min(1).max(600),
+    sourceLabels: z.array(z.string().min(1).max(80)).min(2).max(8),
+  }),
+  basePartSchema.extend({
+    type: z.literal("data-professional-review"),
+    outcome: z
+      .enum([
+        "observation_confirmed",
+        "observation_corrected",
+        "observation_not_visible",
+        "interpretation_rejected",
+        "timing_corrected",
+        "plan_step_supported",
+        "plan_step_rejected",
+        "additional_context_requested",
+        "safety_escalation_supported",
+        "safety_escalation_corrected",
+      ])
+      .nullable(),
+    professionalRole: z.enum(["trainer", "veterinarian"]),
+    summary: z.string().min(1).max(1000),
+  }),
+  basePartSchema.extend({
+    type: z.literal("data-plan-proposal"),
+    proposedBy: z.enum(["trainer", "veterinarian", "dogos"]),
+    requiresOwnerApproval: z.boolean().default(true),
+    status: z.enum(["draft", "reviewed", "accepted", "rejected"]),
+    summary: z.string().min(1).max(1000),
+  }),
+  basePartSchema.extend({
+    type: z.literal("data-handoff-preview"),
+    excludedCount: z.number().int().nonnegative().default(0),
+    includedCount: z.number().int().nonnegative(),
+    mediaIncluded: z.boolean().default(false),
+    targetProfessionalType: z.enum(["trainer", "veterinary"]),
+  }),
+  basePartSchema.extend({
+    type: z.literal("data-handoff-delivery"),
+    deliveryMethod: z.enum(["secure_link", "pdf_download", "secure_email"]),
+    expiresAt: isoTimestampSchema,
+    status: z.enum(["created", "claimed", "revoked", "expired"]),
+  }),
+  basePartSchema.extend({
+    type: z.literal("data-collaborator"),
+    accessExpiresAt: isoTimestampSchema.nullable().default(null),
+    displayName: z.string().min(1).max(160),
+    role: z.enum([
+      "owner",
+      "caregiver",
+      "viewer",
+      "observer_guest",
+      "trainer",
+      "veterinarian",
+      "professional_assistant",
+    ]),
+    status: z.enum(["invited", "active", "revoked", "expired"]),
   }),
   basePartSchema.extend({
     type: z.literal("data-sources"),
@@ -151,6 +256,19 @@ export const dogosDataPartSchema = z.discriminatedUnion("type", [
 ]);
 
 export type DogOSDataPart = z.infer<typeof dogosDataPartSchema>;
+
+export type DogOSMessageMetadata = z.infer<
+  typeof dogosUiMessageMetadataSchema
+>;
+
+export type DogOSTools = Record<string, unknown>;
+
+export type DogOSUIMessage = {
+  id: string;
+  metadata: DogOSMessageMetadata;
+  parts: DogOSDataPart[];
+  role: "assistant" | "system" | "user";
+};
 
 export const dogosUiMessageMetadataSchema = z.strictObject({
   artifactRefs: z.array(artifactRefSchema).max(12).default([]),

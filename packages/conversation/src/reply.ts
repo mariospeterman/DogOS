@@ -260,6 +260,19 @@ export function composeCoachReply(input: {
     });
   }
 
+  if (input.context.quotaExhausted) {
+    text += de
+      ? " Das tägliche KI-Kontingent ist erreicht, deshalb antworte ich gerade mit den geprüften DogOS Regeln."
+      : " The daily AI allowance has been reached, so I am answering from verified DogOS rules right now.";
+    if (input.links.billing !== undefined) {
+      actions.push({
+        href: input.links.billing,
+        label: de ? "Kontingent ansehen" : "View allowance",
+        kind: "secondary" as const,
+      });
+    }
+  }
+
   return {
     actions,
     locale,

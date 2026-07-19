@@ -1,7 +1,7 @@
 # Coaching Context and Memory
 
-- Status: approved foundation; provider benchmark pending
-- Last reviewed: 2026-07-16
+- Status: runtime capsule wired for Coach; approved knowledge retrieval and provider benchmark pending
+- Last reviewed: 2026-07-19
 
 DogOS should feel like a capable natural-language coach, not a form that happens
 to send messages. The model receives a small context capsule assembled from
@@ -12,8 +12,8 @@ history, or unrestricted database access.
 
 ```text
 PostgreSQL facts and measurements (authoritative)
-  -> relevant memory retrieval (read-only projection)
-  -> compact context capsule
+  -> relevant confirmed memory retrieval (read-only projection)
+  -> versioned compact context capsule
   -> natural coaching model
   -> typed draft with citations and proposed actions
   -> validation
@@ -51,6 +51,12 @@ The capsule deliberately excludes billing details, unrelated household data,
 raw authentication data, and an unbounded transcript. The complete record stays
 in PostgreSQL and is retrieved only under household authorization.
 
+The active Coach route now attaches a `version: "1.0"` context capsule to each
+model request. It includes bounded dashboard measurements and confirmed memory
+facts. Reviewed shared knowledge claims, video observations, unresolved
+questions, and historical episode retrieval are still marked as unknown context
+surfaces until those repositories are wired into the compiler.
+
 ## Memory decision
 
 PostgreSQL remains the source of truth. A memory implementation must satisfy the
@@ -72,6 +78,11 @@ mentions relevant advisories briefly, and prohibits invented measurements or
 claims that a proposed action already occurred. Legal and governance controls
 belong in system architecture, tests, traces, and product disclosure, not as a
 large block repeated in every prompt.
+
+Decision-bearing Coach responses are validation-gated. The streaming endpoint
+may send only a harmless status acknowledgement while provider text is generated
+privately; the owner-visible answer is revealed only after canonical validation
+and citation attachment.
 
 ## Evaluation gate
 

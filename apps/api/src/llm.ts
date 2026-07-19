@@ -1,5 +1,9 @@
 import OpenAI from "openai";
-import { assertApprovedCoachModelSnapshot } from "@dogos/agent-evals";
+import {
+  loadDogosAiConfig,
+  type DogosAiConfig,
+} from "./ai/model-policy/config.js";
+import type { DogosAiTask } from "./ai/model-policy/registry.js";
 import type {
   CoachReplyGenerator,
   CoachServiceTier,
@@ -11,6 +15,7 @@ import type {
 } from "@dogos/conversation";
 
 export interface CoachModelConfig {
+  ai: DogosAiConfig;
   apiKey: string;
   baseUrl: string;
   freeModel: string;
@@ -21,14 +26,6 @@ export interface CoachModelConfig {
 
 export type CoachGenerationPurpose =
   "chat" | "evidence" | "onboarding" | "plan" | "professional_summary";
-
-function requiresApprovedSnapshot(environment: NodeJS.ProcessEnv): boolean {
-  const dogosEnv = environment.DOGOS_ENV ?? "local";
-  if (["local", "test", "ci", "development"].includes(dogosEnv)) {
-    return environment.DOGOS_REQUIRE_MODEL_SNAPSHOT === "1";
-  }
-  return true;
-}
 
 export interface CoachGenerationProfile {
   maxOutputTokens: number;
@@ -57,24 +54,43 @@ export function loadCoachModelConfig(
   if (mode !== "openai") throw new Error("DOGOS_LLM_MODE_UNSUPPORTED");
   const apiKey = environment.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY_REQUIRED");
-  const region = environment.OPENAI_DATA_REGION ?? "global";
+  const ai = loadDogosAiConfig({
+    DOGOS_TEXT_PROVIDER: "openai",
+    ...environment,
+  });
+  const region = environment.OPENAI_DATA_REGION ?? ai.requiredRegion;
   if (!["global", "eu"].includes(region)) {
     throw new Error("OPENAI_DATA_REGION_UNSUPPORTED");
   }
+  if (
+    ai.requiredRegion === "eu" &&
+    region !== "eu" &&
+    !ai.allowCrossBorderPersonalData
+  ) {
+    throw new Error("OPENAI_DATA_REGION_EU_REQUIRED");
+  }
   const legacyChatMaximum = environment.DOGOS_COACH_MAX_OUTPUT_TOKENS;
   const config = {
+    ai,
     apiKey,
     baseUrl:
       environment.OPENAI_BASE_URL ??
       (region === "eu"
         ? "https://eu.api.openai.com/v1"
         : "https://api.openai.com/v1"),
-    freeModel: environment.DOGOS_COACH_MODEL_FREE ?? "gpt-5.6-luna",
+    freeModel:
+      environment.DOGOS_TEXT_FAST_MODEL ??
+      environment.DOGOS_COACH_MODEL_FREE ??
+      ai.registry.policies["language.detect"].model,
     onboardingModel:
       environment.DOGOS_ONBOARDING_MODEL ??
+      environment.DOGOS_TEXT_FAST_MODEL ??
       environment.DOGOS_COACH_MODEL_PAID ??
-      "gpt-5.6-terra",
-    paidModel: environment.DOGOS_COACH_MODEL_PAID ?? "gpt-5.6-terra",
+      ai.registry.policies["onboarding.extract"].model,
+    paidModel:
+      environment.DOGOS_TEXT_COACH_MODEL ??
+      environment.DOGOS_COACH_MODEL_PAID ??
+      ai.registry.policies["coach.chat"].model,
     profiles: {
       chat: {
         maxOutputTokens: integerSetting(
@@ -158,16 +174,6 @@ export function loadCoachModelConfig(
       },
     },
   };
-  if (requiresApprovedSnapshot(environment)) {
-    assertApprovedCoachModelSnapshot({
-      freeModel: config.freeModel,
-      onboardingModel: config.onboardingModel,
-      paidModel: config.paidModel,
-      ...(environment.DOGOS_MODEL_SNAPSHOT_APPROVAL === undefined
-        ? {}
-        : { snapshotId: environment.DOGOS_MODEL_SNAPSHOT_APPROVAL }),
-    });
-  }
   return config;
 }
 
@@ -443,10 +449,16 @@ export class OpenAIOnboardingInterpreter {
         parseOnboardingExtraction(response.output_text),
       );
       await this.runs.record({
+        contextSnapshotId: null,
         latencyMs: Math.round(performance.now() - started),
+        modelReleaseManifestId:
+          this.config.ai.registry.policies["onboarding.extract"]
+            .approvedModelReleaseId,
         model,
         outcome: "succeeded",
+        policyVersion: this.config.ai.registry.policyVersion,
         provider: "openai",
+        task: "onboarding.extract",
         usage:
           response.usage === undefined
             ? null
@@ -459,10 +471,14 @@ export class OpenAIOnboardingInterpreter {
       return result;
     } catch (error) {
       await this.runs.record({
+        contextSnapshotId: null,
         latencyMs: Math.round(performance.now() - started),
+        modelReleaseManifestId: null,
         model,
         outcome: "failed",
+        policyVersion: this.config.ai.registry.policyVersion,
         provider: "openai",
+        task: "onboarding.extract",
         usage: null,
       });
       throw error;
@@ -679,8 +695,17 @@ function modelForRequest(
   tier: CoachServiceTier,
   purpose: CoachGenerationPurpose,
 ): string {
-  if (purpose !== "chat") return config.paidModel;
-  return tier === "freemium" ? config.freeModel : config.paidModel;
+  const task = taskForPurpose(purpose);
+  if (purpose === "chat" && tier === "freemium") return config.freeModel;
+  return config.ai.registry.policies[task].model;
+}
+
+function taskForPurpose(purpose: CoachGenerationPurpose): DogosAiTask {
+  if (purpose === "chat") return "coach.chat";
+  if (purpose === "evidence") return "progress.explain";
+  if (purpose === "onboarding") return "onboarding.extract";
+  if (purpose === "professional_summary") return "professional.handoff";
+  return "plan.explain";
 }
 
 export class OpenAICoachReplyGenerator implements CoachReplyGenerator {
@@ -739,10 +764,16 @@ export class OpenAICoachReplyGenerator implements CoachReplyGenerator {
         purpose,
       });
       await this.runs.record({
+        contextSnapshotId: input.context.contextSnapshotId ?? null,
         latencyMs: Math.round(performance.now() - started),
+        modelReleaseManifestId:
+          this.config.ai.registry.policies[taskForPurpose(purpose)]
+            .approvedModelReleaseId,
         model,
         outcome: "succeeded",
+        policyVersion: this.config.ai.registry.policyVersion,
         provider: "openai",
+        task: taskForPurpose(purpose),
         usage:
           response.usage === undefined
             ? null
@@ -755,10 +786,14 @@ export class OpenAICoachReplyGenerator implements CoachReplyGenerator {
       return message;
     } catch (error) {
       await this.runs.record({
+        contextSnapshotId: input.context.contextSnapshotId ?? null,
         latencyMs: Math.round(performance.now() - started),
+        modelReleaseManifestId: null,
         model,
         outcome: "failed",
+        policyVersion: this.config.ai.registry.policyVersion,
         provider: "openai",
+        task: taskForPurpose(purpose),
         usage: null,
       });
       throw error;
@@ -812,10 +847,16 @@ export class OpenAICoachReplyGenerator implements CoachReplyGenerator {
         }
       }
       await this.runs.record({
+        contextSnapshotId: input.context.contextSnapshotId ?? null,
         latencyMs: Math.round(performance.now() - started),
+        modelReleaseManifestId:
+          this.config.ai.registry.policies[taskForPurpose(purpose)]
+            .approvedModelReleaseId,
         model,
         outcome: "succeeded",
+        policyVersion: this.config.ai.registry.policyVersion,
         provider: "openai",
+        task: taskForPurpose(purpose),
         usage:
           outputTokens === 0
             ? null
@@ -827,10 +868,14 @@ export class OpenAICoachReplyGenerator implements CoachReplyGenerator {
       });
     } catch (error) {
       await this.runs.record({
+        contextSnapshotId: input.context.contextSnapshotId ?? null,
         latencyMs: Math.round(performance.now() - started),
+        modelReleaseManifestId: null,
         model,
         outcome: "failed",
+        policyVersion: this.config.ai.registry.policyVersion,
         provider: "openai",
+        task: taskForPurpose(purpose),
         usage: null,
       });
       throw error;

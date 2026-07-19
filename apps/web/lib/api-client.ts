@@ -15,7 +15,7 @@ export async function dogosApiHeaders(
   } catch (error) {
     if (!local) throw error;
   }
-  if (headers.authorization === undefined && local) {
+  if (local) {
     headers["x-dogos-user"] =
       process.env.NEXT_PUBLIC_DOGOS_LOCAL_IDENTITY ?? "owner";
   }

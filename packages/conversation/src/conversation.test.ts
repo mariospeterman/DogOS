@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { composeCoachReply, inferCoachLocale } from "./reply.js";
 import { CoachConversationService } from "./service.js";
 import { InMemoryCoachConversationStore } from "./store.js";
+import { planCoachTurn } from "./turn-planner.js";
 
 const scope = {
   actorUserId: "10000000-0000-0000-0000-000000000001",
@@ -111,6 +112,89 @@ describe("DogOS Coach conversation", () => {
     expect(generations).toBe(1);
   });
 
+  it("persists validated canonical UI artifacts with assistant replies", async () => {
+    const service = new CoachConversationService(
+      new InMemoryCoachConversationStore(),
+    );
+    const result = await service.send({
+      channel: "web",
+      clientMessageId: "artifact-message",
+      context: {
+        ...context,
+        baselineSuccessRate: 50,
+        currentStep: {
+          difficulty: 1,
+          durationSeconds: 240,
+          repetitions: 6,
+          stepCode: "step.low_distraction_baseline",
+        },
+        targetSuccessRate: 80,
+      },
+      contextKind: "plan",
+      links,
+      message: "Explain the plan",
+      scope: { ...scope, locale: "en" },
+      traceId: "trace-artifact-message",
+    });
+    const assistant = result.conversation.messages.find(
+      (message) => message.role === "assistant",
+    );
+    expect(assistant?.uiParts.map((part) => part.type)).toEqual([
+      "data-plan",
+      "data-session",
+      "data-progress",
+    ]);
+    expect(assistant?.secondaryTags).toContain("intent:explain_plan");
+  });
+
+  it("rejects invalid UI parts before they enter the durable timeline", async () => {
+    const store = new InMemoryCoachConversationStore();
+    const conversation = await store.ensure({ ...scope, channel: "web" });
+    expect(() =>
+      store.append({
+        actorUserId: null,
+        channel: "web",
+        content: "Invalid",
+        conversationId: conversation.id,
+        role: "assistant",
+        traceId: "trace-invalid-part",
+        uiParts: [
+          {
+            accessibilityLabel: "Broken",
+            id: "broken",
+            type: "data-plan",
+          },
+        ] as never,
+      }),
+    ).toThrow();
+  });
+
+  it("plans bounded coach turns before natural response generation", () => {
+    expect(
+      planCoachTurn({
+        context,
+        message: "Can you prepare a trainer handoff with the video?",
+      }),
+    ).toMatchObject({
+      primaryIntent: "prepare_handoff",
+      proposedTools: [
+        "dogos_get_relevant_context",
+        "dogos_preview_handoff",
+      ],
+      responseRisk: "decision_bearing",
+      stepLimit: 3,
+    });
+    expect(
+      planCoachTurn({
+        context,
+        message: "Milo is limping after the walk.",
+      }),
+    ).toMatchObject({
+      primaryIntent: "ask_clarifying",
+      responseRisk: "safety_sensitive",
+    });
+  });
+
   it("imports onboarding history once into the durable coach thread", async () => {
     const service = new CoachConversationService(
       new InMemoryCoachConversationStore(),
@@ -179,7 +263,7 @@ describe("DogOS Coach conversation", () => {
     expect(fallbackResult.reply.text).toMatch(/arbeitet gerade/);
   });
 
-  it("streams generated text followed by deterministic citations", async () => {
+  it("streams only a harmless acknowledgement before validated coach text", async () => {
     const service = new CoachConversationService(
       new InMemoryCoachConversationStore(),
       {
@@ -202,7 +286,9 @@ describe("DogOS Coach conversation", () => {
     })) {
       chunks.push(chunk);
     }
-    expect(chunks.join("")).toMatch(/^Streaming answer\./);
+    expect(chunks[0]).toMatch(/checking Milo's current plan/);
+    expect(chunks[0]).not.toMatch(/Streaming answer/);
+    expect(chunks.join("")).toMatch(/Streaming answer\./);
     expect(chunks.join("")).toMatch(/Sources: \[1\] DogOS data: current plan/);
   });
 

@@ -56,13 +56,31 @@ export function useProductDashboard() {
           );
           return;
         }
-        if (!response.ok) throw new Error("PRODUCT_UNAVAILABLE");
+        if (!response.ok) {
+          if (response.status === 403) {
+            throw new Error(
+              "DogOS konnte dein Konto nicht mit diesem Workspace verbinden. Prüfe DOGOS_AUTH_MODE und starte Web/API neu.",
+            );
+          }
+          if (response.status === 404) {
+            throw new Error(
+              "DogOS hat dein Konto noch nicht vollständig vorbereitet. Lade die Seite erneut oder starte das Onboarding.",
+            );
+          }
+          throw new Error("DogOS konnte die Trainingsdaten nicht laden.");
+        }
         const body = (await response.json()) as
           ProductDashboard | { status: "onboarding_required" };
         if (!active) return;
         setProduct(body.status === "ready" ? body : null);
-      } catch {
-        if (active) setError("DogOS konnte die Trainingsdaten nicht laden.");
+      } catch (caught) {
+        if (active) {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "DogOS konnte die Trainingsdaten nicht laden.",
+          );
+        }
       } finally {
         if (active) setLoading(false);
       }

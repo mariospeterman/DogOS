@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { InMemorySearchStore } from "@dogos/database";
+import {
+  InMemoryContextSnapshotStore,
+  InMemoryMemoryStore,
+  InMemoryProfessionalHandoffStore,
+  InMemorySearchStore,
+  InMemoryVideoAnalysisStore,
+} from "@dogos/database";
+import {
+  CoachConversationService,
+  InMemoryCoachConversationStore,
+  type CoachTrainingContext,
+} from "@dogos/conversation";
 
 import { buildApp } from "./app.js";
 
@@ -20,35 +31,66 @@ describe("health routes", () => {
     expect(response.json()).toEqual({ status: "ok" });
   }, 10_000);
 
-  it("reports configured provider readiness separately from liveness", async () => {
-    const app = buildApp({
-      readiness: {
-        database: true,
-        liveKit: false,
-        openAI: true,
-        stripe: false,
-        supabaseStorage: true,
-        workers: true,
-      },
-    });
-    apps.push(app);
+  it(
+    "reports configured provider readiness separately from liveness",
+    async () => {
+      const app = buildApp({
+        readiness: {
+          ai: {
+            asr: "disabled",
+            cv: "disabled",
+            embedding: "disabled",
+            knowledgeRelease: null,
+            live: "disabled",
+            moderation: "disabled",
+            policyVersion: "test-policy",
+            text: "ready",
+            vod: "disabled",
+          },
+          database: true,
+          liveKit: false,
+          openAI: true,
+          stripe: false,
+          supabaseStorage: true,
+          workers: true,
+        },
+      });
+      apps.push(app);
 
-    const response = await app.inject({ method: "GET", url: "/health/ready" });
+      const response = await app.inject({
+        method: "GET",
+        url: "/health/ready",
+      });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
-      checks: {
-        api: "ready",
-        database: "configured",
-        liveKit: "not_configured",
-        openAI: "configured",
-        stripe: "not_configured",
-        supabaseStorage: "configured",
-        workers: "configured",
-      },
-      status: "ready",
-    });
-  });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        checks: {
+          api: "ready",
+          database: "configured",
+          liveKit: "not_configured",
+          openAI: "configured",
+          stripe: "not_configured",
+          supabaseStorage: "configured",
+          workers: "configured",
+        },
+        status: "ready",
+      });
+
+      const capabilities = await app.inject({
+        method: "GET",
+        url: "/health/capabilities",
+      });
+      expect(capabilities.statusCode).toBe(200);
+      expect(capabilities.json()).toEqual({
+        capabilities: expect.objectContaining({
+          policyVersion: "test-policy",
+          text: "ready",
+          vod: "disabled",
+        }),
+      });
+    },
+    10_000,
+  );
 
   it("allows browser API calls only from the configured web origin", async () => {
     const app = buildApp({ webOrigin: "https://mobile.dogos.test" });
@@ -162,6 +204,118 @@ describe("product API", () => {
     expect(response.body).toContain("Heute:");
   });
 
+  it("passes a compiled context snapshot into coach generation", async () => {
+    const capturedContexts: CoachTrainingContext[] = [];
+    const coach = new CoachConversationService(
+      new InMemoryCoachConversationStore(),
+      {
+        generate: async (input) => {
+          capturedContexts.push(input.context);
+          return "Generated reply from compiled context.";
+        },
+      },
+    );
+    const contextSnapshots = new InMemoryContextSnapshotStore();
+    const app = buildApp({ coach, contextSnapshots });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/coach/messages",
+      headers: mutationHeaders("owner", "coach-context-1"),
+      payload: {
+        dogId: "30000000-0000-0000-0000-000000000001",
+        message: "Explain the plan",
+        contextKind: "plan",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(capturedContexts[0]?.contextSnapshot).toMatchObject({
+      activeStep: expect.objectContaining({
+        code: "step.low_distraction_baseline",
+      }),
+      dog: expect.objectContaining({ name: "Rex" }),
+      unknownFactCodes: expect.arrayContaining([
+        "knowledge.approved_claims",
+        "video.timestamped_observations",
+      ]),
+      version: "1.0",
+    });
+    expect(capturedContexts[0]?.contextSnapshotId).toBe(
+      contextSnapshots.records[0]?.id,
+    );
+    expect(contextSnapshots.records[0]).toMatchObject({
+      task: "plan.explain",
+      tokenEstimate: expect.any(Number),
+    });
+  });
+
+  it("degrades coach quota exhaustion to deterministic output with one billing action", async () => {
+    let generated = false;
+    const coach = new CoachConversationService(
+      new InMemoryCoachConversationStore(),
+      {
+        generate: async () => {
+          generated = true;
+          return "should not be used";
+        },
+      },
+    );
+    const app = buildApp({
+      accounts: {
+        resolveByAppUser: async (appUserId) => ({
+          appUserId,
+          capabilities: {
+            coachingMessagesPerDay: 1,
+            concurrentDogs: 1,
+            liveCoachingMinutesPerMonth: 0,
+            planAdjustmentsPerMonth: 1,
+            videoAnalysesPerMonth: 0,
+          },
+          country: "CH",
+          currency: "CHF",
+          displayName: "Owner",
+          householdId: "20000000-0000-0000-0000-000000000001",
+          householdName: "Household",
+          locale: "en",
+          role: "owner" as const,
+          tier: "freemium" as const,
+          timezone: "Europe/Zurich",
+        }),
+      },
+      coach,
+      usage: {
+        consumeCoachingMessage: async () => false,
+        consumeLiveCoachingMinutes: async () => false,
+        consumeVideoAnalysis: async () => false,
+      },
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/coach/messages",
+      headers: mutationHeaders("owner", "coach-quota-1"),
+      payload: {
+        dogId: "30000000-0000-0000-0000-000000000001",
+        message: "What should we train today?",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(generated).toBe(false);
+    expect(response.json().reply.text).toContain(
+      "daily AI allowance has been reached",
+    );
+    expect(response.json().reply.actions).toContainEqual(
+      expect.objectContaining({
+        href: "/app/account/billing",
+        label: "View allowance",
+      }),
+    );
+  });
+
   it("creates and queues asynchronous video analysis jobs after upload", async () => {
     const app = buildApp({
       videoUploads: {
@@ -266,6 +420,245 @@ describe("product API", () => {
       consumedMinutes: 4,
       status: "completed",
     });
+  });
+
+  it("lists reviewed partner offers and creates disclosed referrals", async () => {
+    const app = buildApp();
+    apps.push(app);
+    const dogId = "30000000-0000-0000-0000-000000000001";
+
+    const offers = await app.inject({
+      method: "GET",
+      url: `/v1/dogs/${dogId}/partner-offers?kind=trainer_booking`,
+      headers: { "x-dogos-user": "owner" },
+    });
+
+    expect(offers.statusCode).toBe(200);
+    expect(offers.json().offers[0]).toMatchObject({
+      bookingProvider: "cal.com",
+      disclosure: expect.stringMatching(/Commission never affects ranking/),
+      kind: "trainer_booking",
+    });
+
+    const referral = await app.inject({
+      method: "POST",
+      url: `/v1/dogs/${dogId}/partner-referrals`,
+      headers: mutationHeaders("owner", "partner-referral-1"),
+      payload: {
+        offerId: offers.json().offers[0].id,
+        rewardfulReferralId: "rw_123",
+      },
+    });
+
+    expect(referral.statusCode).toBe(200);
+    expect(referral.json().referral).toMatchObject({
+      offerId: offers.json().offers[0].id,
+      provider: "cal.com",
+      status: "created",
+    });
+    expect(referral.json().referral.url).toContain("dogos_referral=");
+    expect(referral.json().referral.url).toContain("rewardful_referral=rw_123");
+  });
+
+  it("creates an evidence-preserving professional handoff for owner review", async () => {
+    const memories = new InMemoryMemoryStore();
+    const videos = new InMemoryVideoAnalysisStore();
+    const professionalHandoffs = new InMemoryProfessionalHandoffStore();
+    const app = buildApp({ memories, professionalHandoffs, videos });
+    apps.push(app);
+    const dogId = "30000000-0000-0000-0000-000000000001";
+    const householdId = "20000000-0000-0000-0000-000000000001";
+
+    const candidate = await memories.createMemoryCandidate({
+      category: "stable_profile",
+      dogId,
+      householdId,
+      subject: "dog.trigger_distance",
+      value: "Rex starts scanning at 12 meters from other dogs.",
+    });
+    await memories.confirmMemoryCandidate({
+      actorUserId: "10000000-0000-0000-0000-000000000001",
+      householdId,
+      id: candidate.id,
+    });
+    const analysis = await videos.create({
+      actorUserId: "10000000-0000-0000-0000-000000000001",
+      contentType: "video/mp4",
+      dogId,
+      householdId,
+      originalFilename: "loose-leash-review.mp4",
+      sizeBytes: 1024,
+    });
+    await videos.completeAnalysis({
+      findings: [
+        {
+          confidence: 0.82,
+          evidence: "Handler tightens lead as the other dog enters frame.",
+          label: "lead_tension_before_trigger",
+          recommendation: "Increase distance and mark before lead tension.",
+        },
+      ],
+      householdId,
+      id: analysis.id,
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/dogs/${dogId}/referrals`,
+      headers: mutationHeaders("owner", "handoff-1"),
+      payload: {
+        reason: "Prepare a case packet before Saturday trainer session.",
+        targetProfessionalType: "trainer",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().handoff).toMatchObject({
+      dogId,
+      evidenceRefs: expect.arrayContaining([
+        expect.objectContaining({ kind: "memory" }),
+        expect.objectContaining({ kind: "video" }),
+      ]),
+      status: "requested",
+      summary: expect.objectContaining({
+        evidenceCounts: {
+          confirmedMemory: 1,
+          reviewedVideo: 1,
+          videoFindings: 1,
+        },
+        transparency: expect.stringMatching(/AI-assisted DogOS case packet/),
+      }),
+      targetProfessionalType: "trainer",
+    });
+
+    const denied = await app.inject({
+      method: "POST",
+      url: `/v1/dogs/${dogId}/referrals`,
+      headers: mutationHeaders("caregiver", "handoff-caregiver-1"),
+      payload: { targetProfessionalType: "trainer" },
+    });
+    expect(denied.statusCode).toBe(403);
+  });
+
+  it("supports scoped collaboration grants, feedback, reviews, and handoff packages", async () => {
+    const app = buildApp();
+    apps.push(app);
+    const dogId = "30000000-0000-0000-0000-000000000001";
+
+    const feedbackRequest = await app.inject({
+      method: "POST",
+      url: `/v1/dogs/${dogId}/feedback-requests`,
+      headers: mutationHeaders("owner", "feedback-request-1"),
+      payload: {
+        questions: [
+          "What happened immediately before the cue?",
+          "What did the dog visibly do next?",
+        ],
+        recipientRole: "observer_guest",
+      },
+    });
+    expect(feedbackRequest.statusCode).toBe(200);
+    const feedbackBody = feedbackRequest.json() as {
+      feedbackRequest: { id: string };
+      grant: { id: string; token: string };
+    };
+
+    const feedbackResponse = await app.inject({
+      method: "POST",
+      url: `/v1/feedback-requests/${feedbackBody.feedbackRequest.id}/responses`,
+      payload: {
+        certainty: 0.7,
+        observationSummary:
+          "I saw the handler step forward before the recall cue.",
+        responderRole: "observer_guest",
+        shareToken: feedbackBody.grant.token,
+        subjectiveInterpretation: "It looked like the step mattered.",
+      },
+    });
+    expect(feedbackResponse.statusCode).toBe(200);
+    expect(feedbackResponse.json().response).toMatchObject({
+      responderRole: "observer_guest",
+    });
+
+    const trainerGrant = await app.inject({
+      method: "POST",
+      url: `/v1/dogs/${dogId}/case-share-grants`,
+      headers: mutationHeaders("owner", "trainer-grant-1"),
+      payload: {
+        recipientRole: "trainer",
+        scopes: ["trainer_review.submit", "dog_profile.read"],
+        subjectType: "case",
+      },
+    });
+    expect(trainerGrant.statusCode).toBe(200);
+
+    const review = await app.inject({
+      method: "POST",
+      url: `/v1/dogs/${dogId}/professional-reviews`,
+      payload: {
+        correctionType: "timing_corrected",
+        professionalRole: "trainer",
+        shareToken: trainerGrant.json().grant.token,
+        summary: "The handler movement likely became the salient cue.",
+        targetType: "case",
+      },
+    });
+    expect(review.statusCode).toBe(200);
+    expect(review.json().review).toMatchObject({
+      correctionType: "timing_corrected",
+      professionalRole: "trainer",
+    });
+
+    const handoffPackage = await app.inject({
+      method: "POST",
+      url: `/v1/dogs/${dogId}/handoff-packages`,
+      headers: mutationHeaders("owner", "handoff-package-1"),
+      payload: {
+        consentReference: "owner-confirmed-preview-v1",
+        packageType: "trainer_handoff",
+      },
+    });
+    expect(handoffPackage.statusCode).toBe(200);
+    expect(handoffPackage.json().package).toMatchObject({
+      packageType: "trainer_handoff",
+      version: 1,
+    });
+
+    const delivery = await app.inject({
+      method: "POST",
+      url: `/v1/handoff-packages/${handoffPackage.json().package.id}/deliveries`,
+      headers: mutationHeaders("owner", "handoff-delivery-1"),
+      payload: {
+        deliveryMethod: "secure_link",
+        dogId,
+        shareGrantId: trainerGrant.json().grant.id,
+      },
+    });
+    expect(delivery.statusCode).toBe(200);
+    expect(delivery.json().delivery).toMatchObject({
+      deliveryMethod: "secure_link",
+      status: "created",
+    });
+
+    const revoked = await app.inject({
+      method: "POST",
+      url: `/v1/dogs/${dogId}/case-share-grants/${feedbackBody.grant.id}/revoke`,
+      headers: mutationHeaders("owner", "feedback-revoke-1"),
+      payload: {},
+    });
+    expect(revoked.statusCode).toBe(200);
+
+    const blockedResponse = await app.inject({
+      method: "POST",
+      url: `/v1/feedback-requests/${feedbackBody.feedbackRequest.id}/responses`,
+      payload: {
+        certainty: 0.4,
+        observationSummary: "This should be blocked after revocation.",
+        responderRole: "observer_guest",
+        shareToken: feedbackBody.grant.token,
+      },
+    });
+    expect(blockedResponse.statusCode).toBe(403);
   });
 
   it("exports privacy data and records deletion requests for owners", async () => {
@@ -484,13 +877,22 @@ describe("product API", () => {
       "/v1/coach/messages",
       "/v1/dogs/{id}",
       "/v1/dogs/{id}/anamneses",
+      "/v1/dogs/{id}/case-share-grants",
+      "/v1/dogs/{id}/case-share-grants/{grantId}/revoke",
       "/v1/dogs/{id}/current-plan",
+      "/v1/dogs/{id}/feedback-requests",
       "/v1/dogs/{id}/goals",
+      "/v1/dogs/{id}/handoff-packages",
       "/v1/dogs/{id}/live-sessions",
+      "/v1/dogs/{id}/partner-offers",
+      "/v1/dogs/{id}/partner-referrals",
+      "/v1/dogs/{id}/professional-reviews",
       "/v1/dogs/{id}/referrals",
       "/v1/dogs/{id}/video-analyses",
       "/v1/dogs/{id}/safety-assessments",
+      "/v1/feedback-requests/{id}/responses",
       "/v1/goals/{id}/generate-plan",
+      "/v1/handoff-packages/{id}/deliveries",
       "/v1/households",
       "/v1/households/{id}",
       "/v1/households/{id}/dogs",

@@ -11,22 +11,47 @@ import {
 import {
   CoachConversationService,
   InMemoryCoachConversationStore,
+  type CoachContextKind,
 } from "@dogos/conversation";
+import { buildCoachingContext } from "@dogos/agent-tools";
+import type {
+  CoachingContextCapsule,
+  CoachingMemoryFact,
+  Measurement,
+} from "@dogos/contracts";
+import type { AiCapabilityReadiness } from "./ai/model-policy/config.js";
 import {
   InMemoryLiveCoachingStore,
   InMemoryMemoryStore,
   InMemoryPrivacyStore,
   InMemorySearchStore,
+  InMemoryContextSnapshotStore,
+  InMemoryCollaborationStore,
+  InMemoryPartnerMarketplaceStore,
+  InMemoryProfessionalHandoffStore,
   IdempotencyConflictError,
   InMemoryVideoAnalysisStore,
   type AccountRepository,
   type CapabilityUsageRepository,
+  type CaseShareRecipientRole,
+  type CaseShareScope,
+  type CollaborationStore,
+  type ContextSnapshotStore,
   type LiveCoachingStore,
+  type MemoryFactRecord,
   type MemoryStore,
   type OnboardingRepository,
+  type PartnerMarketplaceStore,
+  type PartnerOfferKind,
+  type ProductDashboard,
   type PostgresRepository,
+  type ProfessionalHandoffEvidenceRef,
+  type ProfessionalHandoffStore,
+  type ProfessionalHandoffSummary,
+  type ProfessionalHandoffTarget,
   type PrivacyStore,
   type SearchStore,
+  type VideoAnalysisRecord,
   type VideoAnalysisStore,
 } from "@dogos/database";
 import { LocalProductFixture } from "./local-product-fixture.js";
@@ -129,6 +154,25 @@ const idParams = {
   required: ["id"],
   properties: { id: { type: "string", minLength: 1 } },
 } as const;
+const caseShareScopes = [
+  "dog_profile.read",
+  "goal.read",
+  "plan.read",
+  "session.read",
+  "progress.read",
+  "media.selected.read",
+  "feedback.submit",
+  "trainer_review.submit",
+  "veterinary_note.submit",
+  "plan_proposal.submit",
+  "booking.create",
+] as const;
+const collaboratorRoles = [
+  "observer_guest",
+  "trainer",
+  "veterinarian",
+  "professional_assistant",
+] as const;
 
 function requireWrite(actor: AgentActorContext): void {
   if (!["owner", "caregiver"].includes(actor.role))
@@ -143,7 +187,7 @@ function requireOwner(actor: AgentActorContext): void {
     throw new ApiError(
       403,
       "ACCESS_DENIED",
-      "Only an owner can manage billing",
+      "Only an owner can manage this resource",
     );
   }
 }
@@ -156,6 +200,298 @@ function key(request: FastifyRequest): string {
 
 function requestHash(body: unknown): string {
   return createHash("sha256").update(JSON.stringify(body)).digest("hex");
+}
+
+function toCanonicalCode(prefix: string, value: string | null | undefined) {
+  const normalized = (value ?? "unknown")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9.]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return `${prefix}.${normalized || "unknown"}`;
+}
+
+function contextEntityId(kind: string, value: string): string {
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  ) {
+    return value;
+  }
+  const hex = createHash("sha256").update(`${kind}:${value}`).digest("hex");
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `5${hex.slice(13, 16)}`,
+    `${((Number.parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, "0")}${hex.slice(18, 20)}`,
+    hex.slice(20, 32),
+  ].join("-");
+}
+
+function memoryFactCode(record: MemoryFactRecord): string {
+  return toCanonicalCode("memory", record.subject);
+}
+
+function evidenceIds(record: MemoryFactRecord): string[] {
+  return record.evidenceRefs
+    .map((ref) => {
+      if (typeof ref === "string") return ref;
+      if (
+        typeof ref === "object" &&
+        ref !== null &&
+        "id" in ref &&
+        typeof ref.id === "string"
+      ) {
+        return ref.id;
+      }
+      return null;
+    })
+    .filter(
+      (id): id is string =>
+        id !== null &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          id,
+        ),
+    );
+}
+
+function aiTaskForCoachContext(
+  contextKind: CoachContextKind | undefined,
+  message: string,
+): string {
+  if (
+    contextKind === "progress" ||
+    /\b(progress|evidence|fortschritt)\b/i.test(message)
+  ) {
+    return "progress.explain";
+  }
+  if (
+    contextKind === "plan" ||
+    /\b(plan|calendar|schedule|kalender)\b/i.test(message)
+  ) {
+    return "plan.explain";
+  }
+  if (contextKind === "media") return "video.report";
+  return "coach.chat";
+}
+
+async function compileCoachContextSnapshot(input: {
+  dashboard: ProductDashboard | null | undefined;
+  dogId: string;
+  fallback: LocalProductFixture;
+  householdId: string;
+  locale: "de-CH" | "en";
+  memories: MemoryStore;
+}): Promise<CoachingContextCapsule> {
+  const snapshot = input.fallback.snapshot();
+  const dashboard = input.dashboard;
+  const generatedAt = new Date().toISOString();
+  const goalCode = toCanonicalCode(
+    "goal",
+    dashboard?.goal ?? snapshot.goal ?? "unknown",
+  );
+  const recentMeasurements: Measurement[] =
+    dashboard?.baselineSuccessRate === undefined
+      ? []
+      : [
+          {
+            metricCode: "metric.success_rate",
+            value: dashboard.baselineSuccessRate,
+            unit: "unit.percent",
+            unknown: false,
+            source: "owner_report",
+            method: "method.onboarding_baseline",
+            measuredAt: generatedAt,
+            quality: "moderate",
+          },
+        ];
+  return buildCoachingContext(
+    {
+      activeStep:
+        dashboard?.currentStep === null || dashboard?.currentStep === undefined
+          ? null
+          : {
+              code: dashboard.currentStep.stepCode,
+              difficulty: dashboard.currentStep.difficulty,
+              durationSeconds: dashboard.currentStep.durationSeconds,
+              repetitionCap: dashboard.currentStep.repetitions,
+              version: 1,
+            },
+      advisories:
+        dashboard?.riskDisposition === undefined ||
+        dashboard.riskDisposition === "continue_low_risk_training"
+          ? []
+          : [
+              {
+                affectedActivityCode:
+                  dashboard.currentStep?.stepCode ?? "activity.training",
+                code: toCanonicalCode("safety", dashboard.riskDisposition),
+                level: "professional_review",
+                message: {
+                  "de-CH":
+                    "DogOS behandelt diese Situation vorsichtig und empfiehlt professionelle Prüfung.",
+                  en: "DogOS treats this situation cautiously and recommends professional review.",
+                },
+              },
+            ],
+      claims: [],
+      dog: {
+        breedDescription:
+          dashboard?.dogProfileSummary ?? snapshot.dog.breed ?? "unknown",
+        developmentStage: "unknown",
+        id: contextEntityId("dog", input.dogId),
+        name: dashboard?.dogName ?? snapshot.dog.name,
+      },
+      generatedAt,
+      goal: {
+        code: goalCode,
+        ownerDescription:
+          dashboard?.goalText ?? dashboard?.goal ?? snapshot.goal ?? "unknown",
+      },
+      locale: input.locale,
+      recentMeasurements,
+      sources: [],
+      unknownFactCodes: [
+        "knowledge.approved_claims",
+        "history.relevant_episodes",
+        "video.timestamped_observations",
+        "questions.unresolved",
+      ],
+    },
+    {
+      findRelevant: async ({ limit }) => {
+        const query = dashboard?.goalText ?? dashboard?.goal;
+        const records = await input.memories.getRelevantMemory({
+          dogId: input.dogId,
+          householdId: input.householdId,
+          ...(query === undefined ? {} : { query }),
+        });
+        return records.slice(0, limit).map((record): CoachingMemoryFact => ({
+          evidenceIds: evidenceIds(record).map((id) =>
+            contextEntityId("evidence", id),
+          ),
+          factCode: memoryFactCode(record),
+          id: contextEntityId("memory", record.id),
+          observedAt:
+            record.observedAt ??
+            record.confirmedAt ??
+            record.createdAt ??
+            generatedAt,
+          source:
+            record.category === "derived_pattern"
+              ? "system_measurement"
+              : "owner_report",
+          value: record.value,
+        }));
+      },
+    },
+  );
+}
+
+function handoffReasonCode(input: {
+  reason?: string;
+  targetProfessionalType: ProfessionalHandoffTarget;
+}): string {
+  return toCanonicalCode(
+    `handoff.${input.targetProfessionalType}`,
+    input.reason ?? "owner_requested_case_review",
+  );
+}
+
+function buildProfessionalHandoffArtifact(input: {
+  dashboard: ProductDashboard;
+  memories: MemoryFactRecord[];
+  reason?: string;
+  targetProfessionalType: ProfessionalHandoffTarget;
+  videos: VideoAnalysisRecord[];
+}): {
+  disagreements: string[];
+  evidenceRefs: ProfessionalHandoffEvidenceRef[];
+  summary: ProfessionalHandoffSummary;
+} {
+  const reviewedVideos = input.videos.filter(
+    (video) => video.status === "completed",
+  );
+  const videoFindingsCount = reviewedVideos.reduce(
+    (count, video) => count + video.findings.length,
+    0,
+  );
+  const evidenceRefs: ProfessionalHandoffEvidenceRef[] = [
+    ...(input.dashboard.planId === null
+      ? []
+      : [
+          {
+            id: input.dashboard.planId,
+            kind: "plan" as const,
+            label: "Active training plan",
+          },
+        ]),
+    ...input.memories.slice(0, 6).map((memory) => ({
+      id: memory.id,
+      kind: "memory" as const,
+      label: `${memory.subject}: ${memory.value}`.slice(0, 160),
+    })),
+    ...reviewedVideos.slice(0, 6).map((video) => ({
+      id: video.id,
+      kind: "video" as const,
+      label: `${video.originalFilename} (${video.findings.length} findings)`,
+    })),
+  ];
+  const disagreements = [
+    ...(reviewedVideos.length === 0
+      ? ["No reviewed video evidence is attached to this handoff yet."]
+      : []),
+    ...(input.memories.length === 0
+      ? ["No owner-confirmed memory facts matched the current goal query."]
+      : []),
+    ...(input.dashboard.riskDisposition === "continue_low_risk_training"
+      ? []
+      : [
+          `Safety engine disposition is ${input.dashboard.riskDisposition}; professional review should resolve this before harder training.`,
+        ]),
+    ...(videoFindingsCount === 0 && reviewedVideos.length > 0
+      ? ["Reviewed videos exist, but no timestamped CV findings were recorded."]
+      : []),
+  ];
+  const targetLabel =
+    input.targetProfessionalType === "veterinary" ? "veterinarian" : "trainer";
+  return {
+    disagreements,
+    evidenceRefs,
+    summary: {
+      dog: {
+        currentStep: input.dashboard.currentStep?.stepCode ?? null,
+        goalText: input.dashboard.goalText,
+        name: input.dashboard.dogName,
+        profileSummary: input.dashboard.dogProfileSummary ?? null,
+      },
+      evidenceCounts: {
+        confirmedMemory: input.memories.length,
+        reviewedVideo: reviewedVideos.length,
+        videoFindings: videoFindingsCount,
+      },
+      ownerRequest:
+        input.reason ??
+        `Owner requested a ${targetLabel} handoff for the current training case.`,
+      professionalQuestion:
+        input.targetProfessionalType === "veterinary"
+          ? "Please review possible health, pain, medication, mobility, or sensory contributors before DogOS increases criteria."
+          : "Please confirm trigger distance, reinforcement setup, criteria, handler timing, and whether the current micro-session should progress or regress.",
+      risk: {
+        disposition: input.dashboard.riskDisposition,
+        latestDecision: input.dashboard.latestDecision,
+      },
+      trainingStatus: {
+        baselineSuccessRate: input.dashboard.baselineSuccessRate,
+        planStatus: input.dashboard.planStatus,
+        sessionCount: input.dashboard.sessionCount,
+        targetSuccessRate: input.dashboard.targetSuccessRate ?? null,
+      },
+      transparency:
+        "AI-assisted DogOS case packet. It summarizes owner-approved product data and evidence references; it is not a veterinary diagnosis and preserves unknowns for professional review.",
+    },
+  };
 }
 
 export interface BuildAppOptions {
@@ -179,14 +515,19 @@ export interface BuildAppOptions {
     | "consumeVideoAnalysis"
   >;
   liveKit?: LiveKitConfig;
+  contextSnapshots?: ContextSnapshotStore;
   liveSessions?: LiveCoachingStore;
   memories?: MemoryStore;
+  marketplace?: PartnerMarketplaceStore;
+  professionalHandoffs?: ProfessionalHandoffStore;
+  collaboration?: CollaborationStore;
   privacy?: PrivacyStore;
   search?: SearchStore;
   videoUploads?: VideoUploadSigner;
   videos?: VideoAnalysisStore;
   product?: LocalProductFixture;
   readiness?: {
+    ai?: AiCapabilityReadiness;
     database: boolean;
     liveKit: boolean;
     openAI: boolean;
@@ -211,7 +552,15 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const videoUploads =
     options.videoUploads ?? new DeterministicVideoUploadSigner();
   const liveSessions = options.liveSessions ?? new InMemoryLiveCoachingStore();
+  const contextSnapshots =
+    options.contextSnapshots ?? new InMemoryContextSnapshotStore();
   const memories = options.memories ?? new InMemoryMemoryStore();
+  const marketplace =
+    options.marketplace ?? new InMemoryPartnerMarketplaceStore();
+  const professionalHandoffs =
+    options.professionalHandoffs ?? new InMemoryProfessionalHandoffStore();
+  const collaboration =
+    options.collaboration ?? new InMemoryCollaborationStore();
   const privacy = options.privacy ?? new InMemoryPrivacyStore();
   const search = options.search ?? new InMemorySearchStore();
   const authenticator =
@@ -224,6 +573,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     );
   const configuredWebOrigin = options.webOrigin ?? process.env.WEB_ORIGIN;
   const readiness = options.readiness ?? {
+    ai: undefined,
     database: options.products !== undefined,
     liveKit: options.liveKit !== undefined,
     openAI: options.coach !== undefined,
@@ -365,6 +715,23 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       },
       status: "ready" as const,
     }));
+    routes.get(
+      "/health/capabilities",
+      { schema: { hide: true } },
+      async () => ({
+        capabilities: readiness.ai ?? {
+          asr: "disabled",
+          cv: "disabled",
+          embedding: "disabled",
+          knowledgeRelease: null,
+          live: readiness.liveKit ? "ready" : "disabled",
+          moderation: "disabled",
+          policyVersion: "local-deterministic",
+          text: readiness.openAI ? "ready" : "disabled",
+          vod: readiness.workers ? "ready" : "disabled",
+        },
+      }),
+    );
     routes.get("/openapi.json", { schema: { hide: true } }, async () =>
       routes.swagger(),
     );
@@ -457,6 +824,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             additionalProperties: false,
             required: ["tier"],
             properties: {
+              rewardfulReferralId: {
+                type: "string",
+                minLength: 1,
+                maxLength: 120,
+              },
               tier: { type: "string", enum: ["plus", "pro", "ultra"] },
             },
           },
@@ -477,9 +849,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             "Billing is not configured for this environment",
           );
         }
-        const body = request.body as { tier: "plus" | "pro" | "ultra" };
+        const body = request.body as {
+          rewardfulReferralId?: string;
+          tier: "plus" | "pro" | "ultra";
+        };
         const url = await options.billing.createCheckout({
           householdId: actor.householdId,
+          rewardfulReferralId: body.rewardfulReferralId ?? null,
           returnBaseUrl: configuredWebOrigin ?? "http://localhost:3000",
           tier: body.tier,
         });
@@ -759,7 +1135,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         ) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }
-        if (
+        const quotaExhausted =
           account !== null &&
           account !== undefined &&
           options.usage !== undefined &&
@@ -768,15 +1144,43 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             householdId: actor.householdId,
             limit: account.capabilities.coachingMessagesPerDay,
             timezone: account.timezone,
-          }))
-        ) {
-          throw new ApiError(
-            409,
-            "BILLING_UNAVAILABLE",
-            "The daily coaching limit has been reached",
-          );
-        }
+          }));
         const locale = account?.locale === "en" ? "en" : "de-CH";
+        const contextSnapshot = await compileCoachContextSnapshot({
+          dashboard:
+            dashboard ??
+            (options.products === undefined ? product.dashboard() : null),
+          dogId: body.dogId,
+          fallback: product,
+          householdId: actor.householdId,
+          locale,
+          memories,
+        });
+        const aiTask = aiTaskForCoachContext(body.contextKind, body.message);
+        const persistedContextSnapshot = await contextSnapshots.create({
+          compilerVersion: "context-compiler.1.0",
+          dogId: body.dogId,
+          householdId: actor.householdId,
+          knowledgeReleaseId: process.env.DOGOS_KNOWLEDGE_RELEASE_ID ?? null,
+          locale,
+          selectedReasons: {
+            dashboard: dashboard === null ? "local_fixture" : "authorized_dog",
+            memory: "confirmed_relevant_memory",
+          },
+          excludedReasons: {
+            billing: "excluded_from_model_context",
+            transcript: "complete_transcript_excluded",
+            unreviewedKnowledge: "not_approved_for_runtime",
+          },
+          snapshot: JSON.parse(JSON.stringify(contextSnapshot)) as Record<
+            string,
+            string
+          >,
+          task: aiTask,
+          tokenEstimate: Math.ceil(JSON.stringify(contextSnapshot).length / 4),
+          truncatedCategories: contextSnapshot.unknownFactCodes,
+          version: contextSnapshot.version,
+        });
         const coachInput = {
           channel: "web",
           clientMessageId: key(request),
@@ -802,6 +1206,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             goal: presentGoal(dashboard?.goal ?? snapshot.goal, locale),
             latestDecision:
               dashboard?.latestDecision ?? snapshot.latestDecision,
+            ...(quotaExhausted ? { quotaExhausted: true } : {}),
             ...(dashboard?.requiredConsecutiveSessions === undefined
               ? {}
               : {
@@ -818,6 +1223,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             ...(dashboard?.targetSuccessRate === undefined
               ? {}
               : { targetSuccessRate: dashboard.targetSuccessRate }),
+            contextSnapshot,
+            contextSnapshotId: persistedContextSnapshot.id,
           },
           ...(body.contextKind === undefined
             ? {}
@@ -826,6 +1233,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             ? {}
             : { contextSubjectId: body.contextSubjectId }),
           links: {
+            billing: "/app/account/billing",
             plan: "/app/coach?space=plan",
             progress: "/app/coach?space=progress",
             session: dashboard?.todaySessionId
@@ -842,6 +1250,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           },
           tier: account?.tier ?? "freemium",
           traceId: request.id,
+          ...(quotaExhausted ? { modelEnabled: false } : {}),
         } satisfies Parameters<CoachConversationService["send"]>[0];
         const streamRequested =
           (request.query as { stream?: unknown } | undefined)?.stream === "1";
@@ -1236,6 +1645,785 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
             householdId: actor.householdId,
             id: (request.params as { id: string }).id,
             summary: body.summary,
+          }),
+        };
+      },
+    );
+
+    routes.get(
+      "/v1/dogs/:id/partner-offers",
+      {
+        schema: {
+          operationId: "listPartnerOffers",
+          tags: ["partners"],
+          headers: authHeaders,
+          params: idParams,
+          querystring: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              kind: {
+                type: "string",
+                enum: [
+                  "affiliate_equipment",
+                  "affiliate_food",
+                  "trainer_booking",
+                  "veterinary_triage",
+                ],
+              },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dogId = (request.params as { id: string }).id;
+        const dashboard = await options.products?.dashboardByDog(
+          dogId,
+          actor.householdId,
+        );
+        const snapshot = product.snapshot();
+        if (options.products !== undefined && dashboard === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (
+          options.products === undefined &&
+          (actor.householdId !== snapshot.household.id ||
+            dogId !== snapshot.dog.id ||
+            actor.identity === "unrelated")
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const query = request.query as { kind?: PartnerOfferKind };
+        return {
+          offers: await marketplace.listOffers({
+            dogId,
+            householdId: actor.householdId,
+            kind: query.kind ?? null,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/dogs/:id/partner-referrals",
+      {
+        schema: {
+          operationId: "createPartnerReferral",
+          tags: ["partners"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["offerId"],
+            properties: {
+              offerId: { type: "string", format: "uuid" },
+              rewardfulReferralId: {
+                type: "string",
+                minLength: 1,
+                maxLength: 120,
+              },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const body = request.body as {
+          offerId: string;
+          rewardfulReferralId?: string;
+        };
+        return {
+          referral: await marketplace.createReferral({
+            actorUserId: actor.actorId,
+            dogId: (request.params as { id: string }).id,
+            householdId: actor.householdId,
+            offerId: body.offerId,
+            rewardfulReferralId: body.rewardfulReferralId ?? null,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/dogs/:id/referrals",
+      {
+        schema: {
+          operationId: "createReferral",
+          tags: ["professional-handoff"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              reason: { type: "string", minLength: 1, maxLength: 500 },
+              targetProfessionalType: {
+                type: "string",
+                enum: ["trainer", "veterinary"],
+                default: "trainer",
+              },
+              ttlDays: { type: "integer", minimum: 1, maximum: 30 },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dogId = (request.params as { id: string }).id;
+        const dashboard = await options.products?.dashboardByDog(
+          dogId,
+          actor.householdId,
+        );
+        const snapshot = product.snapshot();
+        if (options.products !== undefined && dashboard === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (
+          options.products === undefined &&
+          (actor.householdId !== snapshot.household.id ||
+            dogId !== snapshot.dog.id ||
+            actor.identity === "unrelated")
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const body = request.body as {
+          reason?: string;
+          targetProfessionalType?: ProfessionalHandoffTarget;
+          ttlDays?: number;
+        };
+        const effectiveDashboard =
+          dashboard ??
+          (options.products === undefined ? product.dashboard() : null);
+        if (effectiveDashboard === null) {
+          throw new ApiError(
+            404,
+            "RESOURCE_NOT_FOUND",
+            "Dog training context was not found",
+          );
+        }
+        const relevantMemoryByGoal = await memories.getRelevantMemory({
+          dogId,
+          householdId: actor.householdId,
+          query: effectiveDashboard.goalText,
+        });
+        const relevantMemory =
+          relevantMemoryByGoal.length > 0
+            ? relevantMemoryByGoal
+            : await memories.getRelevantMemory({
+                dogId,
+                householdId: actor.householdId,
+              });
+        const videoAnalyses = await videos.list({
+          dogId,
+          householdId: actor.householdId,
+        });
+        const targetProfessionalType =
+          body.targetProfessionalType ?? "trainer";
+        const artifact = buildProfessionalHandoffArtifact({
+          dashboard: effectiveDashboard,
+          memories: relevantMemory,
+          targetProfessionalType,
+          videos: videoAnalyses,
+          ...(body.reason === undefined ? {} : { reason: body.reason }),
+        });
+        const ttlDays = body.ttlDays ?? 14;
+        const shareExpiresAt = new Date(
+          Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+        ).toISOString();
+        return {
+          handoff: await professionalHandoffs.create({
+            actorUserId: actor.actorId,
+            disagreements: artifact.disagreements,
+            dogId,
+            evidenceRefs: artifact.evidenceRefs,
+            goalId: null,
+            householdId: actor.householdId,
+            reasonCode: handoffReasonCode({
+              targetProfessionalType,
+              ...(body.reason === undefined ? {} : { reason: body.reason }),
+            }),
+            shareExpiresAt,
+            summary: artifact.summary,
+            targetProfessionalType,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/dogs/:id/case-share-grants",
+      {
+        schema: {
+          operationId: "createCaseShareGrant",
+          tags: ["collaboration"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["recipientRole", "scopes", "subjectType"],
+            properties: {
+              expiresInDays: { type: "integer", minimum: 1, maximum: 30 },
+              maxViews: { type: "integer", minimum: 1, maximum: 50 },
+              recipientRole: { type: "string", enum: collaboratorRoles },
+              scopes: {
+                type: "array",
+                minItems: 1,
+                maxItems: 16,
+                items: { type: "string", enum: caseShareScopes },
+              },
+              subjectId: { type: "string", format: "uuid" },
+              subjectType: {
+                type: "string",
+                enum: [
+                  "case",
+                  "feedback_request",
+                  "trainer_handoff",
+                  "veterinary_handoff",
+                  "video_analysis",
+                  "live_session",
+                ],
+              },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dogId = (request.params as { id: string }).id;
+        const dashboard = await options.products?.dashboardByDog(
+          dogId,
+          actor.householdId,
+        );
+        const snapshot = product.snapshot();
+        if (options.products !== undefined && dashboard === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (
+          options.products === undefined &&
+          (actor.householdId !== snapshot.household.id ||
+            dogId !== snapshot.dog.id ||
+            actor.identity === "unrelated")
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const body = request.body as {
+          expiresInDays?: number;
+          maxViews?: number;
+          recipientRole: CaseShareRecipientRole;
+          scopes: CaseShareScope[];
+          subjectId?: string;
+          subjectType: string;
+        };
+        return {
+          grant: await collaboration.createShareGrant({
+            createdBy: actor.actorId,
+            dogId,
+            expiresAt: new Date(
+              Date.now() + (body.expiresInDays ?? 14) * 24 * 60 * 60 * 1000,
+            ).toISOString(),
+            householdId: actor.householdId,
+            maxViews: body.maxViews ?? 5,
+            recipientRole: body.recipientRole,
+            scopes: body.scopes,
+            subjectId: body.subjectId ?? null,
+            subjectType: body.subjectType,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/dogs/:id/case-share-grants/:grantId/revoke",
+      {
+        schema: {
+          operationId: "revokeCaseShareGrant",
+          tags: ["collaboration"],
+          headers: mutationHeaders,
+          params: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "grantId"],
+            properties: {
+              grantId: { type: "string", format: "uuid" },
+              id: { type: "string", minLength: 1 },
+            },
+          },
+          body: { type: "object", additionalProperties: false, properties: {} },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const params = request.params as { grantId: string; id: string };
+        return {
+          grant: await collaboration.revokeShareGrant({
+            dogId: params.id,
+            householdId: actor.householdId,
+            id: params.grantId,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/dogs/:id/feedback-requests",
+      {
+        schema: {
+          operationId: "createFeedbackRequest",
+          tags: ["collaboration"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["questions", "recipientRole"],
+            properties: {
+              mediaRequested: { type: "boolean", default: false },
+              questions: {
+                type: "array",
+                minItems: 1,
+                maxItems: 8,
+                items: { type: "string", minLength: 1, maxLength: 300 },
+              },
+              recipientRole: {
+                type: "string",
+                enum: ["caregiver", "observer_guest", "trainer", "veterinarian"],
+              },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireWrite(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dogId = (request.params as { id: string }).id;
+        const dashboard = await options.products?.dashboardByDog(
+          dogId,
+          actor.householdId,
+        );
+        const snapshot = product.snapshot();
+        if (options.products !== undefined && dashboard === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        if (
+          options.products === undefined &&
+          (actor.householdId !== snapshot.household.id ||
+            dogId !== snapshot.dog.id ||
+            actor.identity === "unrelated")
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const body = request.body as {
+          mediaRequested?: boolean;
+          questions: string[];
+          recipientRole: string;
+        };
+        const grant =
+          body.recipientRole === "observer_guest" ||
+          body.recipientRole === "trainer" ||
+          body.recipientRole === "veterinarian"
+            ? await collaboration.createShareGrant({
+                createdBy: actor.actorId,
+                dogId,
+                expiresAt: new Date(
+                  Date.now() + 14 * 24 * 60 * 60 * 1000,
+                ).toISOString(),
+                householdId: actor.householdId,
+                maxViews: 5,
+                recipientRole: body.recipientRole as CaseShareRecipientRole,
+                scopes: ["feedback.submit"],
+                subjectType: "feedback_request",
+              })
+            : null;
+        const feedbackRequest = await collaboration.createFeedbackRequest({
+          dogId,
+          householdId: actor.householdId,
+          mediaRequested: body.mediaRequested ?? false,
+          questions: body.questions,
+          recipientRole: body.recipientRole,
+          requestedBy: actor.actorId,
+          shareGrantId: grant?.id ?? null,
+        });
+        return { feedbackRequest, grant };
+      },
+    );
+
+    routes.post(
+      "/v1/feedback-requests/:id/responses",
+      {
+        schema: {
+          operationId: "submitFeedbackResponse",
+          tags: ["collaboration"],
+          headers: authHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["certainty", "observationSummary", "responderRole"],
+            properties: {
+              certainty: { type: "number", minimum: 0, maximum: 1 },
+              observationSummary: {
+                type: "string",
+                minLength: 1,
+                maxLength: 1200,
+              },
+              responderRole: {
+                type: "string",
+                enum: [
+                  "owner",
+                  "caregiver",
+                  "observer_guest",
+                  "trainer",
+                  "veterinarian",
+                ],
+              },
+              shareToken: { type: "string", minLength: 20, maxLength: 200 },
+              subjectiveInterpretation: {
+                type: "string",
+                minLength: 1,
+                maxLength: 1200,
+              },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const body = request.body as {
+          certainty: number;
+          observationSummary: string;
+          responderRole: string;
+          shareToken?: string;
+          subjectiveInterpretation?: string;
+        };
+        if (body.shareToken !== undefined) {
+          const grant = await collaboration.resolveShareGrant({
+            requiredScope: "feedback.submit",
+            token: body.shareToken,
+          });
+          if (grant === null) {
+            throw new ApiError(403, "ACCESS_DENIED", "Share grant denied");
+          }
+        } else {
+          const actor = await authenticator.authenticate(
+            request.headers,
+            request.id,
+          );
+          requireWrite(actor);
+        }
+        return {
+          response: await collaboration.submitFeedbackResponse({
+            certainty: body.certainty,
+            feedbackRequestId: (request.params as { id: string }).id,
+            observationSummary: body.observationSummary,
+            responderRole: body.responderRole,
+            subjectiveInterpretation: body.subjectiveInterpretation ?? null,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/dogs/:id/professional-reviews",
+      {
+        schema: {
+          operationId: "submitProfessionalReview",
+          tags: ["collaboration"],
+          headers: authHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "correctionType",
+              "professionalRole",
+              "shareToken",
+              "summary",
+              "targetType",
+            ],
+            properties: {
+              correctionType: {
+                type: "string",
+                enum: [
+                  "observation_confirmed",
+                  "observation_corrected",
+                  "observation_not_visible",
+                  "interpretation_rejected",
+                  "timing_corrected",
+                  "plan_step_supported",
+                  "plan_step_rejected",
+                  "additional_context_requested",
+                  "safety_escalation_supported",
+                  "safety_escalation_corrected",
+                ],
+              },
+              professionalRole: {
+                type: "string",
+                enum: ["trainer", "veterinarian"],
+              },
+              shareToken: { type: "string", minLength: 20, maxLength: 200 },
+              summary: { type: "string", minLength: 1, maxLength: 1200 },
+              targetId: { type: "string", format: "uuid" },
+              targetType: {
+                type: "string",
+                enum: [
+                  "case",
+                  "feedback_response",
+                  "video_analysis",
+                  "live_session",
+                  "plan",
+                  "handoff_package",
+                ],
+              },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const body = request.body as {
+          correctionType: string;
+          professionalRole: "trainer" | "veterinarian";
+          shareToken: string;
+          summary: string;
+          targetId?: string;
+          targetType: string;
+        };
+        const requiredScope =
+          body.professionalRole === "veterinarian"
+            ? "veterinary_note.submit"
+            : "trainer_review.submit";
+        const grant = await collaboration.resolveShareGrant({
+          requiredScope,
+          token: body.shareToken,
+        });
+        if (
+          grant === null ||
+          grant.dogId !== (request.params as { id: string }).id
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Share grant denied");
+        }
+        return {
+          review: await collaboration.submitProfessionalReview({
+            correctionType: body.correctionType,
+            dogId: grant.dogId,
+            householdId: grant.householdId,
+            professionalRole: body.professionalRole,
+            summary: body.summary,
+            targetId: body.targetId ?? null,
+            targetType: body.targetType,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/dogs/:id/handoff-packages",
+      {
+        schema: {
+          operationId: "createHandoffPackage",
+          tags: ["collaboration"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["consentReference", "packageType"],
+            properties: {
+              consentReference: { type: "string", minLength: 4, maxLength: 200 },
+              packageType: {
+                type: "string",
+                enum: ["trainer_handoff", "veterinary_handoff"],
+              },
+              ttlDays: { type: "integer", minimum: 1, maximum: 30 },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dogId = (request.params as { id: string }).id;
+        const productSnapshot = product.snapshot();
+        if (
+          options.products === undefined &&
+          (actor.householdId !== productSnapshot.household.id ||
+            dogId !== productSnapshot.dog.id ||
+            actor.identity === "unrelated")
+        ) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const dashboard =
+          (await options.products?.dashboardByDog(dogId, actor.householdId)) ??
+          (options.products === undefined ? product.dashboard() : null);
+        if (dashboard === null) {
+          throw new ApiError(404, "RESOURCE_NOT_FOUND", "Dog not found");
+        }
+        const body = request.body as {
+          consentReference: string;
+          packageType: "trainer_handoff" | "veterinary_handoff";
+          ttlDays?: number;
+        };
+        const videosForDog = await videos.list({
+          dogId,
+          householdId: actor.householdId,
+        });
+        const memoriesForDog = await memories.getRelevantMemory({
+          dogId,
+          householdId: actor.householdId,
+        });
+        const handoffSnapshot: Record<string, unknown> = {
+          dashboard,
+          limits:
+            body.packageType === "veterinary_handoff"
+              ? "Veterinary package excludes diagnosis and affiliate recommendations."
+              : "Trainer package excludes unrelated household history and billing.",
+          memories: memoriesForDog.slice(0, 8),
+          videos: videosForDog
+            .filter((video) => video.status === "completed")
+            .slice(0, 8),
+        };
+        return {
+          package: await collaboration.createHandoffPackage({
+            consentReference: body.consentReference,
+            createdBy: actor.actorId,
+            dogId,
+            evidenceRefs: [
+              ...memoriesForDog.slice(0, 8).map((memory) => ({
+                id: memory.id,
+                kind: "memory",
+              })),
+              ...videosForDog.slice(0, 8).map((video) => ({
+                id: video.id,
+                kind: "video",
+              })),
+            ],
+            expiresAt: new Date(
+              Date.now() + (body.ttlDays ?? 14) * 24 * 60 * 60 * 1000,
+            ).toISOString(),
+            householdId: actor.householdId,
+            includedArtifactRefs: [
+              { id: dashboard.dogId, kind: "dog_profile" },
+              ...(dashboard.planId === null
+                ? []
+                : [{ id: dashboard.planId, kind: "plan" }]),
+            ],
+            locale: "de-CH",
+            packageType: body.packageType,
+            snapshot: handoffSnapshot,
+          }),
+        };
+      },
+    );
+
+    routes.post(
+      "/v1/handoff-packages/:id/deliveries",
+      {
+        schema: {
+          operationId: "createHandoffDelivery",
+          tags: ["collaboration"],
+          headers: mutationHeaders,
+          params: idParams,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["deliveryMethod", "dogId"],
+            properties: {
+              deliveryMethod: {
+                type: "string",
+                enum: ["secure_link", "pdf_download", "secure_email"],
+              },
+              dogId: { type: "string", minLength: 1 },
+              shareGrantId: { type: "string", format: "uuid" },
+            },
+          },
+          response: { 200: stateSchema, ...commonResponses },
+        },
+      },
+      async (request) => {
+        const actor = await authenticator.authenticate(
+          request.headers,
+          request.id,
+        );
+        requireOwner(actor);
+        key(request);
+        if (actor.householdId === null) {
+          throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
+        }
+        const body = request.body as {
+          deliveryMethod: "secure_link" | "pdf_download" | "secure_email";
+          dogId: string;
+          shareGrantId?: string;
+        };
+        return {
+          delivery: await collaboration.createHandoffDelivery({
+            createdBy: actor.actorId,
+            deliveryMethod: body.deliveryMethod,
+            dogId: body.dogId,
+            handoffPackageId: (request.params as { id: string }).id,
+            householdId: actor.householdId,
+            shareGrantId: body.shareGrantId ?? null,
           }),
         };
       },
@@ -1882,7 +3070,6 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       ["/v1/sessions/:id/check-in", "submitCheckin"],
       ["/v1/plans/:id/evaluate-progress", "evaluatePlanProgress"],
       ["/v1/plans/:id/adjust", "adjustPlan"],
-      ["/v1/dogs/:id/referrals", "createReferral"],
     ] as const;
     for (const [url, operationId] of simpleCommands)
       routes.post(

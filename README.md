@@ -11,6 +11,8 @@ The language model extracts explicitly stated facts and presents computed
 results. It is not authoritative for safety disposition, protocol eligibility,
 progression, measurements, or plan adjustment. Initial training protocols are
 development content and still require professional review before release.
+Coach requests include a bounded versioned context capsule; decision-bearing
+streamed answers are generated privately and shown only after DogOS validation.
 
 ## Architecture
 
@@ -29,6 +31,13 @@ Embeddings and model fine-tuning are intentionally deferred until evaluated
 retrieval failures justify them.
 
 See [Chat-first PWA architecture](docs/architecture/chat-first-pwa.md).
+See
+[Production AI, VOD, CV, and live coaching](docs/architecture/production-ai-vod-cv-live.md)
+for the provider-neutral policy, media, and release-gate architecture.
+Use the
+[real provider E2E runbook](docs/runbooks/real-provider-e2e.md)
+when validating Supabase Auth, AI, VOD, LiveKit, Stripe, Rewardful, Cal.com, and
+partner flows with real credentials.
 
 ## Local Development
 
@@ -74,7 +83,8 @@ of truth. Real-provider activation is tracked in
 ## Current Release Blockers
 
 - professionally reviewed and versioned training protocols;
-- blind model evaluation for extraction and multilingual coaching quality;
+- external approval evidence plus blind model evaluation for extraction and
+  multilingual coaching quality;
 - commercial Stripe catalog, tax, legal, and entitlement approval;
 - verified professional supply and referral governance;
 - external video model routing, malware/content checks, and LiveKit staging

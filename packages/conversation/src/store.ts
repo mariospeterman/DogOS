@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 import postgres, { type Sql } from "postgres";
+import {
+  dogosDataPartSchema,
+  type DogOSDataPart,
+} from "@dogos/contracts";
 
 import type {
   CoachChannel,
@@ -33,7 +37,7 @@ export interface AppendCoachMessageInput {
   role: "user" | "assistant";
   secondaryTags?: string[];
   traceId: string;
-  uiParts?: unknown[];
+  uiParts?: DogOSDataPart[];
   workspace?: CoachWorkspace;
 }
 
@@ -107,7 +111,7 @@ export class InMemoryCoachConversationStore implements CoachConversationStore {
       createdAt: new Date().toISOString(),
       generationStatus: input.generationStatus ?? "completed",
       secondaryTags: input.secondaryTags ?? [],
-      uiParts: input.uiParts ?? [],
+      uiParts: validatedUiParts(input.uiParts ?? []),
       workspace: input.workspace ?? workspaceFromContext(input.contextKind),
     };
     conversation.messages.push(message);
@@ -220,7 +224,7 @@ export class PostgresCoachConversationStore implements CoachConversationStore {
         ${input.workspace ?? workspaceFromContext(input.contextKind)},
         ${input.secondaryTags ?? []},
         ${this.#sql.json((input.artifactRefs ?? []) as JsonValue)},
-        ${this.#sql.json((input.uiParts ?? []) as JsonValue)},
+        ${this.#sql.json(validatedUiParts(input.uiParts ?? []) as JsonValue)},
         ${input.generationStatus ?? "completed"},
         ${this.#sql.json({ traceId: input.traceId } as JsonValue)}
       )
@@ -336,7 +340,7 @@ function mapMessage(row: MessageRow): CoachMessage {
     createdAt: new Date(row.created_at).toISOString(),
     generationStatus: row.generation_status,
     secondaryTags: row.secondary_tags ?? [],
-    uiParts: parseArray(row.ui_parts),
+    uiParts: validatedUiParts(parseArray(row.ui_parts)),
     workspace: row.workspace,
   };
 }
@@ -362,4 +366,8 @@ function chapterTitleFromContent(content: string): string {
 
 function parseArray<T = unknown>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function validatedUiParts(parts: unknown[]): DogOSDataPart[] {
+  return parts.map((part) => dogosDataPartSchema.parse(part));
 }

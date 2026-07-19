@@ -28,9 +28,13 @@ function SignUpForm() {
   async function signUp() {
     setWorking(true);
     setError(null);
-    const locale = navigator.language.toLowerCase().startsWith("de")
-      ? "de-CH"
-      : "en";
+    const cleanedEmail = email.trim().toLowerCase();
+    const cleanedName = name.trim();
+    const locale =
+      typeof navigator !== "undefined" &&
+      navigator.language.toLowerCase().startsWith("de")
+        ? "de-CH"
+        : "en";
     const requestedNext = searchParams.get("next");
     const next =
       requestedNext !== null && requestedNext.startsWith("/")
@@ -39,31 +43,44 @@ function SignUpForm() {
     const confirmUrl = new URL("/auth/confirm", window.location.origin);
     confirmUrl.searchParams.set("next", next);
     if (referralCode !== null) confirmUrl.searchParams.set("ref", referralCode);
-    const { data, error: signUpError } = await createClient().auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name.trim(),
-          locale,
-          ...(referralCode === null
-            ? {}
-            : { referral_code: referralCode, referral_source: "landing" }),
+    try {
+      const { data, error: signUpError } = await createClient().auth.signUp({
+        email: cleanedEmail,
+        password,
+        options: {
+          data: {
+            full_name: cleanedName,
+            locale,
+            ...(referralCode === null
+              ? {}
+              : { referral_code: referralCode, referral_source: "landing" }),
+          },
+          emailRedirectTo: confirmUrl.toString(),
         },
-        emailRedirectTo: confirmUrl.toString(),
-      },
-    });
-    if (signUpError !== null) {
-      setError("Das Konto konnte nicht erstellt werden. Prüfe deine Angaben.");
+      });
+      if (signUpError !== null) {
+        setError(
+          process.env.NEXT_PUBLIC_DOGOS_ENV === "local"
+            ? `Das Konto konnte nicht erstellt werden: ${signUpError.message}`
+            : "Das Konto konnte nicht erstellt werden. Prüfe deine Angaben.",
+        );
+        setWorking(false);
+        return;
+      }
+      if (data.session !== null) {
+        window.location.assign(next);
+        return;
+      }
+      setSent(true);
       setWorking(false);
-      return;
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? `Supabase ist nicht korrekt konfiguriert: ${caught.message}`
+          : "Supabase ist nicht korrekt konfiguriert.",
+      );
+      setWorking(false);
     }
-    if (data.session !== null) {
-      window.location.assign(next);
-      return;
-    }
-    setSent(true);
-    setWorking(false);
   }
 
   return (
@@ -138,7 +155,7 @@ function SignUpForm() {
                 disabled={
                   working ||
                   name.trim().length === 0 ||
-                  !email.includes("@") ||
+                  !email.trim().includes("@") ||
                   password.length < 10
                 }
                 onClick={signUp}
