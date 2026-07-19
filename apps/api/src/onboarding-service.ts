@@ -134,14 +134,17 @@ function ids(): OnboardingIds {
 }
 
 export class OnboardingService {
-  constructor(private readonly repository: OnboardingRepository) {}
+  constructor(
+    private readonly repository: OnboardingRepository,
+    private readonly pilotGoalFamily = "goal.loose_leash_walking",
+  ) {}
 
   async projectOwner(
     input: { actorUserId: string; householdId: string },
     snapshot: ConversationSnapshot,
   ): Promise<DogProductContext> {
     const existing = await this.repository.findByOwner(input.actorUserId);
-    if (existing !== null && existing.planStatus !== "setup_required") {
+    if (existing !== null) {
       return existing;
     }
     const facts = canonicalFacts(snapshot);
@@ -225,9 +228,12 @@ export class OnboardingService {
       requiredSafetyQuestionCodes: ["question.recent_bite"],
       supportedEnvironmentCodes: ["environment.outdoor_low_distraction"],
     });
-    const protocol = developmentProtocols.find(
-      (candidate) => candidate.goalFamily === facts.goalCode,
-    );
+    const protocol =
+      facts.goalCode === this.pilotGoalFamily
+        ? developmentProtocols.find(
+            (candidate) => candidate.goalFamily === facts.goalCode,
+          )
+        : undefined;
     const now = new Date();
     const firstSession = new Date(now);
     firstSession.setUTCDate(firstSession.getUTCDate() + 1);

@@ -40,6 +40,7 @@ import {
 
 import { dogosApiHeaders, dogosApiUrl } from "../lib/api-client";
 import { DogOSLoader } from "./dogos-loader";
+import { dogosFeatures } from "../lib/features";
 import type { ProductDashboard } from "../lib/product";
 import { trainingPresentation } from "../lib/training-presentation";
 
@@ -1556,15 +1557,19 @@ function CoachRuntime({
         router.push("/app/coach?space=media&action=upload-video");
       },
     },
-    {
-      icon: Camera,
-      id: "live",
-      label: "Live",
-      action: () => {
-        setActivePanel("live");
-        router.push("/app/coach?space=media&action=start-live");
-      },
-    },
+    ...(dogosFeatures.live
+      ? [
+          {
+            icon: Camera,
+            id: "live",
+            label: "Live",
+            action: () => {
+              setActivePanel("live");
+              router.push("/app/coach?space=media&action=start-live");
+            },
+          },
+        ]
+      : []),
   ] as const;
   const heldCopy = heldTrainingCopy(trainingState, english);
   return (
@@ -1655,13 +1660,15 @@ function CoachRuntime({
               {english ? "Upload and review" : "Upload und Prüfung"}
             </small>
           </Link>
-          <Link
-            href="/app/coach?space=media&action=start-live"
-            onClick={() => setActivePanel("live")}
-          >
-            <strong>{english ? "Live session" : "Live Session"}</strong>
-            <small>{english ? "Camera session" : "Kamera-Session"}</small>
-          </Link>
+          {dogosFeatures.live ? (
+            <Link
+              href="/app/coach?space=media&action=start-live"
+              onClick={() => setActivePanel("live")}
+            >
+              <strong>{english ? "Live session" : "Live Session"}</strong>
+              <small>{english ? "Camera session" : "Kamera-Session"}</small>
+            </Link>
+          ) : null}
         </section>
         <div className="sidebar-account">
           <button onClick={() => setActivePanel("profile")} type="button">
@@ -1779,16 +1786,18 @@ function CoachRuntime({
                   {english ? "Upload and review" : "Upload und Prüfung"}
                 </small>
               </Link>
-              <Link
-                href="/app/coach?space=media&action=start-live"
-                onClick={() => {
-                  setActivePanel("live");
-                  setMobileDrawerOpen(false);
-                }}
-              >
-                <strong>{english ? "Live session" : "Live Session"}</strong>
-                <small>{english ? "Camera session" : "Kamera-Session"}</small>
-              </Link>
+              {dogosFeatures.live ? (
+                <Link
+                  href="/app/coach?space=media&action=start-live"
+                  onClick={() => {
+                    setActivePanel("live");
+                    setMobileDrawerOpen(false);
+                  }}
+                >
+                  <strong>{english ? "Live session" : "Live Session"}</strong>
+                  <small>{english ? "Camera session" : "Kamera-Session"}</small>
+                </Link>
+              ) : null}
             </section>
             <div className="sidebar-account">
               <button
@@ -2273,24 +2282,26 @@ function CoachRuntime({
           >
             <Mic size={18} />
           </button>
-          <Link
-            aria-label={
-              english ? "Start live video coaching" : "Live Video starten"
-            }
-            className="composer-tool optional"
-            href="#live"
-            onClick={(event) => {
-              event.preventDefault();
-              setActivePanel("live");
-            }}
-            title={
-              english
-                ? "Live video coaching requires Pro or Ultra."
-                : "Live Video Coaching erfordert Pro oder Ultra."
-            }
-          >
-            <Camera size={18} />
-          </Link>
+          {dogosFeatures.live ? (
+            <Link
+              aria-label={
+                english ? "Start live video coaching" : "Live Video starten"
+              }
+              className="composer-tool optional"
+              href="#live"
+              onClick={(event) => {
+                event.preventDefault();
+                setActivePanel("live");
+              }}
+              title={
+                english
+                  ? "Live video coaching requires Pro or Ultra."
+                  : "Live Video Coaching erfordert Pro oder Ultra."
+              }
+            >
+              <Camera size={18} />
+            </Link>
+          ) : null}
           {busy ? (
             <button aria-label="Antwort stoppen" onClick={stop} type="button">
               <span className="stop-square" />

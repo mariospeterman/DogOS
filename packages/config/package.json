@@ -9,6 +9,11 @@
       "development": "./src/api.ts",
       "default": "./dist/api.js"
     },
+    "./features": {
+      "types": "./src/features.ts",
+      "development": "./src/features.ts",
+      "default": "./dist/features.js"
+    },
     "./web": {
       "types": "./src/web.ts",
       "development": "./src/web.ts",

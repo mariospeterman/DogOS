@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
-import "@livekit/components-styles";
 import "./globals.css";
 import { PwaRegistration } from "../components/pwa-registration";
 

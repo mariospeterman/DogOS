@@ -9,6 +9,10 @@ import {
   type AgentActorContext,
 } from "@dogos/agent-auth";
 import {
+  type DogOSFeatureConfig,
+  privatePilotFeatureDefaults,
+} from "@dogos/config/features";
+import {
   CoachConversationService,
   InMemoryCoachConversationStore,
   type CoachContextKind,
@@ -91,6 +95,7 @@ const errorCodes = [
   "SIGNED_ACTION_REPLAYED",
   "BILLING_UNAVAILABLE",
   "LIVEKIT_UNAVAILABLE",
+  "CAPABILITY_DISABLED",
   "RATE_LIMITED",
 ] as const;
 type ErrorCode = (typeof errorCodes)[number];
@@ -526,6 +531,7 @@ export interface BuildAppOptions {
   videoUploads?: VideoUploadSigner;
   videos?: VideoAnalysisStore;
   product?: LocalProductFixture;
+  features?: DogOSFeatureConfig;
   readiness?: {
     ai?: AiCapabilityReadiness;
     database: boolean;
@@ -545,6 +551,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     requestIdHeader: "x-request-id",
   });
   const product = options.product ?? new LocalProductFixture();
+  const features = options.features ?? privatePilotFeatureDefaults;
   const coach =
     options.coach ??
     new CoachConversationService(new InMemoryCoachConversationStore());
@@ -575,7 +582,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const readiness = options.readiness ?? {
     ai: undefined,
     database: options.products !== undefined,
-    liveKit: options.liveKit !== undefined,
+    liveKit: options.liveKit !== undefined && features.live,
     openAI: options.coach !== undefined,
     stripe: options.billing !== undefined,
     supabaseStorage: options.videoUploads !== undefined,
@@ -724,7 +731,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           cv: "disabled",
           embedding: "disabled",
           knowledgeRelease: null,
-          live: readiness.liveKit ? "ready" : "disabled",
+          live: features.live && readiness.liveKit ? "ready" : "disabled",
           moderation: "disabled",
           policyVersion: "local-deterministic",
           text: readiness.openAI ? "ready" : "disabled",
@@ -1498,6 +1505,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         );
         requireWrite(actor);
         key(request);
+        if (!features.live) {
+          throw new ApiError(
+            409,
+            "CAPABILITY_DISABLED",
+            "Live coaching is disabled for this release",
+          );
+        }
         if (actor.householdId === null) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }
@@ -1587,6 +1601,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           request.headers,
           request.id,
         );
+        if (!features.live) {
+          throw new ApiError(
+            409,
+            "CAPABILITY_DISABLED",
+            "Live coaching is disabled for this release",
+          );
+        }
         if (actor.householdId === null) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }
@@ -1632,6 +1653,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         );
         requireWrite(actor);
         key(request);
+        if (!features.live) {
+          throw new ApiError(
+            409,
+            "CAPABILITY_DISABLED",
+            "Live coaching is disabled for this release",
+          );
+        }
         if (actor.householdId === null) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }
@@ -1681,6 +1709,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
           request.headers,
           request.id,
         );
+        if (!features.professionalMarketplace) {
+          throw new ApiError(
+            409,
+            "CAPABILITY_DISABLED",
+            "Partner marketplace is disabled for this release",
+          );
+        }
         if (actor.householdId === null) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }
@@ -1743,6 +1778,13 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         );
         requireWrite(actor);
         key(request);
+        if (!features.professionalMarketplace) {
+          throw new ApiError(
+            409,
+            "CAPABILITY_DISABLED",
+            "Partner marketplace is disabled for this release",
+          );
+        }
         if (actor.householdId === null) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }

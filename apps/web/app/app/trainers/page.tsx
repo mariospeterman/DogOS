@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/app-shell";
 import { dogosApiHeaders, dogosApiUrl } from "../../../lib/api-client";
+import { dogosFeatures } from "../../../lib/features";
 import { useProductDashboard } from "../../../lib/product";
 
 interface PartnerOffer {
@@ -31,6 +32,7 @@ export default function TrainersPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!dogosFeatures.professionalMarketplace) return;
     if (product === null) return;
     let active = true;
     void (async () => {
@@ -64,6 +66,26 @@ export default function TrainersPage() {
     }
     const body = (await response.json()) as { referral: { url: string } };
     window.location.assign(body.referral.url);
+  }
+
+  if (!dogosFeatures.professionalMarketplace) {
+    return (
+      <AppShell title="Professional network" eyebrow="Private pilot" wide>
+        <section className="command-panel">
+          <div>
+            <p className="eyebrow">Capability disabled</p>
+            <h2>Professional marketplace is not part of this pilot.</h2>
+            <p>
+              DogOS can still prepare a secure trainer or veterinary handoff
+              from the Coach when you ask for professional help.
+            </p>
+          </div>
+          <Link className="button secondary" href="/app/coach?space=plan">
+            <CalendarClock size={17} /> Ask Coach
+          </Link>
+        </section>
+      </AppShell>
+    );
   }
 
   return (

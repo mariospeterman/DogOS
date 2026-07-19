@@ -342,7 +342,7 @@ test("chat-first Coach and management views remain one PWA", async ({
       page.getByRole("link", { name: /Aktueller Plan/ }),
     ).toBeVisible();
   } else {
-    for (const name of ["Plan", "Training", "Fortschritt", "Live"]) {
+    for (const name of ["Plan", "Training", "Fortschritt"]) {
       await expect(
         page.getByRole("button", { name, exact: true }),
       ).toBeVisible();
@@ -380,10 +380,7 @@ test("chat-first Coach and management views remain one PWA", async ({
   await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
   await page.getByLabel("Panel schliessen").click();
   if (testInfo.project.name === "chromium") {
-    await expect(page.getByLabel("Live Video starten")).toBeVisible();
-    await page.getByLabel("Live Video starten").click();
-    await expect(page.getByText("Live Coaching")).toBeVisible();
-    await page.getByLabel("Panel schliessen").click();
+    await expect(page.getByLabel("Live Video starten")).toHaveCount(0);
     await expect(page.getByLabel("Sprachnotiz folgt")).toBeDisabled();
   }
   await page.goto("/app/plan");
@@ -397,8 +394,7 @@ test("chat-first Coach and management views remain one PWA", async ({
   await expect(page).toHaveURL(/\/app\/coach\?action=upload-video/);
   await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
   await page.goto("/app/live");
-  await expect(page).toHaveURL(/\/app\/coach\?action=start-live/);
-  await expect(page.getByText("Live Coaching")).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/coach$/);
 });
 
 test("account language follows conversation without a selector", async ({

@@ -268,9 +268,13 @@ export class WebOnboardingService {
       );
       dogId = product.dogId;
       assistantText =
-        next.locale === "de-CH"
-          ? `Ich habe ${product.dogName}s Ausgangslage und Ziel gespeichert. Der erste messbare Trainingsplan ist bereit. Wir starten mit kurzen Einheiten und passen die Schwierigkeit nur anhand deiner erfassten Ergebnisse an.`
-          : `I saved ${product.dogName}'s starting point and goal. The first measurable training plan is ready. We will begin with short sessions and adjust difficulty only from the results you record.`;
+        product.planStatus === "setup_required"
+          ? next.locale === "de-CH"
+            ? `Ich habe ${product.dogName}s Ausgangslage und Ziel gespeichert. Dieses Ziel ist im privaten Pilot noch nicht für einen autonomen Plan freigegeben. Wir bleiben im Coach bei Beobachtungen und können eine fachliche Übergabe vorbereiten.`
+            : `I saved ${product.dogName}'s starting point and goal. This goal is not enabled for an autonomous private-pilot plan yet. We can keep observations in Coach and prepare a professional handoff.`
+          : next.locale === "de-CH"
+            ? `Ich habe ${product.dogName}s Ausgangslage und Ziel gespeichert. Der erste messbare Trainingsplan ist bereit. Wir starten mit kurzen Einheiten und passen die Schwierigkeit nur anhand deiner erfassten Ergebnisse an.`
+            : `I saved ${product.dogName}'s starting point and goal. The first measurable training plan is ready. We will begin with short sessions and adjust difficulty only from the results you record.`;
     }
     const updated: OnboardingChatState = {
       messages: [

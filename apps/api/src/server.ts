@@ -1,4 +1,5 @@
 import { loadApiEnv } from "@dogos/config/api";
+import { loadDogosReleaseConfig } from "@dogos/config/features";
 import {
   CoachConversationService,
   InMemoryCoachConversationStore,
@@ -46,6 +47,7 @@ import {
 import { WebOnboardingService } from "./web-onboarding-service.js";
 
 const environment = loadApiEnv(process.env);
+const release = loadDogosReleaseConfig(process.env);
 const aiConfig = loadDogosAiConfig(process.env);
 const accounts = environment.DATABASE_URL
   ? new AccountRepository(environment.DATABASE_URL)
@@ -86,7 +88,7 @@ const professionalHandoffs = environment.DATABASE_URL
 const search = environment.DATABASE_URL
   ? new SearchRepository(environment.DATABASE_URL)
   : undefined;
-const liveKit = loadLiveKitConfig(process.env);
+const liveKit = release.features.live ? loadLiveKitConfig(process.env) : null;
 const storageConfig = loadSupabaseStorageConfig(process.env);
 const videoUploads =
   storageConfig === null
@@ -136,7 +138,7 @@ const onboardingInterpreter =
 const onboarding =
   onboardingRepository === undefined
     ? undefined
-    : new OnboardingService(onboardingRepository);
+    : new OnboardingService(onboardingRepository, release.pilotGoalFamily);
 const authenticator = createRequestAuthenticator({
   ...(accounts === undefined ? {} : { accountRepository: accounts }),
   authMode: environment.DOGOS_AUTH_MODE,
@@ -196,6 +198,7 @@ const app = buildApp({
   ...(liveSessions === undefined ? {} : { liveSessions }),
   ...(memories === undefined ? {} : { memories }),
   ...(marketplace === undefined ? {} : { marketplace }),
+  features: release.features,
   ...(professionalHandoffs === undefined ? {} : { professionalHandoffs }),
   ...(privacy === undefined ? {} : { privacy }),
   ...(search === undefined ? {} : { search }),

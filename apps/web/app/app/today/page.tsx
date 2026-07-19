@@ -1,8 +1,9 @@
 "use client";
 
-import { Clock3, MessageCircle, Play, Radio, Target } from "lucide-react";
+import { Clock3, MessageCircle, Play, Target } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "../../../components/app-shell";
+import { dogosFeatures } from "../../../lib/features";
 import { useProductDashboard } from "../../../lib/product";
 import { trainingPresentation } from "../../../lib/training-presentation";
 import { coachHref } from "../../../lib/coach";
@@ -80,9 +81,11 @@ export default function TodayPage() {
           >
             <MessageCircle size={18} /> Coach fragen
           </Link>
-          <Link className="button secondary" href="/app/live">
-            <Radio size={18} /> Live
-          </Link>
+          {dogosFeatures.live ? (
+            <Link className="button secondary" href="/app/live">
+              Live
+            </Link>
+          ) : null}
         </div>
       </section>
       <Link

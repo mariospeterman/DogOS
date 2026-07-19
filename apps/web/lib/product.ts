@@ -28,7 +28,7 @@ export interface ProductDashboard {
   goalText: string;
   latestDecision: string;
   planId: string | null;
-  planStatus: "active" | "blocked";
+  planStatus: "active" | "blocked" | "setup_required";
   riskDisposition: string;
   requiredConsecutiveSessions?: number;
   sessionCount: number;

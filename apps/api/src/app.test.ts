@@ -11,6 +11,7 @@ import {
   InMemoryCoachConversationStore,
   type CoachTrainingContext,
 } from "@dogos/conversation";
+import { privatePilotFeatureDefaults } from "@dogos/config/features";
 
 import { buildApp } from "./app.js";
 
@@ -372,8 +373,31 @@ describe("product API", () => {
     expect(list.json().analyses).toHaveLength(1);
   });
 
-  it("creates LiveKit-backed live coaching sessions", async () => {
+  it("disables LiveKit-backed live coaching sessions in the private pilot", async () => {
     const app = buildApp({
+      liveKit: {
+        apiKey: "devkey",
+        apiSecret: "a-livekit-secret-for-tests",
+        url: "wss://livekit.test",
+      },
+    });
+    apps.push(app);
+    const dogId = "30000000-0000-0000-0000-000000000001";
+
+    const disabled = await app.inject({
+      method: "POST",
+      url: `/v1/dogs/${dogId}/live-sessions`,
+      headers: mutationHeaders("owner", "live-disabled-1"),
+      payload: { plannedMinutes: 5 },
+    });
+
+    expect(disabled.statusCode).toBe(409);
+    expect(disabled.json().error.code).toBe("CAPABILITY_DISABLED");
+  });
+
+  it("creates LiveKit-backed live coaching sessions when explicitly enabled", async () => {
+    const app = buildApp({
+      features: { ...privatePilotFeatureDefaults, live: true },
       liveKit: {
         apiKey: "devkey",
         apiSecret: "a-livekit-secret-for-tests",
@@ -418,8 +442,28 @@ describe("product API", () => {
     });
   });
 
-  it("lists reviewed partner offers and creates disclosed referrals", async () => {
+  it("disables partner marketplace referrals in the private pilot", async () => {
     const app = buildApp();
+    apps.push(app);
+    const dogId = "30000000-0000-0000-0000-000000000001";
+
+    const disabled = await app.inject({
+      method: "GET",
+      url: `/v1/dogs/${dogId}/partner-offers?kind=trainer_booking`,
+      headers: { "x-dogos-user": "owner" },
+    });
+
+    expect(disabled.statusCode).toBe(409);
+    expect(disabled.json().error.code).toBe("CAPABILITY_DISABLED");
+  });
+
+  it("lists reviewed partner offers and creates disclosed referrals when explicitly enabled", async () => {
+    const app = buildApp({
+      features: {
+        ...privatePilotFeatureDefaults,
+        professionalMarketplace: true,
+      },
+    });
     apps.push(app);
     const dogId = "30000000-0000-0000-0000-000000000001";
 
