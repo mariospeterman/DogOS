@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { AppShell } from "../../../components/app-shell";
+import { DogOSLoader } from "../../../components/dogos-loader";
 import { useProductDashboard } from "../../../lib/product";
 
 function percent(value: number | undefined, fallback = 0) {
@@ -36,7 +37,12 @@ export default function ProgressPage() {
       }
       wide
     >
-      {loading ? <p className="helper">Loading progress...</p> : null}
+      {loading ? (
+        <DogOSLoader
+          label="DogOS vergleicht die letzten Einheiten ..."
+          reserve="inline"
+        />
+      ) : null}
       {error ? <p className="coach-error">{error}</p> : null}
       {product ? (
         <div className="dashboard-grid">

@@ -39,6 +39,7 @@ import {
 } from "react";
 
 import { dogosApiHeaders, dogosApiUrl } from "../lib/api-client";
+import { DogOSLoader } from "./dogos-loader";
 import type { ProductDashboard } from "../lib/product";
 import { trainingPresentation } from "../lib/training-presentation";
 
@@ -403,8 +404,11 @@ export function CoachChat({ product }: { product: ProductDashboard }) {
   if (conversation === null) {
     return (
       <div className="coach-loading">
-        <span className="coach-pulse" />
-        <p>{loadError ?? "Gespräch wird geladen"}</p>
+        {loadError === null ? (
+          <DogOSLoader label="DogOS prüft Echos Kontext ..." />
+        ) : (
+          <p>{loadError}</p>
+        )}
       </div>
     );
   }

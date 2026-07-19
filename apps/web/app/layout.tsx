@@ -40,8 +40,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="de-CH">
-      <body>
+    <html lang="de-CH" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <PwaRegistration />
         {children}
       </body>

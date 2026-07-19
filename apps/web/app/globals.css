@@ -1561,17 +1561,155 @@ a {
   font-family: Georgia, "Times New Roman", serif;
   margin: 8px 0 0;
 }
-.coach-pulse {
-  animation: coach-pulse 1.2s infinite ease-in-out;
-  background: var(--blue);
-  border-radius: 50%;
-  height: 12px;
-  width: 12px;
+.dogos-loader-shell {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 104px;
+  width: 100%;
 }
-@keyframes coach-pulse {
+.dogos-loader-shell[data-reserve="page"] {
+  min-height: 132px;
+}
+.dogos-loader {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  inline-size: min(260px, 100%);
+}
+.dogos-loader-art {
+  color: var(--text);
+  display: block;
+  height: 82px;
+  inline-size: 180px;
+  overflow: visible;
+}
+.dogos-loader-arc {
+  fill: none;
+  opacity: 0.24;
+  stroke: color-mix(in srgb, var(--blue) 76%, var(--text));
+  stroke-dasharray: 0.07 0.08;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+.dogos-loader-ball {
+  animation: dogos-ball 1.4s cubic-bezier(0.45, 0, 0.3, 1) infinite;
+  fill: var(--coral);
+  filter: drop-shadow(0 8px 14px rgb(238 108 77 / 0.28));
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.dogos-loader-dog {
+  animation: dogos-dog-run 1.4s cubic-bezier(0.4, 0, 0.25, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.dogos-loader-body,
+.dogos-loader-chest {
+  fill: color-mix(in srgb, var(--text) 84%, var(--panel));
+}
+.dogos-loader-tail,
+.dogos-loader-leg {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text) 84%, var(--panel));
+  stroke-linecap: round;
+  stroke-width: 4.4;
+}
+.dogos-loader-ear {
+  animation: dogos-ear 1.4s ease-in-out infinite;
+  fill: color-mix(in srgb, var(--blue) 62%, var(--text));
+  transform-box: fill-box;
+  transform-origin: 60% 80%;
+}
+.dogos-loader-tail {
+  animation: dogos-tail 0.7s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: 90% 80%;
+}
+.dogos-loader-eye {
+  fill: var(--panel);
+}
+.dogos-loader-leg.front,
+.dogos-loader-leg.rear2 {
+  animation: dogos-leg-a 0.7s ease-in-out infinite;
+}
+.dogos-loader-leg.front2,
+.dogos-loader-leg.rear {
+  animation: dogos-leg-b 0.7s ease-in-out infinite;
+}
+.dogos-loader-text {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+.sr-only {
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+@keyframes dogos-ball {
+  0%,
+  100% {
+    transform: translate(-90px, 3px) scale(0.9);
+  }
+  35% {
+    transform: translate(-48px, -19px) scale(1);
+  }
+  68% {
+    transform: translate(-9px, -12px) scale(0.96);
+  }
+}
+@keyframes dogos-dog-run {
+  0%,
+  100% {
+    transform: translateX(-4px) translateY(1px);
+  }
   50% {
-    opacity: 0.35;
-    transform: scale(0.8);
+    transform: translateX(6px) translateY(-2px);
+  }
+}
+@keyframes dogos-tail {
+  from {
+    transform: rotate(-7deg);
+  }
+  to {
+    transform: rotate(9deg);
+  }
+}
+@keyframes dogos-ear {
+  50% {
+    transform: rotate(-8deg);
+  }
+}
+@keyframes dogos-leg-a {
+  50% {
+    transform: translateX(4px) rotate(-6deg);
+  }
+}
+@keyframes dogos-leg-b {
+  50% {
+    transform: translateX(-4px) rotate(6deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dogos-loader-ball,
+  .dogos-loader-dog,
+  .dogos-loader-ear,
+  .dogos-loader-tail,
+  .dogos-loader-leg {
+    animation: none;
+  }
+  .dogos-loader-ball {
+    transform: translate(-8px, -8px);
   }
 }
 @media (min-width: 841px) {

@@ -75,10 +75,12 @@ export function useProductDashboard() {
         setProduct(body.status === "ready" ? body : null);
       } catch (caught) {
         if (active) {
+          const message =
+            caught instanceof Error ? caught.message : String(caught);
           setError(
-            caught instanceof Error
-              ? caught.message
-              : "DogOS konnte die Trainingsdaten nicht laden.",
+            message === "Failed to fetch" || message === "fetch failed"
+              ? "DogOS konnte die API nicht erreichen. Starte `pnpm dev` oder prüfe NEXT_PUBLIC_API_URL/DOGOS_INTERNAL_API_URL."
+              : message,
           );
         }
       } finally {

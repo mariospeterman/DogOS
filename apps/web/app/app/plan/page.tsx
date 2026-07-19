@@ -4,6 +4,7 @@ import { CalendarDays, CheckCircle2, CircleDot, Route } from "lucide-react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { AppShell } from "../../../components/app-shell";
+import { DogOSLoader } from "../../../components/dogos-loader";
 import { useProductDashboard } from "../../../lib/product";
 
 function pct(value: number | undefined, fallback = 0) {
@@ -27,7 +28,9 @@ export default function PlanPage() {
       }
       wide
     >
-      {loading ? <p className="helper">Loading plan...</p> : null}
+      {loading ? (
+        <DogOSLoader label="DogOS lädt Echos Plan ..." reserve="inline" />
+      ) : null}
       {error ? <p className="coach-error">{error}</p> : null}
       {product ? (
         <div className="dashboard-grid">

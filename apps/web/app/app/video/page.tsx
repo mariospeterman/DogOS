@@ -4,6 +4,7 @@ import { Camera, Film, ShieldCheck, Upload } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/app-shell";
+import { DogOSLoader } from "../../../components/dogos-loader";
 import { dogosApiHeaders, dogosApiUrl } from "../../../lib/api-client";
 import { useProductDashboard } from "../../../lib/product";
 
@@ -53,7 +54,9 @@ export default function VideoPage() {
       }
       wide
     >
-      {loading ? <p className="helper">Loading media...</p> : null}
+      {loading ? (
+        <DogOSLoader label="Video wird vorbereitet ..." reserve="inline" />
+      ) : null}
       {error ? <p className="coach-error">{error}</p> : null}
       <div className="dashboard-grid">
         <section className="command-panel span-2">
