@@ -1,8 +1,15 @@
-import { publicFeatureConfig } from "@dogos/config/features";
+function featureFlag(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (["1", "true", "yes", "on"].includes(value.toLowerCase())) return true;
+  if (["0", "false", "no", "off"].includes(value.toLowerCase())) return false;
+  return fallback;
+}
 
-export const dogosFeatures = publicFeatureConfig({
-  DOGOS_FEATURE_LIVE: process.env.NEXT_PUBLIC_DOGOS_FEATURE_LIVE,
-  DOGOS_FEATURE_PROFESSIONAL_MARKETPLACE:
+export const dogosFeatures = {
+  live: featureFlag(process.env.NEXT_PUBLIC_DOGOS_FEATURE_LIVE, false),
+  professionalMarketplace: featureFlag(
     process.env.NEXT_PUBLIC_DOGOS_FEATURE_PROFESSIONAL_MARKETPLACE,
-  DOGOS_FEATURE_VOD: process.env.NEXT_PUBLIC_DOGOS_FEATURE_VOD,
-});
+    false,
+  ),
+  vod: featureFlag(process.env.NEXT_PUBLIC_DOGOS_FEATURE_VOD, true),
+} as const;
