@@ -32,11 +32,15 @@ test("scenario 1: German low-risk owner reaches the chat-first coach", async ({
   await reset(request);
   await page.goto("/app/coach", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Rexs Coach")).toBeVisible();
-  await expect(page.getByText("Lockere Leine", { exact: false })).toBeVisible();
+  await expect(
+    page.getByRole("main").getByText("Lockere Leine im ruhigen Abschnitt"),
+  ).toBeVisible();
   await page.getByLabel("Nachricht an DogOS").fill("Warum dieser Block?");
   await page.getByLabel("Nachricht an DogOS").press("Enter");
   await expect(
-    page.getByText("Warum dieser Block?", { exact: true }),
+    page.getByRole("article").getByText("Warum dieser Block?", {
+      exact: true,
+    }),
   ).toBeVisible();
   if (testInfo.project.name === "chromium")
     await page.screenshot({
@@ -111,6 +115,10 @@ test("scenario 4: food refusal and avoidance reduce autonomous work without diag
   await expect(
     page.getByText("Neue Beobachtung zu Rex", { exact: false }),
   ).toBeVisible();
+  await page.goto("/app/coach", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Training gestoppt")).toBeVisible();
+  await expect(page.getByText("Training starten")).not.toBeVisible();
+  await expect(page.getByText("Zuerst fachlich abklären")).not.toBeVisible();
 });
 
 test("scenario 5: suspected pain blocks further session starts", async ({
@@ -298,34 +306,106 @@ test("public account creation is available without a provider simulator", async 
 
 test("chat-first Coach and management views remain one PWA", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto("/app/coach");
   await expect(page).toHaveURL(/\/app\/coach$/);
   await expect(page.getByText("Rexs Coach")).toBeVisible();
-  const navigation = page.getByRole("navigation", {
-    name: "Produktnavigation",
-  });
-  for (const name of ["Coach", "Plan", "Fortschritt", "Konto"]) {
+  if (testInfo.project.name === "chromium") {
     await expect(
-      navigation.getByRole("link", { name, exact: true }),
+      page.getByRole("complementary", { name: "DogOS navigation" }),
     ).toBeVisible();
+    await expect(page.getByLabel("Verlauf suchen")).toBeVisible();
+    await page.getByLabel("Nachricht an DogOS").fill("echo ist die beste");
+    await page.getByLabel("Nachricht an DogOS").press("Enter");
+    await expect(
+      page.getByRole("article").getByText("echo ist die beste"),
+    ).toBeVisible();
+    await page.getByLabel("Verlauf suchen").fill("beste");
+    await expect(
+      page
+        .getByRole("complementary", { name: "DogOS navigation" })
+        .getByText("echo ist die beste"),
+    ).toBeVisible();
+    await page.getByLabel("Verlauf suchen").fill("");
+    await page.getByLabel("Seitenleiste einklappen").click();
+    await expect(page.getByLabel("Seitenleiste öffnen")).toBeVisible();
+    await page.getByLabel("Seitenleiste öffnen").click();
+    await expect(page.getByLabel("Verlauf suchen")).toBeVisible();
+  }
+  if (testInfo.project.name === "chromium") {
+    for (const name of ["Plan", "Training", "Fortschritt", "Live"]) {
+      await expect(
+        page.getByRole("button", { name, exact: true }),
+      ).not.toBeVisible();
+    }
+    await expect(
+      page.getByRole("link", { name: /Aktueller Plan/ }),
+    ).toBeVisible();
+  } else {
+    for (const name of ["Plan", "Training", "Fortschritt"]) {
+      await expect(
+        page.getByRole("button", { name, exact: true }),
+      ).toBeVisible();
+    }
+  }
+  if (testInfo.project.name === "chromium") {
+    await expect(page.getByLabel("Coach teilen")).toBeVisible();
+  }
+  await page.getByLabel("Coach Menü").click();
+  await expect(page.getByText("Dateien im Chat anzeigen")).toBeVisible();
+  await expect(page.getByText("Chat anheften")).toBeVisible();
+  await expect(page.getByText("Archivieren")).toBeVisible();
+  await expect(page.getByText("Löschen")).toBeVisible();
+  await page.getByRole("button", { name: "Dateien im Chat anzeigen" }).click();
+  await expect(page.getByText("Dateien im Chat")).toBeVisible();
+  await page.getByLabel("Panel schliessen").click();
+  await page.getByLabel("Coach Menü").click();
+  await page.getByRole("button", { name: "Chat anheften" }).click();
+  await expect(
+    page.locator(".chat-state-banner").getByText("Angeheftet"),
+  ).toBeVisible();
+  await page.getByLabel("Coach Menü").click();
+  await page.getByRole("button", { name: "Archivieren" }).click();
+  await expect(
+    page.locator(".chat-state-banner").getByText("Archiviert"),
+  ).toBeVisible();
+  await page.getByLabel("Coach Menü").click();
+  await page.getByRole("button", { name: "Löschen" }).click();
+  await expect(
+    page.locator("#delete .inline-panel-header").getByText("Chat löschen"),
+  ).toBeVisible();
+  await page.getByLabel("Panel schliessen").click();
+  await expect(page.getByLabel("Trainingsvideo hochladen")).toBeVisible();
+  await page.getByLabel("Trainingsvideo hochladen").click();
+  await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
+  await page.getByLabel("Panel schliessen").click();
+  if (testInfo.project.name === "chromium") {
+    await expect(page.getByLabel("Live Video starten")).toHaveCount(0);
+    await expect(page.getByLabel("Sprachnotiz folgt")).toBeDisabled();
   }
   await page.goto("/app/plan");
-  await expect(
-    page.getByRole("link", { name: "Plan mit Coach besprechen" }),
-  ).toHaveAttribute("href", /\/app\/coach\?prompt=/);
+  await expect(page).toHaveURL(/\/app\/coach\?space=plan/);
+  if (testInfo.project.name !== "chromium") {
+    await expect(
+      page.getByRole("button", { exact: true, name: "Plan" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  }
+  await page.goto("/app/video");
+  await expect(page).toHaveURL(/\/app\/coach\?action=upload-video/);
+  await expect(page.getByText("Trainingsvideo analysieren")).toBeVisible();
+  await page.goto("/app/live");
+  await expect(page).toHaveURL(/\/app\/coach$/);
 });
 
 test("account language follows conversation without a selector", async ({
   page,
 }) => {
   await page.goto("/app/account");
-  await expect(page.getByText("Automatisch", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/coach\?action=profile/);
+  await expect(page.locator("#profile").getByText("Profil")).toBeVisible();
   await expect(page.getByRole("combobox", { name: /Sprache/ })).toHaveCount(0);
   await expect(
-    page.getByText("Antworte DogOS einfach in deiner Sprache", {
-      exact: false,
-    }),
+    page.getByText("Land und Währung", { exact: false }),
   ).toBeVisible();
 });
 
@@ -355,15 +435,16 @@ test("public start opens account creation and preserves referral attribution", a
   await page.goto("/?ref=DOGOS26");
   await expect(
     page.getByRole("heading", {
-      name: "Erzähl mir von deinem Hund.",
+      name: "Ein Trainingscoach, der deinen Hund wirklich kennt.",
     }),
   ).toBeVisible();
   const start = page.getByRole("link", { name: /Gespräch starten/ });
   await expect(start).toHaveAttribute("href", /\/auth\/sign-up/);
   await expect(start).toHaveAttribute("href", /ref=DOGOS26/);
-  await expect(
-    page.getByRole("link", { name: /DogOS öffnen/ }),
-  ).toHaveAttribute("href", "/auth/sign-in");
+  await expect(page.getByRole("link", { name: "Anmelden" })).toHaveAttribute(
+    "href",
+    "/auth/sign-in",
+  );
   await page.locator("main").screenshot({
     path: resolve(screenshots, `start-${testInfo.project.name}.png`),
   });

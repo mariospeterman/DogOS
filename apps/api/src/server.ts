@@ -1,4 +1,5 @@
 import { loadApiEnv } from "@dogos/config/api";
+import { loadDogosReleaseConfig } from "@dogos/config/features";
 import {
   CoachConversationService,
   InMemoryCoachConversationStore,
@@ -8,15 +9,22 @@ import {
   AccountRepository,
   BillingRepository,
   CapabilityUsageRepository,
+  CollaborationRepository,
+  ContextSnapshotRepository,
   LiveCoachingRepository,
+  MemoryRepository,
   ModelRunRepository,
   OnboardingRepository,
   OnboardingSessionRepository,
+  PartnerMarketplaceRepository,
   PostgresRepository,
+  ProfessionalHandoffRepository,
   PrivacyRepository,
+  SearchRepository,
   VideoAnalysisRepository,
 } from "@dogos/database";
 
+import { loadDogosAiConfig } from "./ai/model-policy/config.js";
 import { buildApp } from "./app.js";
 import { createRequestAuthenticator } from "./auth.js";
 import { loadStripeBillingConfig, StripeBillingService } from "./billing.js";
@@ -30,11 +38,19 @@ import { OnboardingService } from "./onboarding-service.js";
 import { SignedActionService } from "./signed-actions.js";
 import {
   loadSupabaseStorageConfig,
+  SupabaseFfmpegVideoObjectInspector,
   SupabaseVideoUploadSigner,
 } from "./storage.js";
+import {
+  createVideoAnalysisProvider,
+  loadVideoAnalysisConfig,
+  VideoAnalysisWorker,
+} from "./video-analysis.js";
 import { WebOnboardingService } from "./web-onboarding-service.js";
 
 const environment = loadApiEnv(process.env);
+const release = loadDogosReleaseConfig(process.env);
+const aiConfig = loadDogosAiConfig(process.env);
 const accounts = environment.DATABASE_URL
   ? new AccountRepository(environment.DATABASE_URL)
   : undefined;
@@ -50,21 +66,71 @@ const commands = environment.DATABASE_URL
 const capabilityUsage = environment.DATABASE_URL
   ? new CapabilityUsageRepository(environment.DATABASE_URL)
   : undefined;
+const collaboration = environment.DATABASE_URL
+  ? new CollaborationRepository(environment.DATABASE_URL)
+  : undefined;
 const videos = environment.DATABASE_URL
   ? new VideoAnalysisRepository(environment.DATABASE_URL)
   : undefined;
 const liveSessions = environment.DATABASE_URL
   ? new LiveCoachingRepository(environment.DATABASE_URL)
   : undefined;
+const memories = environment.DATABASE_URL
+  ? new MemoryRepository(environment.DATABASE_URL)
+  : undefined;
 const privacy = environment.DATABASE_URL
   ? new PrivacyRepository(environment.DATABASE_URL)
   : undefined;
-const liveKit = loadLiveKitConfig(process.env);
+const marketplace = environment.DATABASE_URL
+  ? new PartnerMarketplaceRepository(environment.DATABASE_URL)
+  : undefined;
+const professionalHandoffs = environment.DATABASE_URL
+  ? new ProfessionalHandoffRepository(environment.DATABASE_URL)
+  : undefined;
+const search = environment.DATABASE_URL
+  ? new SearchRepository(environment.DATABASE_URL)
+  : undefined;
+const liveKit = release.features.live ? loadLiveKitConfig(process.env) : null;
 const storageConfig = loadSupabaseStorageConfig(process.env);
 const videoUploads =
   storageConfig === null
     ? undefined
     : new SupabaseVideoUploadSigner(storageConfig);
+const videoAnalysisConfig = loadVideoAnalysisConfig(process.env);
+const videoAnalysisProvider =
+  videoAnalysisConfig === null
+    ? undefined
+    : createVideoAnalysisProvider({
+        ...(process.env.OPENAI_API_KEY === undefined
+          ? {}
+          : { apiKey: process.env.OPENAI_API_KEY }),
+        ...(process.env.OPENAI_BASE_URL === undefined
+          ? {}
+          : { baseUrl: process.env.OPENAI_BASE_URL }),
+        config: videoAnalysisConfig,
+      });
+const videoAnalysisWorker =
+  videos !== undefined &&
+  storageConfig !== null &&
+  videoAnalysisConfig !== null &&
+  videoAnalysisProvider !== undefined &&
+  process.env.DOGOS_VIDEO_WORKER_ENABLED === "1" &&
+  process.env.DOGOS_VIDEO_OBJECT_READER === "supabase" &&
+  process.env.DOGOS_VIDEO_FRAME_EXTRACTOR === "ffmpeg"
+    ? new VideoAnalysisWorker({
+        config: videoAnalysisConfig,
+        inspector: new SupabaseFfmpegVideoObjectInspector(storageConfig, {
+          ...(process.env.FFMPEG_PATH === undefined
+            ? {}
+            : { ffmpegPath: process.env.FFMPEG_PATH }),
+          ...(process.env.FFPROBE_PATH === undefined
+            ? {}
+            : { ffprobePath: process.env.FFPROBE_PATH }),
+        }),
+        provider: videoAnalysisProvider,
+        store: videos,
+      })
+    : undefined;
 const stripeConfig = loadStripeBillingConfig(process.env);
 const billingRepository =
   environment.DATABASE_URL && stripeConfig
@@ -82,6 +148,9 @@ const modelRuns =
   coachModelConfig && environment.DATABASE_URL
     ? new ModelRunRepository(environment.DATABASE_URL)
     : undefined;
+const contextSnapshots = environment.DATABASE_URL
+  ? new ContextSnapshotRepository(environment.DATABASE_URL)
+  : undefined;
 const coachGenerator =
   coachModelConfig && modelRuns
     ? new OpenAICoachReplyGenerator(coachModelConfig, modelRuns)
@@ -93,7 +162,7 @@ const onboardingInterpreter =
 const onboarding =
   onboardingRepository === undefined
     ? undefined
-    : new OnboardingService(onboardingRepository);
+    : new OnboardingService(onboardingRepository, release.pilotGoalFamily);
 const authenticator = createRequestAuthenticator({
   ...(accounts === undefined ? {} : { accountRepository: accounts }),
   authMode: environment.DOGOS_AUTH_MODE,
@@ -145,15 +214,32 @@ const app = buildApp({
   coach,
   ...(webOnboarding === undefined ? {} : { onboarding: webOnboarding }),
   ...(commands === undefined ? {} : { commands }),
+  ...(contextSnapshots === undefined ? {} : { contextSnapshots }),
   ...(capabilityUsage === undefined ? {} : { usage: capabilityUsage }),
+  ...(collaboration === undefined ? {} : { collaboration }),
   ...(videos === undefined ? {} : { videos }),
+  ...(videoAnalysisWorker === undefined ? {} : { videoAnalysisWorker }),
   ...(videoUploads === undefined ? {} : { videoUploads }),
   ...(liveSessions === undefined ? {} : { liveSessions }),
+  ...(memories === undefined ? {} : { memories }),
+  ...(marketplace === undefined ? {} : { marketplace }),
+  features: release.features,
+  ...(professionalHandoffs === undefined ? {} : { professionalHandoffs }),
   ...(privacy === undefined ? {} : { privacy }),
+  ...(search === undefined ? {} : { search }),
   ...(liveKit === null ? {} : { liveKit }),
   ...(onboardingRepository === undefined
     ? {}
     : { products: onboardingRepository }),
+  readiness: {
+    ai: aiConfig.readiness,
+    database: environment.DATABASE_URL !== undefined,
+    liveKit: liveKit !== null,
+    openAI: coachModelConfig !== null,
+    stripe: stripeConfig !== null,
+    supabaseStorage: storageConfig !== null,
+    workers: videoAnalysisWorker !== undefined,
+  },
   signedActions,
 });
 

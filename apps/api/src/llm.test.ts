@@ -20,7 +20,7 @@ describe("coach model configuration", () => {
     ).toMatchObject({
       baseUrl: "https://eu.api.openai.com/v1",
       freeModel: "gpt-5.6-luna",
-      onboardingModel: "gpt-5.6-terra",
+      onboardingModel: "gpt-5.6-luna",
       paidModel: "gpt-5.6-terra",
       profiles: {
         chat: { maxOutputTokens: 900, timeoutMs: 12_000 },
@@ -89,22 +89,32 @@ describe("coach model configuration", () => {
     ).toThrow("DOGOS_LLM_CHAT_MAX_OUTPUT_TOKENS_INVALID");
     expect(() =>
       loadCoachModelConfig({
-        DOGOS_ENV: "production",
+        DOGOS_ENV: "staging",
         DOGOS_LLM_MODE: "openai",
         OPENAI_API_KEY: "test-key",
       }),
-    ).toThrow("DOGOS_MODEL_SNAPSHOT_APPROVAL_REQUIRED");
-    expect(
+    ).toThrow("DOGOS_AI_RELEASE_MANIFEST_REQUIRED");
+    expect(() =>
       loadCoachModelConfig({
-        DOGOS_ENV: "production",
+        DOGOS_ENV: "staging",
         DOGOS_LLM_MODE: "openai",
         DOGOS_MODEL_SNAPSHOT_APPROVAL: "dogos-coach-openai-2026-07-18-reviewed",
         OPENAI_API_KEY: "test-key",
       }),
-    ).toMatchObject({
-      freeModel: "gpt-5.6-luna",
-      paidModel: "gpt-5.6-terra",
-    });
+    ).toThrow("DOGOS_AI_RELEASE_MANIFEST_UNKNOWN");
+  });
+
+  it("rejects global OpenAI routing when EU processing is required", () => {
+    expect(() =>
+      loadCoachModelConfig({
+        DOGOS_AI_ALLOW_CROSS_BORDER_PERSONAL_DATA: "false",
+        DOGOS_AI_REQUIRED_PROCESSING_REGION: "eu",
+        DOGOS_LLM_MODE: "openai",
+        DOGOS_AI_REQUIRE_RELEASE_MANIFEST: "false",
+        OPENAI_API_KEY: "test-key",
+        OPENAI_DATA_REGION: "global",
+      }),
+    ).toThrow("OPENAI_DATA_REGION_EU_REQUIRED");
   });
 
   it("routes chat, plans, evidence, and professional summaries independently", () => {

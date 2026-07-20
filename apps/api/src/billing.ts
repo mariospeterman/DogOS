@@ -57,6 +57,7 @@ export class StripeBillingService {
 
   async createCheckout(input: {
     householdId: string;
+    rewardfulReferralId?: string | null;
     returnBaseUrl: string;
     tier: PaidTier;
   }): Promise<string> {
@@ -67,16 +68,24 @@ export class StripeBillingService {
       allow_promotion_codes: true,
       billing_address_collection: "auto",
       cancel_url: `${input.returnBaseUrl}/app/account?billing=cancelled`,
-      client_reference_id: input.householdId,
+      client_reference_id: input.rewardfulReferralId ?? input.householdId,
       ...(customer === null
         ? { customer_creation: "always" as const }
         : { customer }),
       line_items: [{ price: this.config.prices[input.tier], quantity: 1 }],
       locale: "auto",
-      metadata: { householdId: input.householdId, tier: input.tier },
+      metadata: {
+        householdId: input.householdId,
+        rewardfulReferralId: input.rewardfulReferralId ?? "",
+        tier: input.tier,
+      },
       mode: "subscription",
       subscription_data: {
-        metadata: { householdId: input.householdId, tier: input.tier },
+        metadata: {
+          householdId: input.householdId,
+          rewardfulReferralId: input.rewardfulReferralId ?? "",
+          tier: input.tier,
+        },
       },
       success_url: `${input.returnBaseUrl}/app/account?billing=success`,
     });

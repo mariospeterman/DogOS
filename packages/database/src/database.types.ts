@@ -868,6 +868,159 @@ export type Database = {
           },
         ];
       };
+      feedback_requests: {
+        Row: {
+          created_at: string;
+          dog_id: string;
+          due_at: string | null;
+          household_id: string;
+          id: string;
+          media_requested: boolean;
+          questions: Json;
+          recipient_role: string;
+          requested_by: string;
+          share_grant_id: string | null;
+          status: string;
+          target_id: string | null;
+          target_type: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          dog_id: string;
+          due_at?: string | null;
+          household_id: string;
+          id?: string;
+          media_requested?: boolean;
+          questions: Json;
+          recipient_role: string;
+          requested_by: string;
+          share_grant_id?: string | null;
+          status?: string;
+          target_id?: string | null;
+          target_type?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          dog_id?: string;
+          due_at?: string | null;
+          household_id?: string;
+          id?: string;
+          media_requested?: boolean;
+          questions?: Json;
+          recipient_role?: string;
+          requested_by?: string;
+          share_grant_id?: string | null;
+          status?: string;
+          target_id?: string | null;
+          target_type?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "feedback_requests_dog_id_fkey";
+            columns: ["dog_id"];
+            isOneToOne: false;
+            referencedRelation: "dogs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "feedback_requests_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "feedback_requests_requested_by_fkey";
+            columns: ["requested_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      feedback_responses: {
+        Row: {
+          certainty: number;
+          correction_state: string;
+          dog_id: string;
+          evidence_refs: Json;
+          feedback_request_id: string;
+          household_id: string;
+          id: string;
+          observed_at: string | null;
+          responder_role: string;
+          responder_user_id: string | null;
+          structured_observations: Json;
+          subjective_interpretation: string | null;
+          submitted_at: string;
+          superseded_by: string | null;
+        };
+        Insert: {
+          certainty?: number;
+          correction_state?: string;
+          dog_id: string;
+          evidence_refs?: Json;
+          feedback_request_id: string;
+          household_id: string;
+          id?: string;
+          observed_at?: string | null;
+          responder_role: string;
+          responder_user_id?: string | null;
+          structured_observations: Json;
+          subjective_interpretation?: string | null;
+          submitted_at?: string;
+          superseded_by?: string | null;
+        };
+        Update: {
+          certainty?: number;
+          correction_state?: string;
+          dog_id?: string;
+          evidence_refs?: Json;
+          feedback_request_id?: string;
+          household_id?: string;
+          id?: string;
+          observed_at?: string | null;
+          responder_role?: string;
+          responder_user_id?: string | null;
+          structured_observations?: Json;
+          subjective_interpretation?: string | null;
+          submitted_at?: string;
+          superseded_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "feedback_responses_dog_id_fkey";
+            columns: ["dog_id"];
+            isOneToOne: false;
+            referencedRelation: "dogs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "feedback_responses_feedback_request_id_fkey";
+            columns: ["feedback_request_id"];
+            isOneToOne: false;
+            referencedRelation: "feedback_requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "feedback_responses_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "feedback_responses_responder_user_id_fkey";
+            columns: ["responder_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       goal_measurements: {
         Row: {
           created_at: string;
@@ -1039,6 +1192,172 @@ export type Database = {
             columns: ["owner_user_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      handoff_deliveries: {
+        Row: {
+          created_at: string;
+          created_by: string;
+          delivery_method: string;
+          dog_id: string;
+          handoff_package_id: string;
+          household_id: string;
+          id: string;
+          recipient_email_hash: string | null;
+          share_grant_id: string | null;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by: string;
+          delivery_method: string;
+          dog_id: string;
+          handoff_package_id: string;
+          household_id: string;
+          id?: string;
+          recipient_email_hash?: string | null;
+          share_grant_id?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string;
+          delivery_method?: string;
+          dog_id?: string;
+          handoff_package_id?: string;
+          household_id?: string;
+          id?: string;
+          recipient_email_hash?: string | null;
+          share_grant_id?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "handoff_deliveries_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoff_deliveries_dog_id_fkey";
+            columns: ["dog_id"];
+            isOneToOne: false;
+            referencedRelation: "dogs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoff_deliveries_handoff_package_id_fkey";
+            columns: ["handoff_package_id"];
+            isOneToOne: false;
+            referencedRelation: "handoff_packages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoff_deliveries_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      handoff_packages: {
+        Row: {
+          consent_reference: string;
+          content_hash: string;
+          created_at: string;
+          created_by: string;
+          dog_id: string;
+          evidence_refs: Json;
+          expires_at: string;
+          household_id: string;
+          id: string;
+          included_artifact_refs: Json;
+          included_from: string | null;
+          included_until: string;
+          locale: string;
+          package_type: string;
+          professional_referral_id: string | null;
+          release_refs: Json;
+          revoked_at: string | null;
+          snapshot: Json;
+          version: number;
+        };
+        Insert: {
+          consent_reference: string;
+          content_hash: string;
+          created_at?: string;
+          created_by: string;
+          dog_id: string;
+          evidence_refs?: Json;
+          expires_at: string;
+          household_id: string;
+          id?: string;
+          included_artifact_refs: Json;
+          included_from?: string | null;
+          included_until?: string;
+          locale?: string;
+          package_type: string;
+          professional_referral_id?: string | null;
+          release_refs?: Json;
+          revoked_at?: string | null;
+          snapshot: Json;
+          version?: number;
+        };
+        Update: {
+          consent_reference?: string;
+          content_hash?: string;
+          created_at?: string;
+          created_by?: string;
+          dog_id?: string;
+          evidence_refs?: Json;
+          expires_at?: string;
+          household_id?: string;
+          id?: string;
+          included_artifact_refs?: Json;
+          included_from?: string | null;
+          included_until?: string;
+          locale?: string;
+          package_type?: string;
+          professional_referral_id?: string | null;
+          release_refs?: Json;
+          revoked_at?: string | null;
+          snapshot?: Json;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "handoff_packages_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoff_packages_dog_id_fkey";
+            columns: ["dog_id"];
+            isOneToOne: false;
+            referencedRelation: "dogs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoff_packages_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoff_packages_professional_referral_id_fkey";
+            columns: ["professional_referral_id"];
+            isOneToOne: false;
+            referencedRelation: "professional_referrals";
             referencedColumns: ["id"];
           },
         ];
@@ -1540,6 +1859,44 @@ export type Database = {
           },
         ];
       };
+      notification_preferences: {
+        Row: {
+          created_at: string;
+          household_id: string;
+          quiet_hours_end: string | null;
+          quiet_hours_start: string | null;
+          timezone: string;
+          updated_at: string;
+          web_push_enabled: boolean;
+        };
+        Insert: {
+          created_at?: string;
+          household_id: string;
+          quiet_hours_end?: string | null;
+          quiet_hours_start?: string | null;
+          timezone?: string;
+          updated_at?: string;
+          web_push_enabled?: boolean;
+        };
+        Update: {
+          created_at?: string;
+          household_id?: string;
+          quiet_hours_end?: string | null;
+          quiet_hours_start?: string | null;
+          timezone?: string;
+          updated_at?: string;
+          web_push_enabled?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: true;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       observations: {
         Row: {
           confidence: number | null;
@@ -1705,6 +2062,80 @@ export type Database = {
           {
             foreignKeyName: "owner_profiles_user_id_fkey";
             columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      partner_offers: {
+        Row: {
+          affiliate_url: string | null;
+          booking_provider: string | null;
+          booking_url: string | null;
+          city: string | null;
+          commission_basis_points: number;
+          country: string;
+          created_at: string;
+          disclosure: string;
+          evidence_level: Database["api"]["Enums"]["evidence_level"];
+          id: string;
+          kind: string;
+          price_label: string | null;
+          rank_score: number;
+          reason: string;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          status: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          affiliate_url?: string | null;
+          booking_provider?: string | null;
+          booking_url?: string | null;
+          city?: string | null;
+          commission_basis_points?: number;
+          country?: string;
+          created_at?: string;
+          disclosure: string;
+          evidence_level?: Database["api"]["Enums"]["evidence_level"];
+          id?: string;
+          kind: string;
+          price_label?: string | null;
+          rank_score?: number;
+          reason: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          status?: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          affiliate_url?: string | null;
+          booking_provider?: string | null;
+          booking_url?: string | null;
+          city?: string | null;
+          commission_basis_points?: number;
+          country?: string;
+          created_at?: string;
+          disclosure?: string;
+          evidence_level?: Database["api"]["Enums"]["evidence_level"];
+          id?: string;
+          kind?: string;
+          price_label?: string | null;
+          rank_score?: number;
+          reason?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "partner_offers_reviewed_by_fkey";
+            columns: ["reviewed_by"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
@@ -2002,11 +2433,17 @@ export type Database = {
           created_at: string;
           dog_id: string;
           goal_id: string | null;
+          handoff_disagreements: Json;
+          handoff_evidence_refs: Json;
+          handoff_generated_at: string | null;
+          handoff_summary: Json;
           household_id: string;
           id: string;
           reason_code: string;
+          share_expires_at: string | null;
           signed_token_hash: string | null;
           status: string;
+          target_professional_type: string;
           trainer_id: string | null;
           updated_at: string;
         };
@@ -2015,11 +2452,17 @@ export type Database = {
           created_at?: string;
           dog_id: string;
           goal_id?: string | null;
+          handoff_disagreements?: Json;
+          handoff_evidence_refs?: Json;
+          handoff_generated_at?: string | null;
+          handoff_summary?: Json;
           household_id: string;
           id?: string;
           reason_code: string;
+          share_expires_at?: string | null;
           signed_token_hash?: string | null;
           status?: string;
+          target_professional_type?: string;
           trainer_id?: string | null;
           updated_at?: string;
         };
@@ -2028,11 +2471,17 @@ export type Database = {
           created_at?: string;
           dog_id?: string;
           goal_id?: string | null;
+          handoff_disagreements?: Json;
+          handoff_evidence_refs?: Json;
+          handoff_generated_at?: string | null;
+          handoff_summary?: Json;
           household_id?: string;
           id?: string;
           reason_code?: string;
+          share_expires_at?: string | null;
           signed_token_hash?: string | null;
           status?: string;
+          target_professional_type?: string;
           trainer_id?: string | null;
           updated_at?: string;
         };
@@ -2063,6 +2512,91 @@ export type Database = {
             columns: ["trainer_id"];
             isOneToOne: false;
             referencedRelation: "trainers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      professional_reviews: {
+        Row: {
+          correction_type: string;
+          created_at: string;
+          credential_snapshot: Json;
+          dog_id: string;
+          household_id: string;
+          id: string;
+          interpretation_corrections: Json;
+          observable_corrections: Json;
+          open_questions: string[];
+          outcome: string;
+          plan_feedback: string | null;
+          professional_role: string;
+          reviewer_user_id: string | null;
+          safety_note: string | null;
+          signed_at: string;
+          superseded_by: string | null;
+          target_id: string | null;
+          target_type: string;
+        };
+        Insert: {
+          correction_type: string;
+          created_at?: string;
+          credential_snapshot?: Json;
+          dog_id: string;
+          household_id: string;
+          id?: string;
+          interpretation_corrections?: Json;
+          observable_corrections?: Json;
+          open_questions?: string[];
+          outcome?: string;
+          plan_feedback?: string | null;
+          professional_role: string;
+          reviewer_user_id?: string | null;
+          safety_note?: string | null;
+          signed_at?: string;
+          superseded_by?: string | null;
+          target_id?: string | null;
+          target_type: string;
+        };
+        Update: {
+          correction_type?: string;
+          created_at?: string;
+          credential_snapshot?: Json;
+          dog_id?: string;
+          household_id?: string;
+          id?: string;
+          interpretation_corrections?: Json;
+          observable_corrections?: Json;
+          open_questions?: string[];
+          outcome?: string;
+          plan_feedback?: string | null;
+          professional_role?: string;
+          reviewer_user_id?: string | null;
+          safety_note?: string | null;
+          signed_at?: string;
+          superseded_by?: string | null;
+          target_id?: string | null;
+          target_type?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "professional_reviews_dog_id_fkey";
+            columns: ["dog_id"];
+            isOneToOne: false;
+            referencedRelation: "dogs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "professional_reviews_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "professional_reviews_reviewer_user_id_fkey";
+            columns: ["reviewer_user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
         ];
@@ -2655,6 +3189,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "subscriptions_household_id_fkey";
+            columns: ["household_id"];
+            isOneToOne: false;
+            referencedRelation: "households";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      timeline_events: {
+        Row: {
+          created_at: string;
+          dog_id: string;
+          event_type: string;
+          household_id: string;
+          id: string;
+          occurred_at: string;
+          subject_id: string | null;
+          summary: Json;
+        };
+        Insert: {
+          created_at?: string;
+          dog_id: string;
+          event_type: string;
+          household_id: string;
+          id?: string;
+          occurred_at?: string;
+          subject_id?: string | null;
+          summary?: Json;
+        };
+        Update: {
+          created_at?: string;
+          dog_id?: string;
+          event_type?: string;
+          household_id?: string;
+          id?: string;
+          occurred_at?: string;
+          subject_id?: string | null;
+          summary?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "timeline_events_dog_id_fkey";
+            columns: ["dog_id"];
+            isOneToOne: false;
+            referencedRelation: "dogs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "timeline_events_household_id_fkey";
             columns: ["household_id"];
             isOneToOne: false;
             referencedRelation: "households";

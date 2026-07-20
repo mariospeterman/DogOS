@@ -48,7 +48,14 @@ export const dogosToolSchemas = {
   dogos_adjust_plan: command
     .extend({ planId: id, expectedVersion: z.number().int().min(1) })
     .strict(),
-  dogos_request_professional_handoff: command.extend({ dogId: id }).strict(),
+  dogos_request_professional_handoff: command
+    .extend({
+      dogId: id,
+      reason: z.string().min(1).max(500).optional(),
+      targetProfessionalType: z.enum(["trainer", "veterinary"]).optional(),
+      ttlDays: z.number().int().min(1).max(30).optional(),
+    })
+    .strict(),
 } as const;
 
 export type DogosToolName = keyof typeof dogosToolSchemas;

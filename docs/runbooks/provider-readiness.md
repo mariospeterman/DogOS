@@ -14,8 +14,10 @@ and generated database types.
    must provide `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`,
    `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and
    `SUPABASE_STORAGE_BUCKET`.
-3. Apply migrations with a direct/session database URL, not the transaction
-   pooler. Use the pooler URL only for the API runtime.
+3. Prefer applying migrations with a direct/session database URL, not the
+   transaction pooler. Use the pooler URL only for the API runtime. If only a
+   pooler URL is available, use `psql` with `ON_ERROR_STOP=1`; the Supabase CLI
+   can fail on prepared statements through some poolers.
 4. Run:
 
    ```bash
@@ -51,6 +53,26 @@ Production model activation requires:
 The API must continue to send provider calls through DogOS adapters and store
 model-run telemetry without exposing database tools to the model.
 
+Staging, preview, and production all require the approved snapshot ID when
+`DOGOS_LLM_MODE=openai`. Local/demo flows may remain deterministic or explicitly
+set `DOGOS_REQUIRE_MODEL_SNAPSHOT=1` when testing the gate.
+
+## Video Analysis
+
+Configure video analysis separately from coach text generation:
+
+- `DOGOS_VIDEO_ANALYSIS_PROVIDER=openai`;
+- `DOGOS_VIDEO_ANALYSIS_MODEL`;
+- `DOGOS_VIDEO_ANALYSIS_MAX_FRAMES`;
+- `DOGOS_VIDEO_ANALYSIS_TIMEOUT_MS`;
+- `DOGOS_VIDEO_FRAME_EXTRACTOR=ffmpeg` once the worker host has `ffmpeg`.
+
+The OpenAI adapter analyzes sampled image frames only. DogOS must verify the
+private Supabase object, extract bounded frames, submit only consented evidence,
+persist candidate observations, and require owner confirmation before plan
+changes. Do not claim diagnosis, pain, trauma, anxiety, aggression, identity,
+breed certainty, or human biometrics from user video.
+
 ## LiveKit
 
 Configure all values together:
@@ -63,6 +85,10 @@ LiveKit is media transport only. DogOS remains authoritative for identity,
 household authorization, entitlements, session state, summaries, retention, and
 billing minutes. Verify join tokens are short lived and scoped to one generated
 room name.
+
+The web app uses the official LiveKit React room components. Tokens are passed
+only to the room component and must never be rendered in the UI or stored in
+client logs.
 
 ## Stripe
 

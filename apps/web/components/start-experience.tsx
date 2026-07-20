@@ -1,7 +1,12 @@
 "use client";
 
-import { ArrowRight, Check, MessageCircle } from "lucide-react";
-import Image from "next/image";
+import {
+  ArrowRight,
+  Check,
+  LockKeyhole,
+  MessageCircle,
+  Target,
+} from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -16,59 +21,90 @@ export function StartExperience() {
   }`;
 
   return (
-    <main className="start-screen">
-      <section className="start-brand">
-        <Image
-          src="/icons/dogos-192.png"
-          alt=""
-          width={72}
-          height={72}
-          priority
-        />
-        <div>
-          <span>DogOS</span>
-          <small>Der Coach, der deinen Hund kennt.</small>
+    <main className="public-chat-shell">
+      <header className="public-chat-header">
+        <Link href="/" className="chat-wordmark" aria-label="DogOS">
+          <span className="coach-mark">D</span>
+          <strong>DogOS</strong>
+        </Link>
+        <nav>
+          <Link href="/auth/sign-in">Anmelden</Link>
+          <Link className="button secondary" href={startUrl}>
+            Starten
+          </Link>
+        </nav>
+      </header>
+
+      <section className="public-chat-main">
+        <div className="public-chat-copy">
+          <p className="eyebrow">DogOS Coach</p>
+          <h1>Ein Trainingscoach, der deinen Hund wirklich kennt.</h1>
+          <p>
+            DogOS merkt sich jede Einheit, passt euren Plan an den Fortschritt
+            an und wertet Trainingsvideos im Kontext aus.
+          </p>
+        </div>
+
+        <div className="public-chat-window" aria-label="DogOS Vorschau">
+          <div className="public-message assistant">
+            <span className="coach-avatar">D</span>
+            <div className="message-bubble assistant">
+              <p>Wann klappt Echos Rückruf nicht zuverlässig?</p>
+            </div>
+          </div>
+          <div className="public-message user">
+            <div className="message-bubble user">
+              <p>Echo kommt gut zurück, bis ein anderer Hund auftaucht.</p>
+            </div>
+          </div>
+          <div className="public-message assistant">
+            <span className="coach-avatar">D</span>
+            <div className="message-bubble assistant">
+              <p>Bei welcher Entfernung reagiert Echo ungefähr nicht mehr?</p>
+            </div>
+          </div>
+          <div className="public-chat-card">
+            <Target size={17} />
+            <span>
+              <strong>Zuverlässiger Rückruf bei Hundebegegnungen</strong>
+              <small>Basis: etwa 12 m · Ziel: 7 m · 4 von 5 Rückrufen</small>
+            </span>
+          </div>
         </div>
       </section>
 
-      <section className="start-core">
-        <p className="eyebrow">Dein persönlicher Trainingscoach</p>
-        <h1>Erzähl mir von deinem Hund.</h1>
-        <p>
-          DogOS erinnert sich an Training, Fortschritt und das, was bei euch
-          funktioniert. Daraus entsteht Schritt für Schritt euer Plan.
-        </p>
-        <Link className="button primary start-primary" href={startUrl}>
-          <MessageCircle size={20} /> Gespräch starten
+      <section className="public-prompt-panel">
+        <div>
+          <MessageCircle size={18} />
+          <span>Erzähl DogOS vom ersten echten Trainingsziel.</span>
+        </div>
+        <Link className="button primary" href={startUrl}>
+          Gespräch starten
           <ArrowRight size={18} />
         </Link>
-        <ul className="start-proof">
+      </section>
+
+      <section className="public-proof-row">
+        <ul>
           <li>
-            <Check size={16} /> Natürlich schreiben statt Formulare ausfüllen
+            <Check size={16} /> Persönlicher Plan, der sich anpasst
           </li>
           <li>
-            <Check size={16} /> Ein Coach für Plan, Training und Fortschritt
+            <Check size={16} /> Trainingsvideo-Feedback im Kontext
           </li>
           <li>
-            <Check size={16} /> Als App installierbar, direkt im Browser nutzbar
+            <LockKeyhole size={16} /> Private Erinnerung, die du kontrollierst
           </li>
         </ul>
       </section>
 
-      <section className="start-return">
+      <section className="start-return compact-public">
         <div>
           <strong>DogOS auf diesem Gerät</strong>
-          <span>Schneller zurück zum Coach und aktuellen Training.</span>
+          <span>Installieren, teilen oder direkt zurück zum Coach.</span>
         </div>
         <DistributionActions compact />
       </section>
-
-      <Link className="start-login" href="/auth/sign-in">
-        Schon verbunden? DogOS öffnen <ArrowRight size={16} />
-      </Link>
-      <p className="start-disclosure">
-        KI-gestützter Trainingscoach. Keine Diagnose oder Notfallhilfe.
-      </p>
     </main>
   );
 }

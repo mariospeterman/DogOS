@@ -15,7 +15,10 @@ export const metadata: Metadata = {
     title: "DogOS",
   },
   icons: {
-    icon: "/icons/dogos-192.png",
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/dogos-192.png", sizes: "192x192", type: "image/png" },
+    ],
     apple: "/icons/dogos-192.png",
   },
   openGraph: {
@@ -36,8 +39,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="de-CH">
-      <body>
+    <html lang="de-CH" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <PwaRegistration />
         {children}
       </body>

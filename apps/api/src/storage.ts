@@ -1,4 +1,13 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
+import type {
+  VideoFrameEvidence,
+  VideoObjectInspection,
+  VideoObjectInspector,
+} from "./video-analysis.js";
 
 export interface VideoUploadTicket {
   expiresInSeconds: number;
@@ -88,5 +97,144 @@ export class SupabaseVideoUploadSigner implements VideoUploadSigner {
       method: "PUT",
       url: data.signedUrl,
     };
+  }
+}
+
+function run(command: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { maxBuffer: 1024 * 1024 }, (error, stdout) => {
+      if (error !== null) {
+        reject(new Error(`${command.toUpperCase()}_FAILED`));
+        return;
+      }
+      resolve(stdout);
+    });
+  });
+}
+
+interface ProbePayload {
+  format?: { duration?: string };
+  streams?: Array<{
+    codec_name?: string;
+    codec_type?: string;
+  }>;
+}
+
+export class SupabaseFfmpegVideoObjectInspector implements VideoObjectInspector {
+  readonly #bucket: string;
+  readonly #client: ReturnType<typeof createClient>;
+  readonly #ffmpegPath: string;
+  readonly #ffprobePath: string;
+
+  constructor(
+    config: SupabaseStorageConfig,
+    options: { ffmpegPath?: string; ffprobePath?: string } = {},
+  ) {
+    this.#bucket = config.bucket;
+    this.#client = createClient(config.supabaseUrl, config.secretKey, {
+      auth: {
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        persistSession: false,
+      },
+    });
+    this.#ffmpegPath = options.ffmpegPath ?? "ffmpeg";
+    this.#ffprobePath = options.ffprobePath ?? "ffprobe";
+  }
+
+  async inspect(input: {
+    contentType: "video/mp4" | "video/quicktime" | "video/webm";
+    objectKey: string;
+    sizeBytes: number;
+  }): Promise<VideoObjectInspection> {
+    const directory = await mkdtemp(join(tmpdir(), "dogos-video-"));
+    try {
+      const file = await this.#download(input.objectKey, directory);
+      const probe = JSON.parse(
+        await run(this.#ffprobePath, [
+          "-v",
+          "error",
+          "-show_entries",
+          "format=duration:stream=codec_type,codec_name",
+          "-of",
+          "json",
+          file,
+        ]),
+      ) as ProbePayload;
+      const durationSeconds = Number(probe.format?.duration ?? 0);
+      const codec =
+        probe.streams?.find((stream) => stream.codec_type === "video")
+          ?.codec_name ?? null;
+      return {
+        codec,
+        durationSeconds,
+        malwareVerdict: "unknown",
+        privateObjectVerified: true,
+      };
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  }
+
+  async extractFrames(input: {
+    maxFrames: number;
+    objectKey: string;
+  }): Promise<VideoFrameEvidence[]> {
+    const directory = await mkdtemp(join(tmpdir(), "dogos-frames-"));
+    try {
+      const file = await this.#download(input.objectKey, directory);
+      const pattern = join(directory, "frame-%03d.jpg");
+      await run(this.#ffmpegPath, [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        file,
+        "-vf",
+        `fps=${Math.max(1, Math.min(input.maxFrames, 12))}/60,scale='min(960,iw)':-2`,
+        "-frames:v",
+        String(input.maxFrames),
+        "-q:v",
+        "4",
+        pattern,
+      ]);
+      const frames: VideoFrameEvidence[] = [];
+      for (let index = 1; index <= input.maxFrames; index += 1) {
+        const path = join(
+          directory,
+          `frame-${String(index).padStart(3, "0")}.jpg`,
+        );
+        try {
+          const data = await readFile(path);
+          frames.push({
+            contentType: "image/jpeg",
+            data: data.toString("base64"),
+            timestampMs: Math.round(
+              ((index - 1) * 60_000) / Math.max(1, input.maxFrames),
+            ),
+          });
+        } catch {
+          break;
+        }
+      }
+      if (frames.length === 0)
+        throw new Error("VIDEO_ANALYSIS_FRAMES_REQUIRED");
+      return frames;
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  }
+
+  async #download(objectKey: string, directory: string): Promise<string> {
+    const { data, error } = await this.#client.storage
+      .from(this.#bucket)
+      .download(objectKey);
+    if (error !== null || data === null) {
+      throw new Error("VIDEO_OBJECT_DOWNLOAD_FAILED");
+    }
+    const buffer = Buffer.from(await data.arrayBuffer());
+    const file = join(directory, "source-video");
+    await writeFile(file, buffer);
+    return file;
   }
 }

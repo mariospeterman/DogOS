@@ -28,7 +28,7 @@ export interface ProductDashboard {
   goalText: string;
   latestDecision: string;
   planId: string | null;
-  planStatus: "active" | "blocked";
+  planStatus: "active" | "blocked" | "setup_required";
   riskDisposition: string;
   requiredConsecutiveSessions?: number;
   sessionCount: number;
@@ -56,13 +56,33 @@ export function useProductDashboard() {
           );
           return;
         }
-        if (!response.ok) throw new Error("PRODUCT_UNAVAILABLE");
+        if (!response.ok) {
+          if (response.status === 403) {
+            throw new Error(
+              "DogOS konnte dein Konto nicht mit diesem Workspace verbinden. Prüfe DOGOS_AUTH_MODE und starte Web/API neu.",
+            );
+          }
+          if (response.status === 404) {
+            throw new Error(
+              "DogOS hat dein Konto noch nicht vollständig vorbereitet. Lade die Seite erneut oder starte das Onboarding.",
+            );
+          }
+          throw new Error("DogOS konnte die Trainingsdaten nicht laden.");
+        }
         const body = (await response.json()) as
           ProductDashboard | { status: "onboarding_required" };
         if (!active) return;
         setProduct(body.status === "ready" ? body : null);
-      } catch {
-        if (active) setError("DogOS konnte die Trainingsdaten nicht laden.");
+      } catch (caught) {
+        if (active) {
+          const message =
+            caught instanceof Error ? caught.message : String(caught);
+          setError(
+            message === "Failed to fetch" || message === "fetch failed"
+              ? "DogOS konnte die API nicht erreichen. Starte `pnpm dev` oder prüfe NEXT_PUBLIC_API_URL/DOGOS_INTERNAL_API_URL."
+              : message,
+          );
+        }
       } finally {
         if (active) setLoading(false);
       }

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { dogosApiHeaders, dogosApiUrl } from "../lib/api-client";
+import { DogOSLoader } from "./dogos-loader";
 
 interface OnboardingConversation {
   messages: Array<{
@@ -62,8 +63,11 @@ export function OnboardingChat() {
   if (conversation === null)
     return (
       <div className="coach-loading">
-        <span className="coach-pulse" />
-        <p>{loadError ?? "DogOS wird vorbereitet"}</p>
+        {loadError === null ? (
+          <DogOSLoader label="DogOS prüft Echos Kontext ..." />
+        ) : (
+          <p>{loadError}</p>
+        )}
       </div>
     );
   return (

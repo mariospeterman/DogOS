@@ -1,78 +1,137 @@
+"use client";
+
 import {
-  ArrowRight,
   BadgeCheck,
   CalendarClock,
+  ExternalLink,
   ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/app-shell";
-import { coachHref } from "../../../lib/coach";
+import { dogosApiHeaders, dogosApiUrl } from "../../../lib/api-client";
+import { dogosFeatures } from "../../../lib/features";
+import { useProductDashboard } from "../../../lib/product";
+
+interface PartnerOffer {
+  bookingProvider: "cal.com" | null;
+  city: string | null;
+  disclosure: string;
+  evidenceLevel: string;
+  id: string;
+  kind: string;
+  priceLabel: string | null;
+  rank: number;
+  reason: string;
+  title: string;
+}
 
 export default function TrainersPage() {
+  const { product } = useProductDashboard();
+  const [offers, setOffers] = useState<PartnerOffer[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!dogosFeatures.professionalMarketplace) return;
+    if (product === null) return;
+    let active = true;
+    void (async () => {
+      const response = await fetch(
+        dogosApiUrl(`/v1/dogs/${product.dogId}/partner-offers`),
+        { cache: "no-store", headers: await dogosApiHeaders() },
+      );
+      if (response.ok && active) {
+        const body = (await response.json()) as { offers: PartnerOffer[] };
+        setOffers(body.offers);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [product]);
+
+  async function createReferral(offerId: string) {
+    if (product === null) return;
+    const response = await fetch(
+      dogosApiUrl(`/v1/dogs/${product.dogId}/partner-referrals`),
+      {
+        body: JSON.stringify({ offerId }),
+        headers: await dogosApiHeaders(true),
+        method: "POST",
+      },
+    );
+    if (!response.ok) {
+      setMessage("Referral could not be created.");
+      return;
+    }
+    const body = (await response.json()) as { referral: { url: string } };
+    window.location.assign(body.referral.url);
+  }
+
+  if (!dogosFeatures.professionalMarketplace) {
+    return (
+      <AppShell title="Professional network" eyebrow="Private pilot" wide>
+        <section className="command-panel">
+          <div>
+            <p className="eyebrow">Capability disabled</p>
+            <h2>Professional marketplace is not part of this pilot.</h2>
+            <p>
+              DogOS can still prepare a secure trainer or veterinary handoff
+              from the Coach when you ask for professional help.
+            </p>
+          </div>
+          <Link className="button secondary" href="/app/coach?space=plan">
+            <CalendarClock size={17} /> Ask Coach
+          </Link>
+        </section>
+      </AppShell>
+    );
+  }
+
   return (
-    <AppShell title="Fachperson finden" eyebrow="Geprüftes Netzwerk">
-      <section className="referral-hero">
-        <BadgeCheck />
-        <h2>Empfehlungen erst nach Prüfung</h2>
-        <p>
-          DogOS zeigt hier nur Fachpersonen mit geprüften Angaben und passender
-          Erfahrung für deinen Fall. Das Netzwerk ist in dieser
-          Entwicklungsversion noch nicht freigeschaltet.
-        </p>
+    <AppShell title="Professional network" eyebrow="Reviewed referrals" wide>
+      <section className="command-panel">
+        <div>
+          <p className="eyebrow">Suitability before commission</p>
+          <h2>Trainer, vet, and gear referrals with disclosures</h2>
+          <p>
+            DogOS ranks by protocol fit, dog context, evidence quality, and
+            availability. Commerce never enters the training decision.
+          </p>
+        </div>
+        <Link className="button secondary" href="/app/coach?space=plan">
+          <CalendarClock size={17} /> Ask Coach
+        </Link>
       </section>
 
-      <section className="plain-section">
-        <h2>So entsteht eine Empfehlung</h2>
-        <ol className="step-list">
-          <li>
-            <span>1</span>
-            <div>
-              <strong>Fachliche Passung</strong>
-              <p>
-                Schwerpunkt, Sicherheitskompetenz und belegte Qualifikation.
-              </p>
+      <section className="dashboard-grid">
+        {offers.map((offer) => (
+          <article className="glass-panel" key={offer.id}>
+            <span className="panel-kicker">
+              <BadgeCheck size={16} />{" "}
+              {offer.evidenceLevel.replaceAll("_", " ")}
+            </span>
+            <h3>{offer.title}</h3>
+            <p className="microcopy">{offer.reason}</p>
+            <div className="stat-row">
+              <span>{offer.city ?? offer.kind.replaceAll("_", " ")}</span>
+              <strong>
+                {offer.priceLabel ?? `${Math.round(offer.rank * 100)}% fit`}
+              </strong>
             </div>
-          </li>
-          <li>
-            <span>2</span>
-            <div>
-              <strong>Praktische Passung</strong>
-              <p>Region oder Video, Sprache, Verfügbarkeit und Preisrahmen.</p>
-            </div>
-          </li>
-          <li>
-            <span>3</span>
-            <div>
-              <strong>Transparente Vermittlung</strong>
-              <p>
-                Eine mögliche Vergütung wird gekennzeichnet und beeinflusst die
-                fachliche Rangfolge nicht.
-              </p>
-            </div>
-          </li>
-        </ol>
+            <p className="legal-line">
+              <ShieldCheck size={15} /> {offer.disclosure}
+            </p>
+            <button
+              className="button primary wide"
+              onClick={() => void createReferral(offer.id)}
+            >
+              <ExternalLink size={17} /> Open
+            </button>
+          </article>
+        ))}
       </section>
-
-      <div className="emergency-note">
-        <ShieldCheck />
-        <span>
-          <strong>Keine ungeprüften Profile</strong>
-          Verfügbarkeit und Buchung werden erst angezeigt, wenn ein realer
-          Partner angebunden ist.
-        </span>
-      </div>
-
-      <Link
-        className="button secondary wide"
-        href={coachHref(
-          "Hilf mir, den Bedarf für eine passende Fachperson einzuordnen.",
-        )}
-      >
-        <CalendarClock size={18} /> Bedarf im Coach klären
-      </Link>
-      <Link className="text-link" href="/app/plan">
-        Zurück zum Plan <ArrowRight size={16} />
-      </Link>
+      {message ? <p className="helper">{message}</p> : null}
     </AppShell>
   );
 }

@@ -3,7 +3,9 @@ import postgres from "postgres";
 import type { RiskAssessment } from "@dogos/contracts";
 import { AccountRepository, PostgresRepository } from "@dogos/database";
 
-const connection = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const connection =
+  process.env.DOGOS_TEST_DATABASE_URL ??
+  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const sql = postgres(connection, { prepare: false });
 const repository = new PostgresRepository(connection);
 const accounts = new AccountRepository(connection);

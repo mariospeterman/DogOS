@@ -15,7 +15,7 @@ export async function dogosApiHeaders(
   } catch (error) {
     if (!local) throw error;
   }
-  if (headers.authorization === undefined && local) {
+  if (local) {
     headers["x-dogos-user"] =
       process.env.NEXT_PUBLIC_DOGOS_LOCAL_IDENTITY ?? "owner";
   }
@@ -24,6 +24,11 @@ export async function dogosApiHeaders(
 }
 
 export function dogosApiUrl(path: string): string {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4000";
+  const configured = process.env.NEXT_PUBLIC_API_URL;
+  const local = (process.env.NEXT_PUBLIC_DOGOS_ENV ?? "local") === "local";
+  const localApi =
+    configured?.startsWith("http://127.0.0.1") === true ||
+    configured?.startsWith("http://localhost") === true;
+  const base = local && localApi ? "" : (configured ?? "");
   return `${base}${path}`;
 }

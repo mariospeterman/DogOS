@@ -22,7 +22,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "export NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_URL=http://127.0.0.1:4200 NEXT_PUBLIC_DOGOS_ENV=local WEB_ORIGIN=http://127.0.0.1:3200; node apps/web/node_modules/next/dist/bin/next build apps/web --webpack && node apps/web/node_modules/next/dist/bin/next start apps/web --hostname 127.0.0.1 --port 3200",
+        "export NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_API_URL=http://127.0.0.1:4200 DOGOS_INTERNAL_API_URL=http://127.0.0.1:4200 NEXT_PUBLIC_DOGOS_ENV=local WEB_ORIGIN=http://127.0.0.1:3200; node apps/web/node_modules/next/dist/bin/next build apps/web --webpack && node apps/web/node_modules/next/dist/bin/next start apps/web --hostname 127.0.0.1 --port 3200",
       url: "http://127.0.0.1:3200",
       reuseExistingServer: false,
       timeout: 300_000,
