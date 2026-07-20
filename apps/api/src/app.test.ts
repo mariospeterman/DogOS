@@ -313,8 +313,34 @@ describe("product API", () => {
     );
   });
 
-  it("creates and queues asynchronous video analysis jobs after upload", async () => {
+  it("creates and processes asynchronous video analysis jobs after upload when a worker is available", async () => {
     const app = buildApp({
+      videoAnalysisWorker: {
+        processUploadedAnalysis: async (input) => ({
+          completedAt: new Date().toISOString(),
+          contentType: "video/mp4",
+          createdAt: new Date().toISOString(),
+          dogId: "30000000-0000-0000-0000-000000000001",
+          failureCode: null,
+          findings: [
+            {
+              confidence: 0.82,
+              evidence: `Reviewed ${input.activeStep ?? "current step"}.`,
+              label: "Reward timing",
+              recommendation: "Keep the marker and reward close together.",
+            },
+          ],
+          householdId: input.householdId,
+          id: input.id,
+          jobId: "job-worker",
+          originalFilename: "recall-session.mp4",
+          sizeBytes: 1024,
+          status: "completed",
+          storageObjectKey:
+            "20000000-0000-0000-0000-000000000001/30000000-0000-0000-0000-000000000001/test",
+          uploadedAt: new Date().toISOString(),
+        }),
+      },
       videoUploads: {
         createUpload: async (input) => ({
           expiresInSeconds: 7200,
@@ -359,9 +385,11 @@ describe("product API", () => {
     });
     expect(queued.statusCode).toBe(200);
     expect(queued.json().analysis).toMatchObject({
-      status: "uploaded",
+      status: "completed",
     });
-    expect(queued.json().analysis.findings).toHaveLength(0);
+    expect(queued.json().analysis.findings).toContainEqual(
+      expect.objectContaining({ label: "Reward timing" }),
+    );
     expect(queued.json().analysis.jobId).toEqual(expect.any(String));
 
     const list = await app.inject({

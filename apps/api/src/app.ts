@@ -78,6 +78,7 @@ import {
   DeterministicVideoUploadSigner,
   type VideoUploadSigner,
 } from "./storage.js";
+import type { VideoAnalysisWorker } from "./video-analysis.js";
 
 const errorCodes = [
   "AUTH_REQUIRED",
@@ -234,6 +235,16 @@ function contextEntityId(kind: string, value: string): string {
   ].join("-");
 }
 
+function contextText(
+  value: string | null | undefined,
+  fallback: string,
+  maximum: number,
+): string {
+  const normalized = (value ?? fallback).replace(/\s+/g, " ").trim();
+  const text = normalized.length === 0 ? fallback : normalized;
+  return text.length <= maximum ? text : `${text.slice(0, maximum - 3)}...`;
+}
+
 function memoryFactCode(record: MemoryFactRecord): string {
   return toCanonicalCode("memory", record.subject);
 }
@@ -342,17 +353,23 @@ async function compileCoachContextSnapshot(input: {
             ],
       claims: [],
       dog: {
-        breedDescription:
-          dashboard?.dogProfileSummary ?? snapshot.dog.breed ?? "unknown",
+        breedDescription: contextText(
+          dashboard?.dogProfileSummary,
+          snapshot.dog.breed ?? "unknown",
+          160,
+        ),
         developmentStage: "unknown",
         id: contextEntityId("dog", input.dogId),
-        name: dashboard?.dogName ?? snapshot.dog.name,
+        name: contextText(dashboard?.dogName, snapshot.dog.name, 80),
       },
       generatedAt,
       goal: {
         code: goalCode,
-        ownerDescription:
-          dashboard?.goalText ?? dashboard?.goal ?? snapshot.goal ?? "unknown",
+        ownerDescription: contextText(
+          dashboard?.goalText ?? dashboard?.goal,
+          snapshot.goal ?? "unknown",
+          500,
+        ),
       },
       locale: input.locale,
       recentMeasurements,
@@ -528,6 +545,7 @@ export interface BuildAppOptions {
   collaboration?: CollaborationStore;
   privacy?: PrivacyStore;
   search?: SearchStore;
+  videoAnalysisWorker?: Pick<VideoAnalysisWorker, "processUploadedAnalysis">;
   videoUploads?: VideoUploadSigner;
   videos?: VideoAnalysisStore;
   product?: LocalProductFixture;
@@ -1469,11 +1487,27 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         if (actor.householdId === null) {
           throw new ApiError(403, "ACCESS_DENIED", "Household access denied");
         }
+        const uploaded = await videos.completeUpload({
+          actorUserId: actor.actorId,
+          householdId: actor.householdId,
+          id: (request.params as { id: string }).id,
+        });
+        if (options.videoAnalysisWorker === undefined) {
+          return { analysis: uploaded };
+        }
+        const dashboard = await options.products?.dashboardByDog(
+          uploaded.dogId,
+          actor.householdId,
+        );
         return {
-          analysis: await videos.completeUpload({
-            actorUserId: actor.actorId,
+          analysis: await options.videoAnalysisWorker.processUploadedAnalysis({
+            ...((dashboard?.goalText ?? dashboard?.goal)
+              ? { activeGoal: dashboard.goalText ?? dashboard.goal }
+              : {}),
+            activeStep: dashboard?.currentStep?.stepCode ?? null,
             householdId: actor.householdId,
-            id: (request.params as { id: string }).id,
+            id: uploaded.id,
+            locale: dashboard?.goalText === undefined ? "en" : "de-CH",
           }),
         };
       },

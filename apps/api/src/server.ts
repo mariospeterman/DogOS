@@ -38,11 +38,13 @@ import { OnboardingService } from "./onboarding-service.js";
 import { SignedActionService } from "./signed-actions.js";
 import {
   loadSupabaseStorageConfig,
+  SupabaseFfmpegVideoObjectInspector,
   SupabaseVideoUploadSigner,
 } from "./storage.js";
 import {
   createVideoAnalysisProvider,
   loadVideoAnalysisConfig,
+  VideoAnalysisWorker,
 } from "./video-analysis.js";
 import { WebOnboardingService } from "./web-onboarding-service.js";
 
@@ -107,6 +109,28 @@ const videoAnalysisProvider =
           : { baseUrl: process.env.OPENAI_BASE_URL }),
         config: videoAnalysisConfig,
       });
+const videoAnalysisWorker =
+  videos !== undefined &&
+  storageConfig !== null &&
+  videoAnalysisConfig !== null &&
+  videoAnalysisProvider !== undefined &&
+  process.env.DOGOS_VIDEO_WORKER_ENABLED === "1" &&
+  process.env.DOGOS_VIDEO_OBJECT_READER === "supabase" &&
+  process.env.DOGOS_VIDEO_FRAME_EXTRACTOR === "ffmpeg"
+    ? new VideoAnalysisWorker({
+        config: videoAnalysisConfig,
+        inspector: new SupabaseFfmpegVideoObjectInspector(storageConfig, {
+          ...(process.env.FFMPEG_PATH === undefined
+            ? {}
+            : { ffmpegPath: process.env.FFMPEG_PATH }),
+          ...(process.env.FFPROBE_PATH === undefined
+            ? {}
+            : { ffprobePath: process.env.FFPROBE_PATH }),
+        }),
+        provider: videoAnalysisProvider,
+        store: videos,
+      })
+    : undefined;
 const stripeConfig = loadStripeBillingConfig(process.env);
 const billingRepository =
   environment.DATABASE_URL && stripeConfig
@@ -194,6 +218,7 @@ const app = buildApp({
   ...(capabilityUsage === undefined ? {} : { usage: capabilityUsage }),
   ...(collaboration === undefined ? {} : { collaboration }),
   ...(videos === undefined ? {} : { videos }),
+  ...(videoAnalysisWorker === undefined ? {} : { videoAnalysisWorker }),
   ...(videoUploads === undefined ? {} : { videoUploads }),
   ...(liveSessions === undefined ? {} : { liveSessions }),
   ...(memories === undefined ? {} : { memories }),
@@ -213,13 +238,7 @@ const app = buildApp({
     openAI: coachModelConfig !== null,
     stripe: stripeConfig !== null,
     supabaseStorage: storageConfig !== null,
-    workers:
-      environment.DATABASE_URL !== undefined &&
-      storageConfig !== null &&
-      videoAnalysisProvider !== undefined &&
-      process.env.DOGOS_VIDEO_WORKER_ENABLED === "1" &&
-      process.env.DOGOS_VIDEO_OBJECT_READER === "supabase" &&
-      process.env.DOGOS_VIDEO_FRAME_EXTRACTOR === "ffmpeg",
+    workers: videoAnalysisWorker !== undefined,
   },
   signedActions,
 });

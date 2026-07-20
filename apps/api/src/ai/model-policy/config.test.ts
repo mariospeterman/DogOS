@@ -114,6 +114,21 @@ describe("DogOS AI policy configuration", () => {
     });
   });
 
+  it("uses OpenAI policy metadata when OpenAI VOD is selected", () => {
+    const config = loadDogosAiConfig({
+      DOGOS_AI_FAIL_CLOSED: "false",
+      DOGOS_AI_REQUIRE_RELEASE_MANIFEST: "true",
+      DOGOS_VOD_PROVIDER: "openai",
+      OPENAI_API_KEY: "test-key",
+    });
+
+    expect(config.readiness.vod).toBe("needs_release_manifest");
+    expect(config.registry.policies["video.global_semantics"]).toMatchObject({
+      model: "gpt-5.6-terra",
+      provider: "openai",
+    });
+  });
+
   it("rejects malformed release manifest JSON", () => {
     expect(() =>
       loadDogosAiConfig({

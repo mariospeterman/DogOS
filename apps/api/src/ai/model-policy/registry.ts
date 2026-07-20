@@ -72,6 +72,7 @@ export function createDefaultModelPolicyRegistry(input: {
   textEscalationModel: string;
   textFastModel: string;
   vodModel: string;
+  vodProvider?: Extract<AiProvider, "google_vertex" | "openai">;
   liveModel: string;
   liveFallbackModel: string;
   onboardingModel: string;
@@ -301,7 +302,7 @@ export function createDefaultModelPolicyRegistry(input: {
       outputTokenBudget: 4_000,
       personalData: true,
       personalMedia: true,
-      provider: "google_vertex",
+      provider: input.vodProvider ?? "google_vertex",
       region: input.region,
       retries: 1,
       schemaVersion: "1.0",

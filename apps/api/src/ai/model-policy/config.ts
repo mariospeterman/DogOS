@@ -285,6 +285,19 @@ export function loadDogosAiConfig(input: NodeJS.ProcessEnv): DogosAiConfig {
       "DOGOS_AI_REQUIRE_RELEASE_MANIFEST_INVALID",
     );
   const policyVersion = input.DOGOS_AI_POLICY_VERSION ?? "2026-07-19.1";
+  const vodProvider = (setting(
+    input,
+    "DOGOS_VOD_PROVIDER",
+    "DOGOS_VIDEO_ANALYSIS_PROVIDER",
+  ) ?? "disabled") as "disabled" | "deterministic" | "google_vertex" | "openai";
+  if (
+    vodProvider !== "disabled" &&
+    vodProvider !== "deterministic" &&
+    vodProvider !== "google_vertex" &&
+    vodProvider !== "openai"
+  ) {
+    throw new Error("DOGOS_VIDEO_ANALYSIS_PROVIDER_UNSUPPORTED");
+  }
   const registry = createDefaultModelPolicyRegistry({
     asrModel: setting(input, "DOGOS_ASR_MODEL") ?? "gpt-4o-mini-transcribe",
     liveFallbackModel:
@@ -308,7 +321,10 @@ export function loadDogosAiConfig(input: NodeJS.ProcessEnv): DogosAiConfig {
       "gpt-5.6-luna",
     vodModel:
       setting(input, "DOGOS_VOD_MODEL", "DOGOS_VIDEO_ANALYSIS_MODEL") ??
-      "gemini-3.5-flash",
+      (vodProvider === "openai" ? "gpt-5.6-terra" : "gemini-3.5-flash"),
+    ...(vodProvider === "openai" || vodProvider === "google_vertex"
+      ? { vodProvider }
+      : {}),
   });
   const ids = manifestIds(input);
   const manifests = releaseManifests(input);
@@ -320,9 +336,7 @@ export function loadDogosAiConfig(input: NodeJS.ProcessEnv): DogosAiConfig {
     (setting(input, "DOGOS_TEXT_PROVIDER") ?? input.DOGOS_LLM_MODE) ===
       "openai" &&
     input.OPENAI_API_KEY !== undefined;
-  const vodConfigured =
-    (setting(input, "DOGOS_VOD_PROVIDER", "DOGOS_VIDEO_ANALYSIS_PROVIDER") ??
-      "disabled") !== "disabled";
+  const vodConfigured = vodProvider !== "disabled";
   const liveConfigured =
     (setting(input, "DOGOS_LIVE_PROVIDER") ?? "disabled") !== "disabled";
   const asrConfigured =
