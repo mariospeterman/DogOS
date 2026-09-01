@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@dogos/contracts": "workspace:*",
-    "zod": "4.4.3"
+    "zod": "4.5.2"
   },
   "devDependencies": {
     "typescript": "6.0.3"

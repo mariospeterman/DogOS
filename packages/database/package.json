@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@dogos/contracts": "workspace:*",
-    "postgres": "3.4.8"
+    "postgres": "3.4.9"
   },
   "devDependencies": {
     "typescript": "6.0.3"
